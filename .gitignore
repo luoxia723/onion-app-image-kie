@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.runtime/
+工作区/
+*.kie-task.json
+*.render-input.json
+*.lock/
+.DS_Store

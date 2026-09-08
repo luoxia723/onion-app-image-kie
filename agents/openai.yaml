@@ -1,0 +1,6 @@
+interface:
+  display_name: "APP 图片生成 · KIE API 独立版"
+  short_description: "保留配置卡、品牌资产和采纳交付，直接连接 KIE API"
+  default_prompt: "使用 $onion-app-image-kie，根据已确认文案打开配置卡，通过 KIE API 生成候选并按我的选择交付。"
+policy:
+  allow_implicit_invocation: true
