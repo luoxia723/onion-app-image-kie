@@ -1,0 +1,4 @@
+interface:
+  display_name: "画面叙事与关系规划"
+  short_description: "把确认内容转成故事、动作、镜头相容的单图或系列画面与生图提示词"
+  default_prompt: "使用 $visual-scene-planner，把这些确认内容和参考资产规划为可见、可拍摄的画面，再按我的格式输出提示词。"

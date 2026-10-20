@@ -17,7 +17,7 @@ description: 当用户已经确认 APP 图片文案并要求生成信息流、�
 - [输入、输出与人工门禁](references/input-output-contract.md)
 - [渠道与版位](references/channel-placement.md)
 - [视觉与Prompt规则](references/prompt-rules.md)
-- 设计每套画面时读[完整画面方案](references/visual-directions.md)；按[艺术定调层级](references/art-direction.md)先定画风，再定世界与场景、故事、构图和光色。扩展风格、字体或布局时同时读[固定项清单](references/visual-invariants.md)。
+- 设计每套画面时读[完整画面方案](references/visual-directions.md)和[通用规划的APP适配](references/scene-planning-app.md)，后者连接本包内的画面叙事与关系规划Skill；按[艺术定调层级](references/art-direction.md)先定画风，再定世界与场景、故事、动作与镜头构图和光色。扩展风格、字体或布局时同时读[固定项清单](references/visual-invariants.md)。
 - 需要主风格描述时先检索[联网整理的主风格库](references/style-library.md)，可用`scripts/visual_directions.py --list-styles --query <关键词> --detail`只取相关条目。库外方向再查第一手资料或许可明确的开源库，自写适配描述并记录来源；不直接套用外部negative_prompt或模型参数。
 - [合规视觉雷区](references/visual-compliance.md)
 - [KIE生图合同](references/provider-contract.md)
@@ -45,10 +45,10 @@ description: 当用户已经确认 APP 图片文案并要求生成信息流、�
 单图及首张在Prompt中写明选定画风与每张素材的具体用途：Logo保持原版，字体图用于标题字形，IP图用于角色形象。双/三图后续张仅引用本套已生成的第1张完整广告成图，并明确写“参考图1为本套已生成的第1张完整广告成图”。各请求的参考图编号独立，不能笼统要求从Logo图或字体图继承整幅画风、场景或故事。详见[参考图用途与风格来源](references/prompt-rules.md#参考图用途与风格来源)。
 
 1. 确认输入是已批准的固定格式APP图片文案；把每套的渠道、图片形式、主标题/副标题或短句整理为配置卡上下文。
-2. 建立“产品事实→目标人群→具体场景→产品动作→可感知变化”的最小视觉链。
+2. 建立“产品事实→目标人群→具体场景→产品动作→可感知变化”的最小视觉链，明确当前内容需要被观众读懂的信息；画风分配后再设计具体画面。
 3. 默认启动`scripts/interactive_server.py`，显式把统一任务版本的`02_过程`作为`--output-dir`，打开配置卡供用户保存。用户明确委托Agent填写中间配置时，可由Agent调用同一个`normalize_config_result`校验并代存，不要求用户打开页面；记录本轮委托原文，不冒称用户亲手操作。一次任务只能选择一个具体版位，不能省略确定的配置结果。
 4. 确定屏幕呈现方式：reference使用真实截图，conceptual允许设计清晰示意UI，none不展示屏幕。无截图不再强制模糊或停止；界面仅表达已确认功能，示意UI不冒称真实截图。
-5. 按[艺术定调层级](references/art-direction.md)将画风→世界与场景→叙事瞬间→构图→光色材质串成完整画面，写入`visual_concepts.art_direction`、完整prompt和逐张slot_actions。新配置`learner_story_required=true`，每套保存`learner_story`的protagonist、pain_point、product_action、visible_change；每张动作均围绕该人物与当前短句编写。每张均有人物参与学习场景：有IP使用选定IP，无IP使用普通原创学生；人物动作、表情与学习处境对应当前文案痛点，物件与场景辅助叙事。有IP允许少量时代或风格细节融入，保留主要识别特征。新任务默认`content_first`，批量按套随机主画风，优先不重复；先运行`--assign-styles`，再据此整体设计场景、IP动作、构图与配色，保存对应`style_id`。每张提示词与动作单独编写，同套双/三图共用画风；用户指定画风优先。设计分析留在计划中；最终Prompt用一段正向自然语言，保持之前的画面叙述方式，以说清楚、约束完整为优先，不设默认字数目标，仅合并重复表述。代码可解决的限制留在配置和校验中，不写文字白名单、负面提示段或内部编号。新配置使用`prompt_format=positive_paragraph_v1`，可用`scripts/positive_prompt.py`的`compose`编排。按[完整画面方案](references/visual-directions.md)运行`scripts/visual_directions.py`保存`visual-plan.json`，再编写`image-render-manifest.json`，绑定计划、逐张动作与素材。预计常规裁切达到6%时按[白底蓝框适配](references/blue-frame-adaptation.md)准备布局参考；低于门槛常规适配。双/三图按[同套首张与分支规则](references/prompt-rules.md#同套双图三图生成)执行：图1使用原版素材，图2/3只引用同套图1PNG，按对应短句推进动作与状态。
+5. 按[艺术定调层级](references/art-direction.md)将画风→世界与场景→叙事瞬间→构图→光色材质串成完整画面，写入`visual_concepts.art_direction`、完整prompt和逐张slot_actions。按[画面规划适配](references/scene-planning-app.md)给每张确定传播任务、叙事阶段与可见证据，联合设计动作、接触支撑和镜头，把实际决定写入场景及逐张动作。新配置`learner_story_required=true`，每套保存`learner_story`的protagonist、pain_point、product_action、visible_change；每张动作均围绕该人物与当前短句编写。每张均有人物参与学习场景：有IP使用选定IP，无IP使用普通原创学生；人物动作、表情与学习处境对应当前文案痛点，物件与场景辅助叙事。有IP允许少量时代或风格细节融入，保留主要识别特征。新任务默认`content_first`，批量按套随机主画风，优先不重复；先运行`--assign-styles`，再据此整体设计场景、IP动作、构图与配色，保存对应`style_id`。每张提示词与动作单独编写，同套双/三图共用画风；用户指定画风优先。设计分析留在计划中；最终Prompt用一段正向自然语言，保持之前的画面叙述方式，以说清楚、约束完整为优先，不设默认字数目标，仅合并重复表述。代码可解决的限制留在配置和校验中，不写文字白名单、负面提示段或内部编号。新配置使用`prompt_format=positive_paragraph_v1`，可用`scripts/positive_prompt.py`的`compose`编排。按[完整画面方案](references/visual-directions.md)运行`scripts/visual_directions.py`保存`visual-plan.json`，再编写`image-render-manifest.json`，绑定计划、逐张动作与素材。预计常规裁切达到6%时按[白底蓝框适配](references/blue-frame-adaptation.md)准备布局参考；低于门槛常规适配。双/三图按[同套首张与分支规则](references/prompt-rules.md#同套双图三图生成)执行：图1使用原版素材，图2/3只引用同套图1PNG，按对应短句推进动作与状态。
 6. 运行`scripts/validate_task.py`和`scripts/direct_batch.py --validate-only`，验证全部job、Prompt、比例、引用顺序和输出路径，不调用付费接口；同时确认本地可导入`requirements.txt`锁定的Pillow，以及蓝框模式需要的OpenCV、NumPy。
 7. 告知预计图组数和图片数；取得当前任务付费确认后，按[直连配置与恢复](references/provider-contract.md)执行清单。先验证所有 job，再顺序生成，参考资产按内容哈希去重。默认单批最多12张，用户明确确认时最多20张；技术失败或提交状态不明时保存状态并停止，内容偏差仅作提示，不中断已授权批次。
 8. 每张候选下载并解码为PNG，记录taskId、本地SHA-256、字节数和原图路径；不伪造供应商哈希或MCP产物ID。蓝框模式由`render.py`调用OpenCV识别实际框线、裁到内侧并拉伸至目标尺寸，另存无损预览，保留原图；找框失败的原图同样进入选择页并标注待复核，不中断其余已授权job。完整保留`image-render-result.json`，技术成功的候选全部进入选择页，文字、Logo、UI、事实和构图检查作为提示。
