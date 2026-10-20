@@ -192,9 +192,9 @@ def build_create_request(
 ) -> urllib.request.Request:
     normalize_resolution(resolution)
     if aspect_ratio not in ASPECT_RATIOS:
-        raise ValueError("unsupported Sunburst 1K aspect_ratio")
+        raise ValueError("unsupported Flare 1K aspect_ratio")
     if not input_urls:
-        raise ValueError("Sunburst image-to-image requires at least one reference image; no model fallback is allowed")
+        raise ValueError("Flare image-to-image requires at least one reference image; no model fallback is allowed")
     task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": RESOLUTION, "background": "opaque", "input_urls": input_urls}
     return json_request(
         f"{api_base.rstrip('/')}/api/v1/jobs/createTask",
@@ -570,7 +570,7 @@ def run(args) -> int:
         project_root = find_project_root(SCRIPT_DIR)
         reference_items = normalize_reference_items(list(payload.get("reference_images", [])))
         if not reference_items:
-            raise ValueError("Sunburst image-to-image requires at least one original Logo, IP, font or UI reference image")
+            raise ValueError("Flare image-to-image requires at least one original Logo, IP, font or UI reference image")
         validate_reference_labels(prompt, reference_items)
         validate_asset_reference_bindings(reference_items)
         validate_logo_prompt_rule(prompt, reference_items)

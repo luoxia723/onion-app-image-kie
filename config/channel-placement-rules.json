@@ -10,7 +10,7 @@
     "active_scope": "current_user_table_only",
     "legacy_rules_enabled": false,
     "legacy_archive": "config/history/channel-placement-rules-legacy-102.json",
-    "render_size_rule": "Use target size to select Sunburst 1K ratio. Expected cover crop >=6% uses white/blue frame + OpenCV removal + stretch; lower differences use normal cover.",
+    "render_size_rule": "Use target size to select Flare 1K ratio. Expected cover crop >=6% uses white/blue frame + OpenCV removal + stretch; lower differences use normal cover.",
     "unspecified_channel_rules": "表内未提供的Logo、IP、字体、CTA或文案细则不继承旧清单；按当前制作配置执行。"
   },
   "categories": [

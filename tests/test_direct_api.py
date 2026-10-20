@@ -82,10 +82,11 @@ def test_request_matches_provider_contract():
     request=render.build_create_request(render.DEFAULT_API_BASE,'fake','prompt','9:16','1K',['https://example.invalid/ref.png'])
     payload=json.loads(request.data)
     assert request.full_url == 'https://api.kie.ai/api/v1/jobs/createTask'
-    assert payload['model']=='gpt-image-2-5-sunburst-image-to-image'
-    assert payload['input']['input_urls']==['https://example.invalid/ref.png']
-    assert payload['input']['resolution']=='1K'
-    assert payload['input']['background']=='opaque'
+    assert payload['model']=='gpt-image-2-5-flare-image-to-image'
+    assert payload['input']=={
+        'prompt':'prompt', 'aspect_ratio':'9:16', 'resolution':'1K',
+        'background':'opaque', 'input_urls':['https://example.invalid/ref.png'],
+    }
 
 
 @pytest.mark.parametrize('resolution',['2K','4K'])
@@ -208,7 +209,7 @@ def test_batch_uses_saved_target_geometry_and_keeps_review_findings(tmp_path,mon
     a=argparse.Namespace(manifest=manifest,config=config,validate_only=False,approved_in_current_task=True,approved_count=None)
     assert direct_batch.execute(a)==0
     assert len(calls)==1
-    assert calls[0]['model']=='gpt-image-2-5-sunburst-image-to-image'
+    assert calls[0]['model']=='gpt-image-2-5-flare-image-to-image'
     assert calls[0]['input']['resolution']=='1K'
     assert calls[0]['input']['aspect_ratio']=='9:16'
     result=json.loads((tmp_path/'image-render-result.json').read_text())
@@ -222,13 +223,20 @@ def test_batch_uses_saved_target_geometry_and_keeps_review_findings(tmp_path,mon
     assert any('确认' in item for item in sets[0]['meta']['review_findings'])
 
 
-def test_model_switch_cannot_resubmit_old_task_state(tmp_path,monkeypatch):
+@pytest.mark.parametrize('old_model,old_resolution',[
+    ('gpt-image-2-image-to-image','2K'),
+    ('gpt-image-2-5-sunburst-image-to-image','1K'),
+])
+def test_model_switch_cannot_resubmit_old_task_state(tmp_path,monkeypatch,old_model,old_resolution):
     setup(tmp_path,monkeypatch)
     request=args(tmp_path)
-    fingerprint=render.request_fingerprint('gpt-image-2-image-to-image',request.prompt,[REFERENCE],'1:1','2K')
-    render.atomic_write_json(render.task_state_path(Path(request.output)),{'status':'waiting','task_id':'old-task','fingerprint':fingerprint})
+    fingerprint=render.request_fingerprint(old_model,request.prompt,[REFERENCE],'1:1',old_resolution)
+    state_path=render.task_state_path(Path(request.output))
+    render.atomic_write_json(state_path,{'status':'waiting','task_id':'old-task','fingerprint':fingerprint})
+    original_state=state_path.read_bytes()
     monkeypatch.setattr(render,'request_json',lambda *a,**k:pytest.fail('network called'))
     assert render.run(request)==1
+    assert state_path.read_bytes()==original_state
 
 
 def test_large_crop_requires_frame_before_any_network(tmp_path,monkeypatch):

@@ -471,7 +471,7 @@
           ${slot.disabled_reason ? `<span>暂不可选：${slot.disabled_reason}</span>` : ""}
           <div class="badges">
             <span class="badge">正式交付尺寸</span>
-            <span class="badge">Sunburst 1K</span>
+            <span class="badge">Flare 1K</span>
             <span class="badge">${slot.enabled === false ? "暂不可选" : "可用"}</span>
           </div>
         </button>
@@ -539,7 +539,7 @@
         ["版位", slots.length ? slots.map(slot => `${slot.platform} · ${slot.name}`).join("；") : "请先选择至少一个版位"],
         ["尺寸", slots.length ? slots.map(slot => `${slot.target_size} ← ${slot.render_aspect_ratio} · 1K`).join("；") : "-"],
         ["比例适配", slots.length ? slots.map(slot => slot.geometry?.adaptation_note || "-").join("；") : "-"],
-        ["生图配置", "GPT Image 2.5 Sunburst · 1K"],
+        ["生图配置", "GPT Image 2.5 Flare · 1K"],
         ["费用估算", `每张 ${DATA.estimatedCreditsPerImage || 3} 积分，按账号截图估算`],
         ["压缩", slots.length ? slots.map(slot => slot.maxFileSizeKb ? `<${slot.maxFileSizeKb}KB` : "默认 200KB").join("；") : "-"],
         ["Logo", logo.label],

@@ -1,6 +1,6 @@
 # KIE API 直连配置与恢复
 
-本 Skill 使用本地 Python 访问 KIE。模型固定为 GPT Image 2.5 Sunburst 图生图，分辨率固定1K；本地继续限制最多8张参考图、每张最多10MB。
+本 Skill 使用本地 Python 访问 KIE。模型固定为 GPT Image 2.5 Flare 图生图，分辨率固定1K；本地继续限制最多8张参考图、每张最多10MB。
 
 ## 首次配置
 
@@ -14,22 +14,22 @@ Key 从进程环境变量 `KIE_API_KEY` 读取，也可由用户写入 `~/.confi
 
 ## 官方接口
 
-- 生图：`POST https://api.kie.ai/api/v1/jobs/createTask`；`model=gpt-image-2-5-sunburst-image-to-image`，`input.resolution=1K`，`input.background=opaque`，参考图URL放在 `input.input_urls`。至少需要一张参考图；单图和首张使用原版Logo/IP/字体/UI等资产，同套分支只传首张PNG。首张缺少素材时补充本轮原版资产，不切换文生图或其他型号。
+- 生图：`POST https://api.kie.ai/api/v1/jobs/createTask`；`model=gpt-image-2-5-flare-image-to-image`，`input.resolution=1K`，`input.background=opaque`，参考图URL放在 `input.input_urls`。至少需要一张参考图；单图和首张使用原版Logo/IP/字体/UI等资产，同套分支只传首张PNG。首张缺少素材时补充本轮原版资产，不切换文生图或其他型号。
 - 查询：`GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId=...`。
 - 参考图上传：`POST https://kieai.redpandaai.co/api/file-base64-upload`。
 - 三者使用 `Authorization: Bearer <KIE_API_KEY>`；下载图片不携带Key。
 
-依据：[GPT Image 2.5参数](https://kie.ai/gpt-image-2-5)、[Sunburst图生图接口](https://docs.kie.ai/43286923e0)、[上传接口](https://docs.kie.ai/file-upload-api/upload-file-base-64)，核对日期2026-10-19。上传链接是短时运行缓存，不属于正式交付。
+依据：[GPT Image 2.5参数](https://kie.ai/gpt-image-2-5)、[Flare图生图接口](https://docs.kie.ai/43285205e0)、[上传接口](https://docs.kie.ai/file-upload-api/upload-file-base-64)，核对日期2026-10-20。上传链接是短时运行缓存，不属于正式交付。
 
 ## 1K费用与比例
 
-按用户提供的账号区域报价截图估算3积分/张；此数值只用于预算展示，不是传给KIE的计费参数。KIE公开页面的通用1K价格与截图不同，实际扣费以账号区域报价和任务回执为准。本地请求锁定型号及1K，不会自动改用2K/4K；本次迁移没有发起付费生图或验证真实扣费。
+沿用用户此前账号区域报价截图的3积分/张作为预算估计；该截图不视为Flare报价确认，此数值只用于预算展示，不是传给KIE的计费参数。KIE公开页面的通用1K价格与截图不同，实际扣费以当前型号的账号区域报价和任务回执为准。本地请求锁定型号及1K，不会自动改用2K/4K；本次Flare切换只做静态及模拟API验证，尚未发起Flare付费生图或确认其实际扣费。
 
 供应商当前支持的固定比例见 `scripts/kie_model.py`。显式使用比例而非 `auto`；其中27:16、16:27、9:8、8:9仅在1K可用。原版位的 `render_width/render_height/render_size` 是旧规则中的构图参考，不再代表供应商实际输出像素。新任务按所选版位的 `target_width/target_height` 计算比例；API只传 `aspect_ratio` 和1K档位。
 
 预计常规裁切达到6%（含6%）时先按[白底蓝框适配](blue-frame-adaptation.md)生成布局参考，走框内广告、框外纯白、OpenCV去框后拉伸的分支；小于6%的常规处理。蓝框仍是`input_urls`中的普通参考，不是API硬蒙版。下载后使用实际框线坐标，原图保留，处理后的候选由用户查看再采纳；1K交付大尺寸可能需要放大，保持1K不自动升档。详细清单见[比例适配报告](model-size-compatibility.md)。
 
-切换型号或分辨率会改变任务指纹；已有旧模型任务的输出路径保持原状，新型号任务使用新版本，避免重复提交或覆盖旧结果。
+切换型号或分辨率会改变任务指纹；已有Sunburst等旧模型任务的Prompt、状态、回执与输出路径保持原状。当前入口固定Flare，不能对旧任务路径按新模型继续提交；需要Flare成图时建立新任务或新版本并取得当前生成授权，避免重复提交或覆盖旧结果。
 
 ## 执行
 

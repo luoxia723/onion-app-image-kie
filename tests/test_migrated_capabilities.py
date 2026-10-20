@@ -137,7 +137,7 @@ def test_render_validate_only_needs_no_key_or_paid_approval() -> None:
     payload = json.loads(result.stdout)
     assert payload["valid"] is True
     assert payload["provider"] == "kie"
-    assert payload["model"] == "gpt-image-2-5-sunburst-image-to-image"
+    assert payload["model"] == "gpt-image-2-5-flare-image-to-image"
 
 
 def test_paid_render_and_batch_require_current_approval(tmp_path: Path) -> None:
