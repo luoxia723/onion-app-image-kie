@@ -1016,6 +1016,8 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     if result["visual_style_mode"] not in {"random", "coordinated"}:
         raise ValueError("visual_style_mode must be random or coordinated")
     result["art_direction_required"] = bool(body.get("art_direction_required", True))
+    from positive_prompt import FORMAT
+    result["prompt_format"] = FORMAT
     result["font_prompt_rule"] = (
         "每套从洋葱专属字体参考中选择一张，仅传给首张；同套后续图片通过首张PNG继承字体，不重新随机或重复传入；不复制示例文字。"
         if result["font_reference_randomized"] else "不启用字体参考图。"

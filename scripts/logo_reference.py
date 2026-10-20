@@ -12,10 +12,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 ASSET_MANIFEST = SKILL_DIR / "assets" / "asset-manifest.json"
 
-LOGO_PROMPT_TEMPLATE = (
+LEGACY_LOGO_PROMPT_TEMPLATE = (
     "左上角原样呈现{label}的完整 Logo，图形、文字、颜色、比例、轮廓及角标均与原图一致，"
     "不得重绘、变形、简化或拆分；Logo直接融入画面原有背景，周围延续整体色调，"
     "不另加底板、色块、边框或弧形区域，仅调整整体大小和位置。"
+)
+
+LOGO_PROMPT_TEMPLATE = (
+    "左上角完整呈现{label}的原版Logo，图形、文字、颜色、比例、轮廓及角标与原图一致，"
+    "周围背景自然延续画面色调，原版标识清晰可辨。"
 )
 
 LOGO_BACKGROUND_CONFLICTS = (
@@ -49,6 +54,11 @@ def logo_prompt_rule(label: str = "参考图1", position: str = "左上角") -> 
     if position not in {"左上角", "上方居中"}:
         raise ValueError("unsupported Logo position")
     return LOGO_PROMPT_TEMPLATE.replace("左上角", position).format(label=str(label).strip() or "参考图1")
+
+
+def has_logo_rule(prompt, label, position):
+    return any(template.replace("左上角", position).format(label=label) in prompt
+               for template in (LOGO_PROMPT_TEMPLATE, LEGACY_LOGO_PROMPT_TEMPLATE))
 
 
 def load_asset_manifest(path: Path = ASSET_MANIFEST) -> list[dict[str, Any]]:
@@ -173,7 +183,7 @@ def validate_logo_prompt_rule(prompt: str, reference_items: list[dict[str, Any]]
     for item in logo_reference_items(reference_items):
         label = str(item.get("label") or "参考图1")
         required = logo_prompt_rule(label)
-        if not any(logo_prompt_rule(label, position) in prompt for position in ("左上角", "上方居中")):
+        if not any(has_logo_rule(prompt, label, position) for position in ("左上角", "上方居中")):
             raise ValueError(f"prompt 缺少 {label} 的 Logo 保真约束：{required}")
         conflict = next((value for value in LOGO_BACKGROUND_CONFLICTS if value in prompt), None)
         if conflict:
@@ -229,9 +239,9 @@ def validate_manifest_logo(manifest: dict[str, Any], config: dict[str, Any]) -> 
         validate_logo_prompt_rule(str(job.get("prompt") or ""), [first])
         prompt = str(job.get("prompt") or "")
         position = logo_position(config)
-        if logo_prompt_rule("参考图1", position) not in prompt:
+        if not has_logo_rule(prompt, "参考图1", position):
             raise ValueError(f"{job_id} Logo 必须放在{position}")
         other_position = "左上角" if position == "上方居中" else "上方居中"
-        if logo_prompt_rule("参考图1", other_position) in prompt:
+        if has_logo_rule(prompt, "参考图1", other_position):
             raise ValueError(f"{job_id} Logo 位置指令冲突")
     return selection

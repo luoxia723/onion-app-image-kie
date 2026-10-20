@@ -4,7 +4,7 @@
 
 ## 设计一套画面
 
-内部设计层级以[艺术定调](art-direction.md)为准：画风→世界与场景→故事→构图→光色材质。新配置还需在visual_concepts.art_direction中保存这五层决定；最终仍沿用原Prompt结构，将这些决定提炼合并，不重复输出分层分析或已包含的约束。
+内部设计层级以[艺术定调](art-direction.md)为准：画风→世界与场景→故事→构图→光色材质。新配置还需在visual_concepts.art_direction中保存这五层决定；最终沿用之前的自然画面叙述方式，将这些决定提炼合并为一段正向描述，不输出分层分析、文字白名单或负面提示段。新配置使用prompt_format=positive_paragraph_v1。
 
 从[Prompt规则](prompt-rules.md)中的创意链出发，先讲清楚学生处于哪个学习瞬间、卡在哪里、产品做了什么，以及变化如何被看见。有IP时，让IP通过姿势、视线、表情和道具参与这个过程；为角色表演与场景关系保留画面空间。
 
@@ -22,7 +22,7 @@
 python scripts/visual_directions.py --assign-styles --config <02_过程/image-config-result.json> --output <02_过程/visual-style-assignments.json>
 ```
 
-读取每套的style_id、style_prompt和ip_adaptation，按该画风编写完整 `visual_concepts`，保存对应style_id。顺序为文案1的全部套数、文案2的全部套数，长度等于文案数乘套数。下面仅示意抽中commercial_anime时的一套内容，实际使用本次分配结果。
+读取每套的style_id和style_prompt（新格式取库中visual_prompt正向描述），按该画风编写完整 `visual_concepts`，保存对应style_id。顺序为文案1的全部套数、文案2的全部套数，长度等于文案数乘套数。下面仅示意抽中commercial_anime时的一套内容，实际使用本次分配结果。
 
 ```json
 {
@@ -35,7 +35,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
       "prompt": "本周开始数学学习的书桌场景。所选IP与练习本、纸卡处在统一的商业动漫视觉体系中，清楚线稿和柔和光影表现角色。浅蓝乳白环境、深色标题与少量暖黄呼应角色服装。主文案在左侧完整留白，角色在右侧略微前倾，视线与手部动作将阅读引向桌面任务；前景纸面与后景形成自然层次，Logo按规定位置保留。",
       "slot_actions": [
         "IP看向数学练习本，握笔、身体前倾，表现想把本周数学补起来、准备开始的状态。",
-        "IP把无字纸卡沿目标与基础汇合的路线排好，用整理动作表现每日任务安排。",
+        "IP把空白纸卡沿目标与基础汇合的路线排好，用整理动作表现每日任务安排。",
         "IP指向今日纸卡，旁边的完成勾选表现学习推进，神态比开始时更轻松。"
       ]
     }
@@ -45,7 +45,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
 
 - `art_direction`保存从世界到光色的五层定调，按[艺术定调](art-direction.md)执行。screen_ui_mode和screen_text管理清晰示意UI或真实截图。
 - `name` 是方案名称，`prompt` 是完整视觉方案，均不作为额外广告文案。
-- `slot_actions` 按图片顺序写每张的动作和情绪，长度等于所选形式的图片数。对应短句仍由 `copy_refs`、`copy_text` 和文字白名单管理。
+- `slot_actions` 按图片顺序写每张的动作和情绪，长度等于所选形式的图片数。对应短句由 `copy_refs` 与 `copy_text` 比对，Prompt直接写对应原句。
 - 可选 `ip_asset_id` 在配置为随机IP时指定本套角色；用户已固定IP或不用IP时不能覆盖。可选 `font_reference_path` 只能选择原版字体库中的文件，并遵守字体开关。未指定时仍按已保存配置为每套选择IP和字体；整体方案需与最终所选素材协调。
 - 用户指定的画风或布局继续保存到 `visual_direction`，其要求优先进入方案。明确使用coordinated模式时，可跳过随机分配，由Agent整体设计所需画风。
 
@@ -55,7 +55,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
 python scripts/visual_directions.py --config <02_过程/image-config-result.json> --output <02_过程/visual-plan.json>
 ```
 
-首张Prompt包含 `base_prompt_rule`，其中已经包含图1动作。图2/3的Prompt包含同套 `branch_prompt_rule`，再加入各自的 `slot_prompt_rules["2"]` 或 `["3"]`。清单顶层填写 `visual_plan_path`，每张绑定对应 `visual_direction_id`；首张IP和字体使用计划中的路径。付费前检查整套覆盖、配置指纹、逐张动作与实际素材绑定。同套分支仍只引用本套首张原始PNG。
+建议用`positive_prompt.compose(config, direction, slot, references, frame_label)`合成一段正向Prompt，frame_label仅在实际使用蓝框时传入。首张Prompt包含 `base_prompt_rule`，其中已经包含图1动作。图2/3的Prompt包含同套 `branch_prompt_rule`，再加入各自的 `slot_prompt_rules["2"]` 或 `["3"]`。清单顶层填写 `visual_plan_path`，每张绑定对应 `visual_direction_id`；首张IP和字体使用计划中的路径。付费前检查整套覆盖、配置指纹、逐张动作与实际素材绑定。同套分支仍只引用本套首张原始PNG。
 
 ## 风格库按需参考
 

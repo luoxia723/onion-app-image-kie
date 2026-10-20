@@ -4,9 +4,11 @@ from pathlib import Path
 import re
 
 from logo_reference import normalize_job_references
+from positive_prompt import enabled as positive_format, approved_copy, validate_paragraph
 
 
 def text_rule(text, logo="洋葱学园", cta="", ui_text=None):
+    """Legacy frozen manifests only; new prompts use positive prose."""
     if ui_text is not None and (not isinstance(ui_text, list) or any(not isinstance(value, str) or not value.strip() for value in ui_text)):
         raise ValueError("ui_text must be a list of non-empty screen labels")
     allowed = [value for value in (text, logo, cta) if value]
@@ -31,15 +33,25 @@ def validate_series(manifest, config):
         if base.get("base_job_id") or (count > 1 and base.get("depends_on")):
             raise ValueError("the base must not depend on a branch")
         for job in group:
+            if positive_format(config):
+                validate_paragraph(job["prompt"])
             slot = int(job.get("slot") or 1)
             copies = config.get("copy_refs") or []
-            if copies and count > 1:
+            if copies and (count > 1 or positive_format(config)):
                 copy_id = job.get("copy_draft_id")
                 source = copies[0] if len(copies) == 1 else next(
                     (c for c in copies if c.get("copyDraftId") == copy_id), None)
                 if not source:
                     raise ValueError("job must identify its approved copy")
-                text = source.get(f"short{slot}")
+                if positive_format(config):
+                    texts = [text for text in approved_copy(source, slot, count) if text]
+                    if not texts or job.get("copy_text") != "\n".join(texts) or any(text not in job["prompt"] for text in texts):
+                        raise ValueError("copy_text and prompt must match the approved slot copy")
+                    if config.get("cta") and config["cta"] not in job["prompt"]:
+                        raise ValueError("prompt must include the approved CTA")
+                    text = None
+                else:
+                    text = source.get(f"short{slot}")
                 if text:
                     if job.get("copy_text") != text or text_rule(text, config.get("logo", ""), config.get("cta", ""), job.get("ui_text")) not in job["prompt"]:
                         raise ValueError("copy_text and text whitelist must match the approved slot")

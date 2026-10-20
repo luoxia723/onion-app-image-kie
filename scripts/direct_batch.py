@@ -74,8 +74,8 @@ def execute(args):
             render.generation_geometry(str(job.get("size") or ""), str(job.get("aspect_ratio") or ""))
             render.load_output_state(Path(job["output"]).expanduser().resolve())
             if job.get("frame_layout_path"):
-                from blue_frame import prompt_rule
-                if prompt_rule("参考图1") not in job["prompt"]:
+                from blue_frame import has_prompt_rule
+                if not has_prompt_rule(job["prompt"], "参考图1"):
                     raise ValueError("branch prompt must inherit the base blue-frame range")
         else:
             invoke(job, True)

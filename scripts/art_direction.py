@@ -53,6 +53,10 @@ def screen_rule(config, concept):
     texts = list(dict.fromkeys(texts))
     if mode == "none" and texts:
         raise ValueError("screen_text is incompatible with screen_ui_mode=none")
+    from positive_prompt import enabled
+    if enabled(config):
+        rule = "屏幕以清晰示意界面呈现" + "、".join(f'“{text}”' for text in texts) + "。" if mode == "conceptual" and texts else ""
+        return mode, texts, rule
     rules = {
         "conceptual": "屏幕可显示清晰示意UI，无需模糊；仅表达已确认功能，内部文字遵循本轮白名单，不生成未经确认的成绩、价格或效果数字。",
         "reference": "屏幕使用本轮提供的真实UI截图，保持已确认界面与功能，不凭空替换为另一种真实产品页面。",

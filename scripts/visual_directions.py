@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import random
 from art_direction import IP_RULE, NO_IP_RULE, art_direction_layers, concise_ip_note, screen_rule
+from positive_prompt import enabled as positive_format, paragraph, validate_paragraph
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CATALOG = SKILL_DIR / "config/visual-directions.json"
@@ -32,7 +33,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "screen_ui_mode"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "screen_ui_mode", "prompt_format"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -134,8 +135,9 @@ def assign_styles(config, seed=None):
     return {"schema_version": "onion_style_assignments_v1", "request_id": config.get("request_id"),
             "directions": [{"set_id": f"copy-{i // sets + 1:03d}-placement-001-set-{i % sets + 1:02d}",
                             "style_id": style["id"], "style_name": style["name"],
-                            "style_prompt": style["prompt"] if has_ip else style.get("no_ip_prompt", style["prompt"]),
-                            "ip_adaptation": style.get("ip_adaptation", "") if has_ip else "",
+                            "style_prompt": (style.get("visual_prompt", style["prompt"]) if positive_format(config) else
+                                             style["prompt"] if has_ip else style.get("no_ip_prompt", style["prompt"])),
+                            "ip_adaptation": style.get("ip_adaptation", "") if has_ip and not positive_format(config) else "",
                             "style_source_ids": style.get("source_ids", [])} for i, style in enumerate(selected)]}
 
 
@@ -175,7 +177,8 @@ def plan_content_concepts(config, seed=None):
             match = next((v for v in load_catalog()[kind + "s"] if fixed[kind + "_id"] == v["id"] or fixed[kind + "_id"] in v.get("alias_ids", [])), None)
             if match is None:
                 raise ValueError("unknown visual direction: " + kind)
-            selected_prompt = match["prompt"] if fixed_ip or random_ip else match.get("no_ip_prompt", match["prompt"])
+            selected_prompt = (match.get("visual_prompt", match["prompt"]) if positive_format(config) else
+                               match["prompt"] if fixed_ip or random_ip else match.get("no_ip_prompt", match["prompt"]))
             if kind == "style":
                 fixed_style_prompt = selected_prompt
             else:
@@ -214,18 +217,28 @@ def plan_content_concepts(config, seed=None):
             font = str(Path(font).resolve())
         copy_index, set_index = index // sets + 1, index % sets + 1
         direction_id = f"visual-{index + 1:03d}"
-        slot_rules = {str(i): f"本张动作与情绪[{direction_id}/图{i}]：{action}" for i, action in enumerate(actions, 1)}
-        style_rule = (f"画风定调：{style['style_name']}；{style['style_prompt']}\n" if style else
-                      f"画风定调（用户指定）：{fixed_style_prompt}\n" if fixed_style_prompt else "")
-        base_rule = (style_rule
-                     + f"场景与故事：{concept['prompt']}\n" + slot_rules["1"] + "\n"
-                     + ("用户指定的视觉要求优先：" + "；".join(fixed_rules) + "。" if fixed_rules else "")
-                     + "主体、道具、光线与文字统一设计，标题可读并为故事和场景关系保留空间。")
-        base_rule += (IP_RULE if ip else NO_IP_RULE) + ui_rule
-        if ip and style:
-            medium_note = concise_ip_note(style["ip_adaptation"])
-            if medium_note:
-                base_rule += "IP画风适配：" + medium_note
+        if positive_format(config):
+            slot_rules = {str(i): paragraph(action) for i, action in enumerate(actions, 1)}
+            style_text = f"以{style['style_name']}画风呈现，{style['style_prompt']}" if style else fixed_style_prompt
+            base_rule = paragraph(style_text, concept["prompt"], slot_rules["1"], *fixed_rules,
+                                  "主体、道具与光线形成统一空间，标题位于清晰留白并具有鲜明阅读层级。",
+                                  IP_RULE if ip else "", ui_rule)
+            inherited = "画风、场景、主体设定和字体" + ("、Logo及其位置" if config.get("logo_asset_id") or config.get("logo") not in (None, "", "不用") else "")
+            branch_rule = f"延续参考图1的{inherited}，推进当前画面的故事。"
+        else:
+            slot_rules = {str(i): f"本张动作与情绪[{direction_id}/图{i}]：{action}" for i, action in enumerate(actions, 1)}
+            style_rule = (f"画风定调：{style['style_name']}；{style['style_prompt']}\n" if style else
+                          f"画风定调（用户指定）：{fixed_style_prompt}\n" if fixed_style_prompt else "")
+            base_rule = (style_rule
+                         + f"场景与故事：{concept['prompt']}\n" + slot_rules["1"] + "\n"
+                         + ("用户指定的视觉要求优先：" + "；".join(fixed_rules) + "。" if fixed_rules else "")
+                         + "主体、道具、光线与文字统一设计，标题可读并为故事和场景关系保留空间。")
+            base_rule += (IP_RULE if ip else NO_IP_RULE) + ui_rule
+            if ip and style:
+                medium_note = concise_ip_note(style["ip_adaptation"])
+                if medium_note:
+                    base_rule += "IP画风适配：" + medium_note
+            branch_rule = f"同套画面继承[{direction_id}]：从本套首张PNG继承{'IP身份与本套服饰、' if ip else '选定主体、'}视觉体系、场景连续性、字体与Logo；按当前短句和动作推进故事，调整必要形态、视线或道具关系，使每张承担对应的叙事内容。" + ui_rule
         directions.append({
             "direction_id": direction_id, "set_id": f"copy-{copy_index:03d}-placement-001-set-{set_index:02d}",
             "copy_draft_id": copies[copy_index - 1].get("copyDraftId", f"draft-{copy_index}"),
@@ -239,7 +252,7 @@ def plan_content_concepts(config, seed=None):
             "ip_reference_path": ip["path"] if ip else "", "font_reference_path": font,
             "subject_mode": "selected_ip" if ip else "approved_action_without_ip",
             "base_prompt_rule": base_rule,
-            "branch_prompt_rule": f"同套画面继承[{direction_id}]：从本套首张PNG继承{'IP身份与本套服饰、' if ip else '选定主体、'}视觉体系、场景连续性、字体与Logo；按当前短句和动作推进故事，调整必要形态、视线或道具关系，使每张承担对应的叙事内容。" + ui_rule,
+            "branch_prompt_rule": branch_rule,
         })
     return {"schema_version": "onion_visual_plan_v1", "request_id": config.get("request_id"),
             "config_fingerprint": config_fingerprint(config), "mode": "content_first",
@@ -249,7 +262,7 @@ def plan_content_concepts(config, seed=None):
 def plan_directions(config, seed=None):
     if len(config.get("placements", [])) != 1:
         raise ValueError("visual planning requires one saved placement")
-    if config.get("visual_diversity_mode", "content_first") == "content_first":
+    if positive_format(config) or config.get("visual_diversity_mode", "content_first") == "content_first":
         return plan_content_concepts(config, seed)
     catalog = load_catalog()
     rng = random.Random(str(seed if seed is not None else config.get("request_id", "")))
@@ -365,7 +378,7 @@ def validate_visual_plan(manifest, config):
     if plan.get("schema_version") != "onion_visual_plan_v1" or plan.get("request_id") != config.get("request_id") or plan.get("config_fingerprint") != config_fingerprint(config):
         raise ValueError("visual plan is stale or belongs to another configuration")
     directions = {value["set_id"]: value for value in plan["directions"]}
-    if plan.get("style_mode") == "random":
+    if positive_format(config) or plan.get("style_mode") == "random":
         prompts = ["".join(job["prompt"].split()) for job in manifest["jobs"]]
         if len(set(prompts)) != len(prompts):
             raise ValueError("each image must have its own distinct complete prompt")
@@ -374,6 +387,8 @@ def validate_visual_plan(manifest, config):
     if len(directions) != expected or len(directions) != len(plan["directions"]) or len({d["direction_id"] for d in directions.values()}) != expected or set(directions) != {job["set_id"] for job in manifest["jobs"]}:
         raise ValueError("visual plan must cover exactly the manifest sets")
     for job in manifest["jobs"]:
+        if positive_format(config):
+            validate_paragraph(job["prompt"])
         direction = directions[job["set_id"]]
         key = "base_prompt_rule" if int(job.get("slot") or 1) == 1 else "branch_prompt_rule"
         if job.get("visual_direction_id") != direction["direction_id"] or direction[key] not in job["prompt"]:
@@ -383,7 +398,7 @@ def validate_visual_plan(manifest, config):
             if not action or action not in job["prompt"]:
                 raise ValueError("each content-first job must use its planned scene action")
             if "screen_text" in direction and job.get("ui_text", []) != direction["screen_text"]:
-                raise ValueError("job ui_text differs from the planned screen_text whitelist")
+                raise ValueError("job ui_text differs from the planned screen_text")
         if int(job.get("slot") or 1) == 1:
             from logo_reference import normalize_job_references
             refs = normalize_job_references(job)
@@ -411,7 +426,7 @@ def main():
         styles = load_catalog()["styles"]
         query = args.query.casefold().strip()
         matches = [style for style in styles if not query or query in json.dumps(style, ensure_ascii=False).casefold()]
-        keys = ("id", "name", "name_en", "family", "prompt", "no_ip_prompt", "source_ids", "verification_status", "image_validated")
+        keys = ("id", "name", "name_en", "family", "prompt", "no_ip_prompt", "visual_prompt", "source_ids", "verification_status", "image_validated")
         rows = matches if args.detail else [{key: style.get(key) for key in keys} for style in matches]
         print(json.dumps({"library_count": len(styles), "matched_count": len(rows), "styles": rows}, ensure_ascii=False, indent=2))
         return

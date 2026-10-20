@@ -9,11 +9,20 @@ import numpy as np
 from kie_model import geometry_report, nearest_aspect_ratio, CROP_REVIEW_THRESHOLD_PERCENT
 
 
-def prompt_rule(label):
+def legacy_prompt_rule(label):
     return (f'{label}是白底蓝框布局模板。只在蓝框内部生成完整广告，广告背景也只铺满蓝框内部；'
             '完整Logo、文案、人物和道具都放在框内，文字笔画、描边和阴影不得越框。'
             '蓝框外全部保持纯白，不画背景延伸、文字、人物、装饰或阴影。保持蓝框原有位置、形状和大小，'
             '蓝框作为制作辅助线保留在原位置，后续由代码连同框外白边一起裁掉。')
+
+
+def prompt_rule(label):
+    return (f'{label}为白底蓝框布局参考，完整广告的背景、文案、主体和道具均位于蓝框内，'
+            '文字笔画、描边与阴影完整收在框内；框外为纯白，蓝框位置、形状和大小与参考一致。')
+
+
+def has_prompt_rule(prompt, label):
+    return any(rule(label) in prompt for rule in (prompt_rule, legacy_prompt_rule))
 
 
 def sha256(path):
@@ -84,7 +93,7 @@ def validate_layout(path, target_size, reference_items, reference_paths, prompt,
                for item, file in zip(reference_items, reference_paths)):
         raise ValueError('参考图编号或文件与蓝框配置不符。')
     label = reference_items[0]['label'] if inherits_frame else spec['reference_label']
-    if prompt_rule(label) not in prompt:
+    if not has_prompt_rule(prompt, label):
         raise ValueError('Prompt缺少本轮蓝框生成范围规则。')
     return spec
 
