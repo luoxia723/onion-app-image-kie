@@ -4,7 +4,7 @@
 
 中文Prompt与IP适配要求由本项目根据来源自行总结，未复制上游正负提示词、未下载艺术作品图片。所有条目当前为text_reviewed、image_validated=false。描述已进入编排脚本，但效果仍须看真实成图。
 
-新任务使用各条目的visual_prompt正向画法描述，主体与画法分别管理。无IP时直接设计选定主体；有IP时在完整场景里选择少量对应时代或画风的纹样、材质和配饰，识别要求由统一角色规则维护。旧prompt、no_ip_prompt与ip_adaptation字段仅供历史任务恢复，不整段注入新Prompt。
+新任务使用各条目的visual_prompt正向画法描述，主体与画法分别管理。无IP时设计普通原创学生参与每张学习场景；有IP时在完整场景里选择少量对应时代或画风的纹样、材质和配饰，识别要求由统一角色规则维护。旧prompt、no_ip_prompt与ip_adaptation字段仅供历史任务恢复，不整段注入新Prompt。
 
 执行数据以[风格JSON](../config/visual-directions.json)为准，[来源登记](../config/visual-style-sources.json)包含原始页面、仓库提交、许可证与采用方式。检索和使用方式见[多样化编排](visual-directions.md)。
 

@@ -17,6 +17,17 @@ NO_IP_RULE = (
 )
 
 
+def learner_story(concept, required=False):
+    """Keep the learner and product story explicit before writing final prose."""
+    story = concept.get("learner_story")
+    if story is None and not required:
+        return None
+    keys = ("protagonist", "pain_point", "product_action", "visible_change")
+    if not isinstance(story, dict) or any(not isinstance(story.get(key), str) or not story[key].strip() for key in keys):
+        raise ValueError("learner_story requires protagonist, pain_point, product_action and visible_change")
+    return {key: story[key].strip() for key in keys}
+
+
 def art_direction_layers(concept, required=False):
     layers = concept.get("art_direction")
     if layers is None:

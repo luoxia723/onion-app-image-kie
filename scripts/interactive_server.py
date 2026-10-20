@@ -1016,6 +1016,7 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     if result["visual_style_mode"] not in {"random", "coordinated"}:
         raise ValueError("visual_style_mode must be random or coordinated")
     result["art_direction_required"] = bool(body.get("art_direction_required", True))
+    result["learner_story_required"] = True
     from positive_prompt import FORMAT
     result["prompt_format"] = FORMAT
     result["font_prompt_rule"] = (

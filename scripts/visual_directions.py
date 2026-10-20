@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import random
-from art_direction import IP_RULE, NO_IP_RULE, art_direction_layers, concise_ip_note, screen_rule
+from art_direction import IP_RULE, NO_IP_RULE, art_direction_layers, concise_ip_note, screen_rule, learner_story
 from positive_prompt import enabled as positive_format, paragraph, validate_paragraph
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -33,7 +33,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "screen_ui_mode", "prompt_format"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -202,6 +202,7 @@ def plan_content_concepts(config, seed=None):
         if not isinstance(actions, list) or len(actions) != image_count or any(not isinstance(a, str) or not a.strip() for a in actions):
             raise ValueError("visual concept slot_actions must cover each image in the saved form")
         art_layers = art_direction_layers(concept, config.get("art_direction_required", False))
+        story = learner_story(concept, config.get("learner_story_required", False))
         if config.get("art_direction_required") and not (style or fixed_style_prompt):
             raise ValueError("art direction requires a selected main style before world and scene")
         screen_mode, screen_text, ui_rule = screen_rule(config, concept)
@@ -224,10 +225,12 @@ def plan_content_concepts(config, seed=None):
             style_name = style["style_name"] if style and style["style_id"] != "user_fixed_style" else fixed_style_name
             style_description = style["style_prompt"] if style else fixed_style_prompt
             style_text = f"以{style_name}画风呈现，{style_description}" if style_name else style_description
-            base_rule = paragraph(style_text, concept["prompt"], slot_rules["1"], *fixed_rules,
+            base_rule = paragraph(style_text, f"画面中的学习者为{story['protagonist']}。" if story else "",
+                                  story["pain_point"] if story else "",
+                                  concept["prompt"], slot_rules["1"], *fixed_rules,
                                   "主体、道具与光线形成统一空间，标题位于清晰留白并具有鲜明阅读层级。",
                                   IP_RULE if ip else "", ui_rule)
-            inherited = ["画风", "场景", "主体设定"]
+            inherited = ["画风", "场景", "人物外形与服饰" if story else "主体设定"]
             if font:
                 inherited.append("字体")
             if config.get("logo_asset_id") or config.get("logo") not in (None, "", "不用"):
@@ -254,13 +257,14 @@ def plan_content_concepts(config, seed=None):
             "copy_draft_id": copies[copy_index - 1].get("copyDraftId", f"draft-{copy_index}"),
             "concept_name": concept["name"], "concept_prompt": concept["prompt"],
             "art_direction": art_layers, "screen_ui_mode": screen_mode, "screen_text": screen_text,
+            **({"learner_story": story} if story else {}),
             "style_source_ids": style["style_source_ids"] if style else concept.get("style_source_ids", []),
             **({"style_id": style["style_id"], "style_name": style["style_name"]} if style else {}),
             "style_description_origin": "task_authored", "style_verification_status": "task_authored",
             "style_image_validated": False,
             "slot_prompt_rules": slot_rules, "ip_asset_id": selected_ip,
             "ip_reference_path": ip["path"] if ip else "", "font_reference_path": font,
-            "subject_mode": "selected_ip" if ip else "approved_action_without_ip",
+            "subject_mode": "selected_ip" if ip else "original_student" if story else "approved_action_without_ip",
             "base_prompt_rule": base_rule,
             "branch_prompt_rule": branch_rule,
         })

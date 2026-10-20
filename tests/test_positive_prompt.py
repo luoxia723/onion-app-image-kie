@@ -52,6 +52,7 @@ def jobs_for(cfg):
 def test_new_saved_config_selects_positive_format():
     cfg = interactive_server.normalize_config_result({'delivery_name': '格式', 'placement_ids': ['oppo-rich-horizontal-big-1280x720']}, interactive_server.slots_by_id())
     assert cfg['prompt_format'] == positive.FORMAT
+    assert cfg['learner_story_required']
 
 
 @pytest.mark.parametrize('count', [1, 2, 3])
@@ -139,7 +140,7 @@ def test_asset_roles_and_complete_ad_reference_are_explicit(count):
     refs = [logo_reference.build_logo_reference(cfg),
             {'label': '参考图2', 'role': '标题字体参考', 'path': d['font_reference_path']}]
     base = positive.compose(cfg, d, references=refs)
-    assert '参考图1的原版Logo' in base and '参考图2用于标题字形参考' in base
+    assert '原样呈现参考图1的完整Logo' in base and '参考图2用于标题字形参考' in base
     assert '完整广告成图' not in base
     for slot in range(2, count + 1):
         branch = positive.compose(cfg, d, slot, [{'label': '参考图1', 'path': '/tmp/base.png'}])
@@ -158,3 +159,35 @@ def test_random_style_is_bound_before_writing_even_a_single_image_prompt():
     other = next(s['id'] for s in visual.load_catalog()['styles'] if s['id'] != assignment['style_id'])
     cfg['visual_concepts'][0]['style_id'] = other
     with pytest.raises(ValueError, match='assign-styles'): visual.plan_directions(cfg)
+
+
+def test_new_learner_story_keeps_a_student_in_no_ip_prompts_and_records_the_pain():
+    cfg = configuration(); cfg['learner_story_required'] = True
+    story = {'protagonist': '一位扎马尾、穿米白上衣的原创初中女生',
+             'pain_point': '想补数学，却不知道该先补哪个章节',
+             'product_action': '洋葱AI按目标和基础安排每日任务',
+             'visible_change': '学生看清今天先学什么，开始动笔'}
+    cfg['visual_concepts'][0]['learner_story'] = story
+    d = visual.plan_directions(cfg)['directions'][0]
+    assert d['subject_mode'] == 'original_student' and not d['ip_asset_id']
+    assert story['protagonist'] in d['base_prompt_rule']
+    assert d['learner_story'] == story
+    assert story['pain_point'] in d['base_prompt_rule']
+    del cfg['visual_concepts'][0]['learner_story']['pain_point']
+    with pytest.raises(ValueError, match='learner_story'): visual.plan_directions(cfg)
+
+
+def test_missing_new_story_fails_without_changing_frozen_legacy_configs():
+    cfg = configuration(); cfg['learner_story_required'] = True
+    with pytest.raises(ValueError, match='learner_story'): visual.plan_directions(cfg)
+    cfg.pop('learner_story_required')
+    assert visual.plan_directions(cfg)['directions'][0]['subject_mode'] == 'approved_action_without_ip'
+
+
+def test_logo_prompt_keeps_the_complete_mark_wordmark_and_original_geometry():
+    rule = logo_reference.logo_prompt_rule()
+    for key in ['参考图1', '品牌图形', '洋葱学园', '全部标准字', '同一完整组合', '原版颜色', '图文比例', '轮廓', '眼睛', '角标', '整体等比缩放']:
+        assert key in rule
+    assert not re.search(r'不得|不要|禁止|不能', rule)
+    previous = logo_reference.PREVIOUS_POSITIVE_LOGO_TEMPLATE.format(label='参考图1')
+    assert logo_reference.has_logo_rule(previous, '参考图1', '左上角')

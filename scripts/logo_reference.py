@@ -18,9 +18,15 @@ LEGACY_LOGO_PROMPT_TEMPLATE = (
     "不另加底板、色块、边框或弧形区域，仅调整整体大小和位置。"
 )
 
-LOGO_PROMPT_TEMPLATE = (
+PREVIOUS_POSITIVE_LOGO_TEMPLATE = (
     "左上角完整呈现{label}的原版Logo，图形、文字、颜色、比例、轮廓及角标与原图一致，"
     "周围背景自然延续画面色调，原版标识清晰可辨。"
+)
+
+LOGO_PROMPT_TEMPLATE = (
+    "左上角原样呈现{label}的完整Logo，品牌图形与包含“洋葱学园”的全部标准字作为同一完整组合呈现，"
+    "原版颜色、图文比例、轮廓、眼睛及角标逐项保持一致；以原版整体等比缩放与定位，"
+    "Logo周围背景自然延续画面色调，完整图形和全部标准字清晰可辨。"
 )
 
 LOGO_BACKGROUND_CONFLICTS = (
@@ -58,7 +64,7 @@ def logo_prompt_rule(label: str = "参考图1", position: str = "左上角") -> 
 
 def has_logo_rule(prompt, label, position):
     return any(template.replace("左上角", position).format(label=label) in prompt
-               for template in (LOGO_PROMPT_TEMPLATE, LEGACY_LOGO_PROMPT_TEMPLATE))
+               for template in (LOGO_PROMPT_TEMPLATE, PREVIOUS_POSITIVE_LOGO_TEMPLATE, LEGACY_LOGO_PROMPT_TEMPLATE))
 
 
 def load_asset_manifest(path: Path = ASSET_MANIFEST) -> list[dict[str, Any]]:
@@ -239,6 +245,8 @@ def validate_manifest_logo(manifest: dict[str, Any], config: dict[str, Any]) -> 
         validate_logo_prompt_rule(str(job.get("prompt") or ""), [first])
         prompt = str(job.get("prompt") or "")
         position = logo_position(config)
+        if config.get("learner_story_required") and logo_prompt_rule("参考图1", position) not in prompt:
+            raise ValueError(f"{job_id} 新任务须使用完整图形与全部标准字的Logo保真约束")
         if not has_logo_rule(prompt, "参考图1", position):
             raise ValueError(f"{job_id} Logo 必须放在{position}")
         other_position = "左上角" if position == "上方居中" else "上方居中"
