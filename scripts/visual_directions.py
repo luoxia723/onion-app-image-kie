@@ -31,7 +31,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -111,6 +111,31 @@ def varied_layouts(styles, layouts, rng):
     return result
 
 
+def assign_styles(config, seed=None):
+    """Choose only the main style; the agent designs each complete scene afterward."""
+    copies = config.get("copy_refs") or [{} for _ in range(int(config.get("copy_count") or 1))]
+    sets = int(config.get("sets") or 1)
+    if not 1 <= sets <= 50 or len(copies) * sets > 100:
+        raise ValueError("visual planning exceeds configured group limits")
+    styles = load_catalog()["styles"]
+    if config.get("ip_random") or config.get("ip_asset_id") or config.get("ip") == "随机":
+        styles = [style for style in styles if style.get("supports_ip", False)]
+    fixed = config.get("visual_direction") or {}
+    if fixed.get("style_prompt"):
+        styles = [{"id": "user_fixed_style", "name": "用户指定画风", "prompt": fixed["style_prompt"]}]
+    elif fixed.get("style_id"):
+        styles = [style for style in styles if fixed["style_id"] == style["id"] or fixed["style_id"] in style.get("alias_ids", [])]
+    if not styles:
+        raise ValueError("no compatible main styles for the saved configuration")
+    rng = random.Random(str(seed if seed is not None else config.get("request_id", "")) + ":main-styles")
+    selected = balanced(styles, len(copies) * sets, rng)
+    return {"schema_version": "onion_style_assignments_v1", "request_id": config.get("request_id"),
+            "directions": [{"set_id": f"copy-{i // sets + 1:03d}-placement-001-set-{i % sets + 1:02d}",
+                            "style_id": style["id"], "style_name": style["name"], "style_prompt": style["prompt"],
+                            "ip_adaptation": style.get("ip_adaptation", ""),
+                            "style_source_ids": style.get("source_ids", [])} for i, style in enumerate(selected)]}
+
+
 def plan_content_concepts(config, seed=None):
     copies = config.get("copy_refs") or [{} for _ in range(int(config.get("copy_count") or 1))]
     sets = int(config.get("sets") or 1)
@@ -119,6 +144,11 @@ def plan_content_concepts(config, seed=None):
     concepts = config.get("visual_concepts")
     if not isinstance(concepts, list) or len(concepts) != len(copies) * sets:
         raise ValueError("content_first requires one complete visual_concepts entry per copy/set")
+    style_mode = config.get("visual_style_mode", "random")
+    if style_mode not in {"random", "coordinated"}:
+        raise ValueError("visual_style_mode must be random or coordinated")
+    random_batch = style_mode == "random" and len(concepts) > 1
+    assigned = assign_styles(config, seed)["directions"] if random_batch else []
     placement = config["placements"][0]
     image_count = int(placement.get("image_count") or {"双图": 2, "三图": 3}.get(config.get("image_form"), 1))
     assets = json.loads((SKILL_DIR / "assets/asset-manifest.json").read_text())["assets"]
@@ -143,6 +173,11 @@ def plan_content_concepts(config, seed=None):
     for index, concept in enumerate(concepts):
         if not isinstance(concept, dict) or any(not isinstance(concept.get(k), str) or not concept[k].strip() for k in ("name", "prompt")):
             raise ValueError("each visual concept needs a name and a complete scene prompt")
+        style = assigned[index] if random_batch else None
+        if style:
+            acknowledged = concept.get("style_id") or (style["style_id"] if fixed.get("style_id") or fixed.get("style_prompt") else "")
+            if acknowledged != style["style_id"]:
+                raise ValueError("run --assign-styles first, then design each concept with its assigned style_id")
         actions = concept.get("slot_actions")
         if not isinstance(actions, list) or len(actions) != image_count or any(not isinstance(a, str) or not a.strip() for a in actions):
             raise ValueError("visual concept slot_actions must cover each image in the saved form")
@@ -168,11 +203,16 @@ def plan_content_concepts(config, seed=None):
                      "所选Logo保持原版图形、标准字、颜色与规定位置；标题遵循所选独立字体参考。")
         base_rule += ("IP是场景的行动主体，保留原版脸型、发型、体型、服装与关键标识，用姿势、视线和表情表现本张状态。"
                       if ip else "本套未选IP，按方案中的主体和道具表现确认动作，不新增吉祥物。")
+        if style:
+            base_rule += f"\n本套主画风：{style['style_name']}；{style['style_prompt']}"
+            if ip and style["ip_adaptation"]:
+                base_rule += "IP画风适配：" + style["ip_adaptation"]
         directions.append({
             "direction_id": direction_id, "set_id": f"copy-{copy_index:03d}-placement-001-set-{set_index:02d}",
             "copy_draft_id": copies[copy_index - 1].get("copyDraftId", f"draft-{copy_index}"),
             "concept_name": concept["name"], "concept_prompt": concept["prompt"],
-            "style_source_ids": concept.get("style_source_ids", []),
+            "style_source_ids": style["style_source_ids"] if style else concept.get("style_source_ids", []),
+            **({"style_id": style["style_id"], "style_name": style["style_name"]} if style else {}),
             "style_description_origin": "task_authored", "style_verification_status": "task_authored",
             "style_image_validated": False,
             "slot_prompt_rules": slot_rules, "ip_asset_id": selected_ip,
@@ -182,7 +222,8 @@ def plan_content_concepts(config, seed=None):
             "branch_prompt_rule": f"同套画面继承[{direction_id}]：从本套首张PNG继承角色身份、服装、视觉体系、场景、字体与Logo；按当前短句和本张动作推进状态，调整姿势、视线、表情与必要道具，使每张承担对应的叙事内容。",
         })
     return {"schema_version": "onion_visual_plan_v1", "request_id": config.get("request_id"),
-            "config_fingerprint": config_fingerprint(config), "mode": "content_first", "directions": directions}
+            "config_fingerprint": config_fingerprint(config), "mode": "content_first",
+            "style_mode": style_mode, "directions": directions}
 
 
 def plan_directions(config, seed=None):
@@ -302,6 +343,10 @@ def validate_visual_plan(manifest, config):
     if plan.get("schema_version") != "onion_visual_plan_v1" or plan.get("request_id") != config.get("request_id") or plan.get("config_fingerprint") != config_fingerprint(config):
         raise ValueError("visual plan is stale or belongs to another configuration")
     directions = {value["set_id"]: value for value in plan["directions"]}
+    if plan.get("style_mode") == "random":
+        prompts = ["".join(job["prompt"].split()) for job in manifest["jobs"]]
+        if len(set(prompts)) != len(prompts):
+            raise ValueError("each image must have its own distinct complete prompt")
     copy_count = len(config.get("copy_refs") or []) or int(config.get("copy_count") or 1)
     expected = copy_count * int(config.get("sets") or 1)
     if len(directions) != expected or len(directions) != len(plan["directions"]) or len({d["direction_id"] for d in directions.values()}) != expected or set(directions) != {job["set_id"] for job in manifest["jobs"]}:
@@ -334,6 +379,7 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--seed")
     parser.add_argument("--list-styles", action="store_true", help="Read the local source-backed descriptor library without generating images")
+    parser.add_argument("--assign-styles", action="store_true", help="Assign one main style per set before authoring complete scenes")
     parser.add_argument("--query", default="", help="Filter Chinese/English names, aliases or visual descriptions")
     parser.add_argument("--detail", action="store_true", help="Include IP adaptation and source metadata")
     args = parser.parse_args()
@@ -347,7 +393,8 @@ def main():
         return
     if not args.config or not args.output:
         parser.error("planning requires --config and --output")
-    result = plan_directions(json.loads(args.config.read_text()), args.seed)
+    config = json.loads(args.config.read_text())
+    result = assign_styles(config, args.seed) if args.assign_styles else plan_directions(config, args.seed)
     if args.output.exists():
         raise ValueError("visual plan exists; use a new task version or output path")
     args.output.parent.mkdir(parents=True, exist_ok=True)

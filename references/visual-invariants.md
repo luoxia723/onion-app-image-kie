@@ -36,6 +36,6 @@
 
 ## 编排与效果验证的边界
 
-[完整画面方案](visual-directions.md)由Agent先设计内容、IP动作与整体视觉，再保存可复核的计划；脚本检查计划、逐张动作与实际Prompt、所选IP和字体的绑定。同套继承首张，多套允许共用合适的画风。风格描述及来源仍由config/visual-directions.json、config/visual-style-sources.json维护，供整体设计时按需参考。
+[完整画面方案](visual-directions.md)由Agent先设计内容、IP动作与整体视觉，再保存可复核的计划；脚本检查计划、逐张动作与实际Prompt、所选IP和字体的绑定。批量默认按套随机主画风并优先不重复，同套继承首张；用户指定画风优先。风格描述及来源仍由config/visual-directions.json、config/visual-style-sources.json维护，供整体设计时按需参考。
 
 当前没有Logo像素保真、前景背景可读性或生成画风一致性的自动图像检测。计划不同不代表成图必然不同，Prompt规则仍需在候选中逐张查看。内容偏差按[候选选择规则](input-output-contract.md)记录，不自动新增付费任务。

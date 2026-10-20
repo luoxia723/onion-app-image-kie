@@ -14,6 +14,7 @@ import visual_directions as visual
 def content_config():
     return {
         'request_id': 'content-first-math', 'sets': 2, 'visual_diversity_enabled': True,
+        'visual_style_mode': 'coordinated',  # Explicit shared-style design remains available.
         'logo': '洋葱学园', 'ip_asset_id': 'ip.leiting.junior.standard.001',
         'font_reference_enabled': True,
         'copy_refs': [{'copyDraftId': 'math', 'short1': '这周我想把数学补起来',
@@ -35,7 +36,7 @@ def bound_manifest(cfg, plan, tmp_path):
     path.write_text(json.dumps(plan, ensure_ascii=False))
     jobs = []
     for direction in plan['directions']:
-        for slot in (1, 2, 3):
+        for slot in range(1, int(cfg['placements'][0]['image_count']) + 1):
             rule = direction['base_prompt_rule'] if slot == 1 else direction['branch_prompt_rule']
             refs = ([{'asset_id': direction['ip_asset_id'], 'path': str(visual.SKILL_DIR / direction['ip_reference_path'])},
                      {'path': direction['font_reference_path']}] if slot == 1 else [])
@@ -50,6 +51,7 @@ def test_new_saved_config_defaults_to_content_first():
         {'delivery_name': '数学三图', 'placement_ids': ['oppo-app-slot-slot-320x210']},
         interactive_server.slots_by_id())
     assert saved['visual_diversity_mode'] == 'content_first'
+    assert saved['visual_style_mode'] == 'random'
 
 
 def test_complete_concepts_are_preserved_without_any_visual_pool_sampling(monkeypatch):
@@ -168,3 +170,57 @@ def test_content_first_triptych_passes_batch_preflight_and_rejects_wrong_action(
     manifest_path.write_text(json.dumps(manifest,ensure_ascii=False))
     monkeypatch.setattr(direct_batch,'invoke',lambda *a,**k:pytest.fail('render called before validating all scene actions'))
     with pytest.raises(ValueError,match='planned scene action'):direct_batch.execute(args)
+
+
+def random_style_config(sets=6):
+    cfg=content_config();cfg.pop('visual_style_mode');cfg['sets']=sets
+    assigned=visual.assign_styles(cfg)['directions']
+    cfg['visual_concepts']=[{
+        'name':f'学习场景{i+1}', 'style_id':style['style_id'],
+        'prompt':'在家庭学习角整理数学任务，人物与纸张的动作关系清楚。'+style['style_prompt'],
+        'slot_actions':['握笔准备开始。','展开纸卡安排任务。','查看完成纸卡。'],
+    } for i,style in enumerate(assigned)]
+    return cfg,assigned
+
+
+def test_batch_default_assigns_random_main_styles_without_repeating_the_pool():
+    cfg,assigned=random_style_config()
+    assert assigned==visual.assign_styles(cfg)['directions']
+    assert len({s['style_id'] for s in assigned})==6
+    other=copy.deepcopy(cfg);other['request_id']='another-random-style-task'
+    assert [s['style_id'] for s in assigned]!=[s['style_id'] for s in visual.assign_styles(other)['directions']]
+    plan=visual.plan_directions(cfg)
+    assert plan['style_mode']=='random'
+    for direction,style in zip(plan['directions'],assigned):
+        assert direction['style_id']==style['style_id']
+        assert style['style_prompt'] in direction['base_prompt_rule']
+        assert direction['style_source_ids']==style['style_source_ids']
+
+
+def test_scene_must_acknowledge_its_randomly_assigned_style():
+    cfg,_=random_style_config(2)
+    cfg['visual_concepts'][0]['style_id']='unassigned-style'
+    with pytest.raises(ValueError,match='assign-styles'):visual.plan_directions(cfg)
+
+
+def test_user_fixed_style_overrides_batch_randomization():
+    cfg,_=random_style_config(6)
+    cfg['visual_direction']={'style_id':'commercial_anime'}
+    for concept in cfg['visual_concepts']:
+        concept['style_id']='commercial_anime'
+        concept['prompt']='在完整的学习场景中使用商业动漫画法，人物动作、光线与构图统一。'
+    plan=visual.plan_directions(cfg)
+    assert {d['style_id'] for d in plan['directions']}=={'commercial_anime'}
+
+
+def test_double_image_batches_randomize_by_set_and_keep_each_branch_bound(tmp_path):
+    cfg,_=random_style_config(2)
+    cfg['placements'][0]['image_count']=2
+    for concept in cfg['visual_concepts']:concept['slot_actions']=concept['slot_actions'][:2]
+    plan=visual.plan_directions(cfg)
+    manifest=bound_manifest(cfg,plan,tmp_path)
+    assert len({d['style_id'] for d in plan['directions']})==2
+    assert len(manifest['jobs'])==4
+    visual.validate_visual_plan(manifest,cfg)
+    manifest['jobs'][1]['prompt']=manifest['jobs'][0]['prompt']
+    with pytest.raises(ValueError,match='distinct complete prompt'):visual.validate_visual_plan(manifest,cfg)
