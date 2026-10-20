@@ -33,7 +33,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format", "cta_render_mode"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -228,7 +228,6 @@ def plan_content_concepts(config, seed=None):
             base_rule = paragraph(style_text, f"画面中的学习者为{story['protagonist']}。" if story else "",
                                   story["pain_point"] if story else "",
                                   concept["prompt"], slot_rules["1"], *fixed_rules,
-                                  "主体、道具与光线形成统一空间，标题位于清晰留白并具有鲜明阅读层级。",
                                   IP_RULE if ip else "", ui_rule)
             inherited = ["画风", "场景", "人物外形与服饰" if story else "主体设定"]
             if font:

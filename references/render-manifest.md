@@ -37,6 +37,7 @@
 
 - 所有有确认文案的job保存`copy_text`：双/三图对应当前slot短句，单图为主副文案以换行连接。新配置`prompt_format=positive_paragraph_v1`时，代码比对文案字段和Prompt原句，无需文字白名单。Prompt使用一段正向自然语言，技术限制留在配置和校验层。
 - 正式执行使用`direct_batch.py`，该入口负责整套完整性、首张依赖、分支只传首张PNG以及本地回执校验。
+- 新配置总是显式保存cta（可为空）及cta_render_mode=button。非空CTA由cta_rules.prompt_rule编排为带位置、按钮文字、对比和间距的可见按钮；预检检查每张的完整按钮指令。旧配置未保存该模式时继续按原任务恢复。
 
 ## 多样化计划
 

@@ -35,6 +35,12 @@ def validate_series(manifest, config):
         for job in group:
             if positive_format(config):
                 validate_paragraph(job["prompt"])
+                if config.get("cta") and config["cta"] not in job["prompt"]:
+                    raise ValueError("prompt must include the approved CTA")
+                if config.get("cta") and config.get("cta_render_mode") == "button":
+                    from cta_rules import prompt_rule as cta_rule
+                    if cta_rule(config["cta"]) not in job["prompt"]:
+                        raise ValueError("prompt must render the configured CTA as a button")
             slot = int(job.get("slot") or 1)
             copies = config.get("copy_refs") or []
             if copies and (count > 1 or positive_format(config)):
@@ -47,8 +53,6 @@ def validate_series(manifest, config):
                     texts = [text for text in approved_copy(source, slot, count) if text]
                     if not texts or job.get("copy_text") != "\n".join(texts) or any(text not in job["prompt"] for text in texts):
                         raise ValueError("copy_text and prompt must match the approved slot copy")
-                    if config.get("cta") and config["cta"] not in job["prompt"]:
-                        raise ValueError("prompt must include the approved CTA")
                     text = None
                 else:
                     text = source.get(f"short{slot}")

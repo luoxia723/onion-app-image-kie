@@ -43,6 +43,7 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
         raise ValueError("compose requires the new prompt_format")
     from logo_reference import logo_position, logo_prompt_rule
     from blue_frame import prompt_rule
+    from cta_rules import prompt_rule as cta_rule
 
     count = int(config["placements"][0].get("image_count") or {"双图": 2, "三图": 3}.get(config.get("image_form"), 1))
     copies = config.get("copy_refs") or []
@@ -56,11 +57,11 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
     if slot > 1:
         parts.append(direction["slot_prompt_rules"][str(slot)])
     if texts[0]:
-        parts.append(f'当前画面的主标题逐字呈现“{texts[0]}”。' if slot == 1 else f'主文案更新为“{texts[0]}”。')
+        parts.append(f'主标题文字逐字呈现为“{texts[0]}”，作为画面的第一文字层级，按本张构图完整排布。' if slot == 1 else f'本张主标题文字逐字更新为“{texts[0]}”，保持本套标题的视觉层级。')
     if len(texts) > 1 and texts[1]:
-        parts.append(f'副标题逐字呈现“{texts[1]}”，主副层级清楚。')
+        parts.append(f'副标题文字逐字呈现为“{texts[1]}”，字号小于主标题，与主标题形成清楚的阅读关系。')
     if config.get("cta"):
-        parts.append(f'行动文案呈现“{config["cta"]}”。')
+        parts.append(cta_rule(config["cta"]))
     if slot == 1:
         for ref in references:
             label, role = ref["label"], ref.get("role", "")

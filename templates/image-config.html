@@ -331,8 +331,8 @@
         <div class="hint">每套随机选择一张字体参考。同套后续图片沿用首张字体。</div>
       </div>
       <div id="ctaField" class="field hidden">
-        <label for="cta">CTA</label>
-        <input id="cta" placeholder="仅信息流填写，例如：立即体验 / 现在下载">
+        <label for="cta">CTA按钮文字</label>
+        <input id="cta" placeholder="例如：立即体验 / 立即下载；留空则不添加">
       </div>
       <div class="field">
         <label>界面 / 功能参考图</label>
@@ -379,7 +379,7 @@
       ipIndex: 0,
       fontEnabled: true,
       uiReferenceRequired: false,
-      cta: "",
+      cta: DATA.cta || "",
       notes: ""
     };
 
@@ -543,6 +543,8 @@
         ["费用估算", `每张 ${DATA.estimatedCreditsPerImage || 3} 积分，按账号截图估算`],
         ["压缩", slots.length ? slots.map(slot => slot.maxFileSizeKb ? `<${slot.maxFileSizeKb}KB` : "默认 200KB").join("；") : "-"],
         ["Logo", logo.label],
+        ["CTA按钮", selectedSlots().some(slot => slot.cta_policy === "optional" || slot.cta_policy === "required")
+          ? (state.cta.trim() ? state.cta.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) : "不添加") : "当前版位不添加"],
         ["IP", ip.random ? "随机：每张重新抽取" : ip.label],
         ["模式", "直接生图"],
         ["字体参考", state.fontEnabled ? "启用：每套统一字体" : "不启用"],

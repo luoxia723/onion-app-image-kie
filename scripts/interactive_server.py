@@ -792,6 +792,7 @@ def build_config_payload(
     started_at: str | None = None,
 ) -> dict[str, Any]:
     context = normalize_context(context)
+    from cta_rules import configured_text
     # Formal APP image generation is intentionally direct-generation only for now.
     # Existing-image iteration is not exposed by this local card.
     generation_mode = "explore"
@@ -819,6 +820,7 @@ def build_config_payload(
     return {
         "request_id": request_id,
         "context": context,
+        "cta": configured_text(context),
         "deliveryName": extract_delivery_name(context),
         "generationMode": generation_mode,
         "slots": slots,
@@ -961,6 +963,14 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result["generation_mode"] = generation_mode
     result["placement_ids"] = [slot["id"] for slot in placements]
     result["placements"] = placements
+    from cta_rules import configured_text
+    result["cta"] = configured_text(body)
+    policy = placements[0].get("cta_policy", "optional")
+    if policy == "forbidden" and result["cta"]:
+        raise ValueError("所选版位不允许CTA按钮")
+    if policy == "required" and not result["cta"]:
+        raise ValueError("所选版位必须填写CTA按钮文字")
+    result["cta_render_mode"] = "button"
     result["categories"] = sorted({slot["category"] for slot in placements if slot.get("category")})
     result["channels"] = sorted({slot["channel"] for slot in placements if slot.get("channel")})
     first = placements[0]
