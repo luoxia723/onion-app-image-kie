@@ -14,6 +14,11 @@ import render
 from logo_reference import build_logo_reference, logo_prompt_rule
 
 
+@pytest.fixture(autouse=True)
+def in_process_mock_worker(monkeypatch):
+    monkeypatch.setattr(direct_batch, 'invoke_paid', lambda job, policy: direct_batch.invoke(job, False))
+
+
 def triptych(tmp_path, monkeypatch):
     monkeypatch.setenv('ONION_IMAGE_WORKSPACE', str(tmp_path))
     output = tmp_path / '工作区/产物/03_候选'
@@ -38,7 +43,7 @@ def triptych(tmp_path, monkeypatch):
     manifest.write_text(json.dumps({'request_id': 'chain', 'jobs': jobs}, ensure_ascii=False))
     cfg.write_text(json.dumps(config, ensure_ascii=False))
     args = argparse.Namespace(manifest=manifest, config=cfg, validate_only=True,
-                              approved_in_current_task=False, approved_count=None)
+                              approved_in_current_task=False, approved_count=None, concurrency=1)
     return args, jobs
 
 

@@ -18,6 +18,8 @@ def args(tmp_path, approved=True):
 
 
 def setup(tmp_path, monkeypatch):
+    import direct_batch
+    monkeypatch.setattr(direct_batch, 'invoke_paid', lambda job, policy: direct_batch.invoke(job, False))
     monkeypatch.setenv('ONION_IMAGE_WORKSPACE', str(tmp_path))
     monkeypatch.setenv('KIE_API_KEY','mock-key')
     monkeypatch.setattr(render, 'autoload_dotenv', lambda: None)

@@ -532,6 +532,7 @@
       const ip = selectedIp();
       const delivery = safeDeliveryComponent(state.deliveryName, "未填写");
       const estimatedGroups = COPY_COUNT * slots.length * Number.parseInt(state.sets || "0", 10);
+      const estimatedImages = COPY_COUNT * Number.parseInt(state.sets || "0", 10) * slots.reduce((total, slot) => total + (slot.image_count || {single:1,double:2,triple:3}[slot.imageForm] || 1), 0);
       const items = [
         ["方向名", delivery],
         ["场景", state.category],
@@ -541,6 +542,9 @@
         ["比例适配", slots.length ? slots.map(slot => slot.geometry?.adaptation_note || "-").join("；") : "-"],
         ["生图配置", "GPT Image 2.5 Sunburst · 1K"],
         ["费用估算", `每张 ${DATA.estimatedCreditsPerImage || 3} 积分，按账号截图估算`],
+        ["本批预算", slots.length ? `正常预计${estimatedImages * (DATA.estimatedCreditsPerImage || 3)}积分；含超时重开最多${estimatedImages * (DATA.estimatedCreditsPerImage || 3) * (1 + (DATA.executionPolicy?.max_timeout_restarts ?? 1))}积分` : "-"],
+        ["批量执行", `${DATA.executionPolicy?.concurrency || 3}路并发；单次等待${(DATA.executionPolicy?.generation_timeout_seconds || 240) / 60}分钟`],
+        ["超时重开", `最多${DATA.executionPolicy?.max_timeout_restarts ?? 1}次；原任务可能继续扣费，重开时单张预算上限${(DATA.estimatedCreditsPerImage || 3) * (1 + (DATA.executionPolicy?.max_timeout_restarts ?? 1))}积分`],
         ["压缩", slots.length ? slots.map(slot => slot.maxFileSizeKb ? `<${slot.maxFileSizeKb}KB` : "默认 200KB").join("；") : "-"],
         ["Logo", logo.label],
         ["CTA按钮", selectedSlots().some(slot => slot.cta_policy === "optional" || slot.cta_policy === "required")
@@ -620,6 +624,7 @@
         copy_count: COPY_COUNT,
         copy_refs: COPY_REFS,
         estimated_group_count: estimatedGroups,
+        execution_policy: DATA.executionPolicy || {concurrency: 3, generation_timeout_seconds: 240, max_timeout_restarts: 1},
         max_group_count: MAX_GROUP_COUNT,
         category: selectedCategories[0] || state.category,
         categories: selectedCategories,

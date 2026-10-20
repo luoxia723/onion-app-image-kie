@@ -54,7 +54,7 @@ description: 当用户已有确认的APP图片文案，要求预览生图提示�
 4. 确定屏幕呈现方式：reference使用真实截图，conceptual允许设计清晰示意UI，none不展示屏幕。无截图不再强制模糊或停止；界面仅表达已确认功能，示意UI不冒称真实截图。
 5. 按[艺术定调层级](references/art-direction.md)将画风→世界与场景→叙事瞬间→构图→光色材质串成完整画面，写入`visual_concepts.art_direction`、完整prompt和逐张slot_actions。按[画面规划适配](references/scene-planning-app.md)给每张确定传播任务、叙事阶段与可见证据，联合设计动作、接触支撑和镜头，把实际决定写入场景及逐张动作。新配置`learner_story_required=true`，每套保存`learner_story`的protagonist、pain_point、product_action、visible_change；每张动作均围绕该人物与当前短句编写。每张均有人物参与学习场景：有IP使用选定IP，无IP默认使用普通原创初中生；人物动作、表情与学习处境对应当前文案痛点，物件与场景辅助叙事。有IP允许少量时代或风格细节融入，保留主要识别特征。新任务默认`content_first`，批量按套随机主画风，优先不重复；先运行`--assign-styles`，再据此整体设计场景、IP动作、构图与配色，保存对应`style_id`。每张提示词与动作单独编写，同套双/三图共用画风；用户指定画风优先。设计分析留在计划中；最终Prompt用一段正向自然语言，保持之前的画面叙述方式，以说清楚、约束完整为优先，不设默认字数目标，仅合并重复表述。代码可解决的限制留在配置和校验中，不写文字白名单、负面提示段或内部编号。新配置使用`prompt_format=positive_paragraph_v1`，可用`scripts/positive_prompt.py`的`compose`编排。按[完整画面方案](references/visual-directions.md)运行`scripts/visual_directions.py`保存`visual-plan.json`，再编写`image-render-manifest.json`，绑定计划、逐张动作与素材。预计常规裁切达到6%时按[白底蓝框适配](references/blue-frame-adaptation.md)准备布局参考；低于门槛常规适配。双/三图按[同套首张与分支规则](references/prompt-rules.md#同套双图三图生成)执行：图1使用原版素材，图2/3只引用同套图1PNG，按对应短句推进动作与状态。
 6. 运行`scripts/validate_task.py`和`scripts/direct_batch.py --validate-only`，验证全部job、Prompt、比例、引用顺序和输出路径，不调用付费接口；同时确认本地可导入`requirements.txt`锁定的Pillow，以及蓝框模式需要的OpenCV、NumPy。
-7. 告知预计图组数和图片数；取得当前任务付费确认后，按[直连配置与恢复](references/provider-contract.md)执行清单。先验证所有 job，再顺序生成，参考资产按内容哈希去重。默认单批最多12张，用户明确确认时最多20张；技术失败或提交状态不明时保存状态并停止，内容偏差仅作提示，不中断已授权批次。
+7. 告知预计图组数、图片数、正常预算及含超时重开的预算上限；取得当前任务付费确认后，按[直连配置与恢复](references/provider-contract.md)执行清单。先验证所有job，再按保存的execution_policy执行，默认3路并发、单次等待240秒、超时最多重开1次，参考资产按内容哈希去重。不同套及独立单图并发，同套分支在首张完成并核对回执后并发。单批候选默认最多12张，用户明确确认时最多20张；重开次数单独计入预算。超时后查询确认：成功就下载，明确仍在等待或生成才按限额重开；第二次超时、技术失败或状态不明时保存状态、停止新启动job，已运行job继续保存结果。内容偏差仅作提示，不中断已授权批次。
 8. 每张候选下载并解码为PNG，记录taskId、本地SHA-256、字节数和原图路径；不伪造供应商哈希或MCP产物ID。蓝框模式由`render.py`调用OpenCV识别实际框线、裁到内侧并拉伸至目标尺寸，另存无损预览，保留原图；找框失败的原图同样进入选择页并标注待复核，不中断其余已授权job。完整保留`image-render-result.json`，技术成功的候选全部进入选择页，文字、Logo、UI、事实和构图检查作为提示。
 9. 默认由用户结合候选和检查提示直接选择“采纳”或“不采纳”，不要求理由。用户明确要求只看最终结果并委托中间选择时，Agent可检查候选、代选符合要求的方案，保存`decision_source=agent_delegated`及委托原文，不能冒称用户已人工审核；最终仍把成图交给用户查看。选择结果保存后直接运行`scripts/prepare_accepted_deliveries.py`，一次读取全部`accepted_schemes`，使用本地Pillow按已保存版位的精确尺寸和KB上限生成JPEG、校验并写入`04_交付`与`05_质检`；零采纳同样正常完成，本地处理不按图片数再次向用户授权。用户明确要求打包时，才把交付规格质检结果传给`scripts/package_accepted_images.py --delivery-result <路径>`，生成ZIP和交付清单到`06_打包`。
 10. 任务根目录、版本、文件名和包名由`scripts/artifact_workspace.py`创建与校验；`.runtime/<任务ID>/`只保存可重建过程文件，不上传广告平台、不发布。
@@ -74,7 +74,7 @@ description: 当用户已有确认的APP图片文案，要求预览生图提示�
 - 旧任务文件里的`paid_generation_approved=true`不能替代当前任务命令上的`--approved-in-current-task`。
 - KIE提交结果不确定时保留任务状态并停止，不能再次创建可能重复扣费的任务。
 - 生成后内容检查按[输入、输出与人工门禁](references/input-output-contract.md)只作为候选提示，不中断已授权批次、不自动淘汰或重做。
-- 正式直连批次使用 `scripts/direct_batch.py`，统一验证、上传去重、任务恢复和结果记录；单张 `render.py` 提供同样的授权与状态保护。
+- 正式直连批次使用 `scripts/direct_batch.py`，统一验证、上传去重、依赖并发、任务恢复和结果记录。新配置保存execution_policy：concurrency=3、generation_timeout_seconds=240、max_timeout_restarts=1；每个逻辑图片最多2个KIE任务，重跑不重置次数。KIE未提供已确认可用的Market生图取消接口，停止本地等待不代表服务端取消，原超时任务仍可能完成扣费；全量任务ID保留。旧配置缺少该策略时不自动重开。单张render.py默认4分钟等待，只有显式--max-timeout-restarts 1才允许一次重开。
 - 蓝框去框与拉伸先形成候选预览；正式JPEG压缩与交付只处理用户采纳的图片。交付沿用同一框内处理结果，不再次对原图做cover裁切。本地处理不需要逐张授权。
 - 交付打包只读取交付规格质检结果中已经校验的JPEG，不重新读取候选或重复压缩。
 - 自动规格检查和内容提示都不替代人工选择；技术成功的候选全部给用户看，由用户决定是否采纳。

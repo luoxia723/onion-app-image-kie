@@ -37,6 +37,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from build_selection_page import normalize_sets  # noqa: E402
 from logo_reference import canonical_logo_fields  # noqa: E402
 from kie_model import MODEL, RESOLUTION, ESTIMATED_CREDITS_PER_IMAGE, geometry_report  # noqa: E402
+from execution_policy import DEFAULT_POLICY, normalize_policy  # noqa: E402
 
 IMAGE_SETS_FILE = "image-sets.json"
 MAX_BATCH_GROUP_COUNT = 100
@@ -836,6 +837,7 @@ def build_config_payload(
         "model": MODEL,
         "resolution": RESOLUTION,
         "estimatedCreditsPerImage": ESTIMATED_CREDITS_PER_IMAGE,
+        "executionPolicy": dict(DEFAULT_POLICY),
         "categories": categories or ["应用商店", "信息流", "学习机"],
         "diagnostics": diagnostics,
     }
@@ -992,6 +994,7 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result["resolution"] = RESOLUTION
     result["geometry"] = first["geometry"]
     result["estimated_credits_per_image"] = ESTIMATED_CREDITS_PER_IMAGE
+    result["execution_policy"] = normalize_policy(body.get("execution_policy"))
     result["target_kb"] = first["max_file_size_kb"] or 200
     result["sets"] = parse_set_count(body.get("sets"))
     result["copy_count"] = parse_positive_int(body.get("copy_count") or body.get("copyCount"), 1)
@@ -1001,6 +1004,9 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
         result["copy_count"] = max(result["copy_count"], len(result["copy_refs"]))
     result["max_group_count"] = MAX_BATCH_GROUP_COUNT
     result["estimated_group_count"] = result["copy_count"] * len(placements) * result["sets"]
+    result["estimated_candidate_count"] = result["estimated_group_count"] * first["image_count"]
+    result["estimated_credits"] = result["estimated_candidate_count"] * ESTIMATED_CREDITS_PER_IMAGE
+    result["max_estimated_credits"] = result["estimated_credits"] * (1 + result["execution_policy"]["max_timeout_restarts"])
     if result["estimated_group_count"] > MAX_BATCH_GROUP_COUNT:
         raise ValueError(
             f"batch group count exceeds {MAX_BATCH_GROUP_COUNT}: "

@@ -23,3 +23,5 @@
 配置卡、Prompt生成和`validate-only`阶段允许`paid_generation_approved=false`。正式执行前本字段必须为真，同时调用命令必须显式带`--approved-in-current-task`；历史任务合同不能替代当前授权。本合同永远不允许投放发布。
 
 屏幕模式为conceptual时可设计清晰示意UI，无需真实截图；reference表示要求还原真实界面，必须有ui_references；none不展示屏幕。旧任务未保存模式时，保留其原有ui_required含义。
+
+新任务的image-config-result.json同时保存execution_policy（默认3路并发、240秒等待、最多一次超时重开）、estimated_candidate_count、estimated_credits与max_estimated_credits。实际授权应涵盖候选数量和含重开的预算上限；旧合同不因本地默认策略变化获得新提交额度。

@@ -36,7 +36,7 @@ ENV_FILE = Path.home() / ".config" / "onion-app-image-kie" / ".env"
 SIZE_RE = re.compile(r"^([1-9]\d*)x([1-9]\d*)$")
 MAX_REFERENCE_IMAGES = 8
 MAX_REFERENCE_BYTES = 10 * 1024 * 1024
-DEFAULT_POLL_TIMEOUT = 900
+DEFAULT_POLL_TIMEOUT = 240
 
 
 
@@ -45,6 +45,10 @@ class KieError(Exception):
         super().__init__(message)
         self.exit_code = exit_code
         self.uncertain_submit = uncertain_submit
+
+
+class GenerationTimeout(KieError):
+    """The provider confirmed this task is still pending at its deadline."""
 
 
 def log(level: str, message: str) -> None:
@@ -248,11 +252,16 @@ def request_json(
     *,
     operation: str = "KIE request",
     retry_network: bool = True,
+    request_timeout: float = 300,
+    retry_deadline: float | None = None,
 ) -> dict[str, Any]:
     waits = [1, 3, 9]
     for attempt in range(1, max(1, retries) + 1):
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
+            remaining = retry_deadline - time.monotonic() if retry_deadline is not None else request_timeout
+            if remaining <= 0:
+                raise KieError(f"{operation} exceeded its query time budget", 3)
+            with urllib.request.urlopen(req, timeout=min(request_timeout, remaining)) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
             if not isinstance(body, dict):
                 raise KieError(f"{operation} returned non-object JSON", 3)
@@ -269,14 +278,14 @@ def request_json(
             if (exc.code == 429 or 500 <= exc.code <= 599) and attempt < retries:
                 wait = waits[min(attempt - 1, len(waits) - 1)]
                 log("WARN", f"{operation} HTTP {exc.code}; retrying in {wait}s ({attempt}/{retries})")
-                time.sleep(wait)
+                time.sleep(min(wait, max(0, retry_deadline - time.monotonic())) if retry_deadline is not None else wait)
                 continue
             raise KieError(f"{operation} failed: HTTP {exc.code}: {raw[:500]}", 3)
         except (urllib.error.URLError, TimeoutError) as exc:
             if retry_network and attempt < retries:
                 wait = waits[min(attempt - 1, len(waits) - 1)]
                 log("WARN", f"{operation} network error; retrying in {wait}s ({attempt}/{retries})")
-                time.sleep(wait)
+                time.sleep(min(wait, max(0, retry_deadline - time.monotonic())) if retry_deadline is not None else wait)
                 continue
             raise KieError(
                 f"{operation} network error: {exc}",
@@ -334,7 +343,16 @@ def load_output_state(output: Path) -> dict[str, Any]:
     state = load_task_state(task_state_path(output))
     if output.exists() and not state:
         raise ValueError("existing output has no task state; use a new output path")
-    if state and not state.get("task_id"):
+    if state:
+        history, count = state.get("attempt_history", []), state.get("timeout_restarts", 0)
+        if (type(count) is not int or count not in (0, 1) or not isinstance(history, list) or len(history) != count
+                or any(not isinstance(old, dict) or not old.get("task_id") or not old.get("timeout_confirmed")
+                       or old.get("fingerprint") != state.get("fingerprint") for old in history)):
+            raise KieError("invalid timeout restart journal; refusing a new task", 1)
+    if state and state.get("status") == "restart_ready":
+        if count != 1:
+            raise KieError("invalid timeout restart journal; refusing a new task", 1)
+    elif state and not state.get("task_id"):
         raise KieError(f"previous KIE task submission was uncertain; refusing to create a duplicate for {output}", 3)
     return state
 
@@ -400,21 +418,33 @@ def poll_task(
     retries: int,
     timeout_seconds: int,
 ) -> tuple[str, dict[str, Any]]:
-    started = time.monotonic()
+    started = state.get("submitted_at", time.time())
     while True:
+        remaining = started + timeout_seconds - time.time()
+        confirming = remaining <= 0
+        # A final bounded status query distinguishes a slow task from a lost connection.
+        query_budget = 10 if confirming else min(30, remaining)
         body = request_json(
             build_status_request(api_base, api_key, task_id),
-            retries,
+            1 if confirming else retries,
             operation=f"poll KIE task {task_id}",
+            request_timeout=query_budget,
+            retry_deadline=time.monotonic() + query_budget,
         )
         data = body.get("data") or {}
         task_status = str(data.get("state") or "").lower()
         state.update({"status": task_status or "unknown", "task_id": task_id})
+        if type(data.get("createTime")) in (int, float) and data["createTime"] > 0:
+            started = min(started, data["createTime"] / 1000)
+            state["submitted_at"] = started
+        else:
+            state.setdefault("submitted_at", started)
         if task_status == "success":
             urls = parse_result_urls(data.get("resultJson"))
             if not urls:
                 raise KieError(f"KIE task {task_id} succeeded without resultUrls", 3)
             state["result_url"] = urls[0]
+            state["credits_consumed"] = data.get("creditsConsumed")
             atomic_write_json(state_path, state)
             return urls[0], data
         if task_status == "fail":
@@ -428,12 +458,64 @@ def poll_task(
             atomic_write_json(state_path, state)
             raise KieError(f"KIE task {task_id} returned unknown state: {task_status or 'empty'}", 3)
         atomic_write_json(state_path, state)
-        elapsed = time.monotonic() - started
+        elapsed = time.time() - started
         if elapsed >= timeout_seconds:
             state["status"] = "poll_timeout"
+            state["timeout_confirmed"] = True
+            state["provider_state_at_timeout"] = task_status
             atomic_write_json(state_path, state)
-            raise KieError(f"KIE task {task_id} did not finish within {timeout_seconds}s; rerun to resume it", 3)
+            raise GenerationTimeout(f"KIE task {task_id} is still {task_status} after {timeout_seconds}s", 3)
         time.sleep(min(poll_delay(elapsed), max(0.0, timeout_seconds - elapsed)))
+
+
+def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths, fingerprint, state_path, state, aspect_ratio, resolution):
+    """Resume one active task, replacing only a confirmed timeout within its saved cap."""
+    limit = getattr(args, "max_timeout_restarts", 0)
+    if type(limit) is not int or limit not in (0, 1):
+        raise ValueError("max_timeout_restarts must be 0 or 1")
+    while True:
+        task_id = str(state.get("task_id") or "")
+        if not task_id:
+            if state and (state.get("status") != "restart_ready" or limit < state.get("timeout_restarts", 0)):
+                raise KieError("submission or restart is not authorized; retain the task state", 3)
+            cache_path = getattr(args, "upload_cache", None)
+            cache = json.loads(Path(cache_path).read_text()) if cache_path and Path(cache_path).is_file() else None
+            urls = (upload_references(upload_base, api_key, reference_paths, args.retries, cache=cache)
+                    if cache is not None else upload_references(upload_base, api_key, reference_paths, args.retries))
+            state = {"provider": "kie", "fingerprint": fingerprint, "model": MODEL,
+                     "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "submitting",
+                     "submitted_at": time.time(), "attempt_history": state.get("attempt_history", []),
+                     "timeout_restarts": state.get("timeout_restarts", 0)}
+            atomic_write_json(state_path, state)
+            try:
+                created = request_json(build_create_request(api_base, api_key, prompt, aspect_ratio, resolution, urls),
+                                       1, operation="create KIE image task", retry_network=False,
+                                       request_timeout=min(30, max(1, args.poll_timeout)))
+                task_id = str((created.get("data") or {}).get("taskId") or "")
+                if not task_id:
+                    raise KieError("create KIE image task returned no taskId", 3)
+            except KieError:
+                state["status"] = "submit_uncertain"
+                atomic_write_json(state_path, state)
+                raise
+            state.update(task_id=task_id, status="waiting")
+            atomic_write_json(state_path, state)
+        if state.get("result_url"):
+            return state["result_url"], state
+        try:
+            url, _ = poll_task(api_base, api_key, task_id, state_path, state, args.retries, max(1, args.poll_timeout))
+            return url, state
+        except GenerationTimeout:
+            count = state.get("timeout_restarts", 0)
+            if count >= limit or not state.get("timeout_confirmed"):
+                raise
+            previous = {key: value for key, value in state.items() if key != "attempt_history"}
+            previous.update(abandoned_at=time.time(), cancellation_confirmed=False)
+            state = {"provider": "kie", "fingerprint": fingerprint, "model": MODEL,
+                     "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "restart_ready",
+                     "attempt_history": [*state.get("attempt_history", []), previous], "timeout_restarts": count + 1}
+            atomic_write_json(state_path, state)
+            log("WARN", f"Task {task_id} timed out; starting its one authorized replacement. The old task may still complete and be billed.")
 
 
 def download_image(url: str, output_path: str | Path) -> Path:
@@ -524,6 +606,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--upload-base", default=None, help=f"KIE upload API base, default {DEFAULT_UPLOAD_BASE}")
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT)
+    parser.add_argument("--max-timeout-restarts", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--upload-cache", help=argparse.SUPPRESS)
     parser.add_argument("--validate-only", action="store_true", help="Validate without calling KIE")
     parser.add_argument(
         "--approved-in-current-task",
@@ -650,64 +734,29 @@ def run(args) -> int:
             if state.get("sha256") == sha256_file(output):
                 metadata.update({"task_id": state.get("task_id"), "sha256": state["sha256"], "byte_count": output.stat().st_size})
                 metadata.update(output_geometry(output, size_label))
+                metadata.update(timeout_restarts=state.get("timeout_restarts", 0), previous_attempts=state.get("attempt_history", []))
+                if metadata["previous_attempts"]:
+                    metadata["review_findings"].append("超时原任务未确认取消，仍可能完成并扣费；已保留全部任务ID。")
                 if frame_layout_path:
                     from blue_frame import attach_result
                     attach_result(metadata, output, frame_layout_path)
                 print(json.dumps(metadata, ensure_ascii=False))
                 return 0
-        result_url = str(state.get("result_url") or "")
-        task_id = str(state.get("task_id") or "")
-        if not task_id and state:
-            raise KieError(
-                f"previous KIE task submission was uncertain; refusing to create a duplicate for {output}",
-                3,
-            )
-        if not task_id:
-            input_urls = upload_references(upload_base, api_key, reference_paths, args.retries)
-            state = {
-                "provider": "kie",
-                "fingerprint": fingerprint,
-                "model": model,
-                "aspect_ratio": aspect_ratio,
-                "resolution": resolution,
-                "status": "submitting",
-            }
-            atomic_write_json(state_path, state)
-            try:
-                created = request_json(
-                    build_create_request(api_base, api_key, prompt, aspect_ratio, resolution, input_urls),
-                    1,
-                    operation="create KIE image task",
-                    retry_network=False,
-                )
-            except KieError as exc:
-                state["status"] = "submit_uncertain"
-                atomic_write_json(state_path, state)
-                raise
-            task_id = str((created.get("data") or {}).get("taskId") or "")
-            if not task_id:
-                state["status"] = "submit_uncertain"
-                atomic_write_json(state_path, state)
-                raise KieError("create KIE image task returned no taskId", 3)
-            state.update({"task_id": task_id, "status": "waiting"})
-            atomic_write_json(state_path, state)
-
-        if not result_url:
-            result_url, task_data = poll_task(
-                api_base,
-                api_key,
-                task_id,
-                state_path,
-                state,
-                args.retries,
-                max(1, args.poll_timeout),
-            )
-            metadata["credits_consumed"] = task_data.get("creditsConsumed")
+        result_url, state = obtain_result(args, api_base, upload_base, api_key, prompt,
+                                          reference_paths, fingerprint, state_path, state, aspect_ratio, resolution)
+        task_id = state["task_id"]
+        metadata["credits_consumed"] = state.get("credits_consumed")
+        metadata["timeout_restarts"] = state.get("timeout_restarts", 0)
+        metadata["previous_attempts"] = state.get("attempt_history", [])
+        if metadata["previous_attempts"]:
+            metadata["review_findings"] = ["超时原任务未确认取消，仍可能完成并扣费；已保留全部任务ID。"]
         saved = download_image(result_url, output)
         state.update({"status": "downloaded", "task_id": task_id, "result_url": result_url, "sha256": sha256_file(saved)})
         atomic_write_json(state_path, state)
         metadata.update({"filepath": str(saved), "task_id": task_id, "valid": True, "sha256": sha256_file(saved), "byte_count": saved.stat().st_size})
-        metadata.update(output_geometry(saved, size_label))
+        geometry = output_geometry(saved, size_label)
+        geometry["review_findings"] = metadata.get("review_findings", []) + geometry["review_findings"]
+        metadata.update(geometry)
         if frame_layout_path:
             from blue_frame import attach_result
             attach_result(metadata, saved, frame_layout_path)

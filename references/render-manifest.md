@@ -49,3 +49,7 @@
 计划保留style_source_ids、style_description_origin、style_verification_status和style_image_validated。新任务使用库中visual_prompt正向画法描述，IP时代细节由完整场景决定，来源URL留在资料登记中；不把文献链接或上游负向模板画进广告。
 
 清晰示意UI通过screen_ui_mode=conceptual记录，不需要截图参考；job.ui_text须等于计划screen_text，字段留在清单中校验；需要可见时直接描述具体界面内容。reference模式才要求真实截图。
+
+## 执行策略
+
+新配置execution_policy默认concurrency=3、generation_timeout_seconds=240、max_timeout_restarts=1。该策略不改变Prompt、生成参数或同套引用身份。direct_batch先预检全部job，再并发启动已就绪的job，首张成功后其分支同时就绪；每个worker独立持有输出锁。单次等待超时按[供应商合同](provider-contract.md)最多重开一次，全部尝试ID与计费不确定性保留在任务状态及结果previous_attempts中。历史配置无策略时不自动重开；不修改旧指纹追认费用。

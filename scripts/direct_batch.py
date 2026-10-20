@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Validate and run one bounded, sequential KIE image batch."""
+"""Preflight a bounded KIE batch, then run independent jobs in isolated workers."""
 from __future__ import annotations
 import argparse
 import contextlib
 import io
+import os
+import hashlib
+import re
+import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import json
 from pathlib import Path
 import sys
@@ -14,6 +20,7 @@ from logo_reference import validate_manifest_logo
 from kie_model import PROVIDER, RESOLUTION, ESTIMATED_CREDITS_PER_IMAGE, nearest_aspect_ratio, geometry_report
 from series_chain import validate_series
 from visual_directions import validate_visual_plan
+from execution_policy import normalize_policy
 
 
 def render_args(job, validate):
@@ -21,7 +28,7 @@ def render_args(job, validate):
     return argparse.Namespace(
         input_json=str(input_path), prompt=None, aspect_ratio=None, size=None,
         resolution=None, quality=None, reference=[], output=str(job["output"]),
-        api_base=None, upload_base=None, retries=3, poll_timeout=900,
+        api_base=None, upload_base=None, retries=3, poll_timeout=render.DEFAULT_POLL_TIMEOUT,
         validate_only=validate, approved_in_current_task=not validate,
     )
 
@@ -39,6 +46,49 @@ def invoke(job, validate):
     return json.loads(output.getvalue())
 
 
+_UPLOAD_LOCK = threading.Lock()
+
+
+def invoke_paid(job, policy):
+    """Workers have separate stdout, model state and output locks."""
+    cache_path = Path(policy["upload_cache_path"])
+    state = render.load_output_state(Path(job["output"]))
+    if state.get("status") == "restart_ready" and policy["max_timeout_restarts"] < state["timeout_restarts"]:
+        raise render.KieError("timeout replacement is not authorized for this configuration", 3)
+    if not state.get("task_id"):
+        render.autoload_dotenv()
+        key = os.environ.get("KIE_API_KEY", "").strip()
+        if not key:
+            raise render.KieError("KIE_API_KEY is missing", 2)
+        refs = render.normalize_reference_items(job.get("references") or job.get("reference_images") or [])
+        paths = [render.resolve_reference_path(ref["path"], batch.repository_root(), render.SCRIPT_DIR.parent) for ref in refs]
+        with _UPLOAD_LOCK:
+            cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+            render.upload_references(os.environ.get("KIE_UPLOAD_BASE_URL", render.DEFAULT_UPLOAD_BASE), key, paths, 3, cache=cache)
+            batch.atomic_write_json(cache_path, cache)
+    input_path = batch.write_render_input(job)
+    command = [sys.executable, str(render.SCRIPT_DIR / "render.py"), "--input-json", str(input_path),
+               "--output", str(job["output"]), "--poll-timeout", str(policy["generation_timeout_seconds"]),
+               "--max-timeout-restarts", str(policy["max_timeout_restarts"]), "--upload-cache", str(cache_path),
+               "--approved-in-current-task"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.stderr:
+        Path(job["output"]).with_suffix(".render.log").write_text(result.stderr)
+    if result.returncode:
+        raise render.KieError(f"job {job['job_id']} stopped; retain its task state: {result.stderr.strip()}", result.returncode)
+    return json.loads(result.stdout)
+
+
+def execution_policy(args, config, manifest_path):
+    policy = normalize_policy(config.get("execution_policy"), legacy="execution_policy" not in config)
+    if getattr(args, "concurrency", None) is not None:
+        policy = normalize_policy({**policy, "concurrency": args.concurrency})
+    identity = str(config.get("request_id") or hashlib.sha256(str(manifest_path).encode()).hexdigest()[:16])
+    identity = re.sub(r"[^a-zA-Z0-9_.-]", "_", identity).strip(".") or "batch"
+    policy["upload_cache_path"] = str(batch.repository_root() / ".runtime" / identity / "reference-upload-cache.json")
+    return policy
+
+
 def execute(args):
     manifest_path = args.manifest.expanduser().resolve()
     manifest = batch.load_manifest(manifest_path)
@@ -48,6 +98,7 @@ def execute(args):
         raise ValueError("saved config must have exactly one placement")
     validate_visual_plan(manifest, config)
     jobs = manifest["jobs"]
+    policy = execution_policy(args, config, manifest_path)
     branches = validate_series(manifest, config)
     placement = config["placements"][0]
     width, height = placement.get("target_width"), placement.get("target_height")
@@ -80,7 +131,7 @@ def execute(args):
         else:
             invoke(job, True)
     if args.validate_only:
-        print(json.dumps({"valid": True, "candidate_count": len(jobs), "model": render.MODEL, "resolution": RESOLUTION, "estimated_credits": len(jobs) * ESTIMATED_CREDITS_PER_IMAGE}))
+        print(json.dumps({"valid": True, "candidate_count": len(jobs), "model": render.MODEL, "resolution": RESOLUTION, "estimated_credits": len(jobs) * ESTIMATED_CREDITS_PER_IMAGE, "execution_policy": {k: v for k, v in policy.items() if k != "upload_cache_path"}, "max_estimated_credits": len(jobs) * ESTIMATED_CREDITS_PER_IMAGE * (1 + policy["max_timeout_restarts"])}))
         return 0
     if not args.approved_in_current_task:
         raise ValueError("paid KIE generation requires --approved-in-current-task")
@@ -88,29 +139,46 @@ def execute(args):
     result_path = manifest_path.parent / "image-render-result.json"
     pending = list(jobs)
     failed = []
-    try:
-        while pending:
-            ready = next((j for j in pending if all(states.get(str(d)) == "completed" for d in j.get("depends_on", []))), None)
-            if ready is None:
-                raise ValueError("cyclic or failed dependencies")
-            if ready["job_id"] in branches:
-                base = branches[ready["job_id"]]
-                base_path = Path(base["output"]).expanduser().resolve()
-                state = render.load_task_state(render.task_state_path(base_path))
-                if state.get("status") != "downloaded" or not base_path.is_file() or state.get("sha256") != render.sha256_file(base_path):
-                    raise ValueError("branch base PNG must match its downloaded task receipt")
-                ready["base_image_path"] = str(base_path)
-                invoke(ready, True)
-            result = invoke(ready, False)
-            states[str(ready["job_id"])] = "completed"
-            results.append({"job_id": ready["job_id"], **result})
-            pending.remove(ready)
+    error = None
+    with ThreadPoolExecutor(max_workers=policy["concurrency"]) as pool:
+        active = {}
+        while pending or active:
+            if error is None:
+                ready = [job for job in pending if all(states.get(str(dep)) == "completed" for dep in job.get("depends_on", []))]
+                for job in ready[:policy["concurrency"] - len(active)]:
+                    try:
+                        if job["job_id"] in branches:
+                            base_path = Path(branches[job["job_id"]]["output"]).expanduser().resolve()
+                            state = render.load_task_state(render.task_state_path(base_path))
+                            if state.get("status") != "downloaded" or not base_path.is_file() or state.get("sha256") != render.sha256_file(base_path):
+                                raise ValueError("branch base PNG must match its downloaded task receipt")
+                            job["base_image_path"] = str(base_path)
+                            invoke(job, True)
+                        active[pool.submit(invoke_paid, job, policy)] = job
+                        pending.remove(job)
+                    except Exception as exc:
+                        error = exc
+                        failed.append({"job_id": job["job_id"], "error": str(exc)})
+                        break
+            if not active:
+                if pending and error is None:
+                    error = ValueError("cyclic or failed dependencies")
+                    failed.append({"job_id": None, "error": str(error)})
+                break
+            done, _ = wait(active, return_when=FIRST_COMPLETED)
+            for future in done:
+                job = active.pop(future)
+                try:
+                    result = future.result()
+                    states[str(job["job_id"])] = "completed"
+                    results.append({"job_id": job["job_id"], **result})
+                except Exception as exc:
+                    error = error or exc
+                    failed.append({"job_id": job["job_id"], "error": str(exc)})
             save_result(result_path, manifest, states, results, failed)
-    except (Exception, KeyboardInterrupt) as exc:
-        failed.append({"job_id": ready["job_id"] if ready else None, "error": str(exc)})
-        save_result(result_path, manifest, states, results, failed)
-        raise
     save_result(result_path, manifest, states, results, failed)
+    if error is not None:
+        raise error
     print(json.dumps({"status": "completed", "result": str(result_path)}))
     return 0
 
@@ -147,6 +215,7 @@ def main():
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--approved-in-current-task", action="store_true")
     parser.add_argument("--approved-count", type=int)
+    parser.add_argument("--concurrency", type=int)
     args = parser.parse_args()
     try:
         with render.output_lock(args.manifest.expanduser().resolve()):
