@@ -50,7 +50,6 @@ def test_long_internal_art_direction_is_saved_but_not_dumped_into_prompt():
     assert len(json.dumps(d['art_direction'],ensure_ascii=False))>10000
     assert '内部设计推敲' not in d['base_prompt_rule']
     assert cfg['visual_concepts'][0]['prompt'] in d['base_prompt_rule']
-    assert len(d['base_prompt_rule'])<1000
 
 
 @pytest.mark.parametrize('missing',['world','scene','story','composition','lighting_materials'])

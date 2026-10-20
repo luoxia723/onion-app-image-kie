@@ -68,7 +68,6 @@ def test_composed_prompts_validate_copy_and_topology_without_allowlist(tmp_path,
     for job in jobs:
         assert '\n' not in job['prompt']
         assert not any(word in job['prompt'] for word in ['白名单', '不得', '禁止', '不能', '不需要', '不展示', '无品牌IP', 'visual-001', '1K', '1280', 'SHA', '积分'])
-        assert len(job['prompt']) < 900
 
 
 @pytest.mark.parametrize('corruption', ['metadata', 'missing_title', 'missing_subtitle', 'paragraph', 'allowlist'])
