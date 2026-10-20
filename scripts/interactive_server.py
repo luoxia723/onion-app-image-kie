@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import posixpath
+import re
 import socket
 import sys
 from typing import Any
@@ -336,6 +337,29 @@ def normalize_desired_channels(context: dict[str, Any]) -> list[str]:
     return channels
 
 
+def normalize_desired_platforms(context: dict[str, Any], slots: list[dict[str, Any]]) -> list[str]:
+    aliases = {
+        "华为": ("华为", "huawei"), "vivo": ("vivo",), "OPPO": ("oppo",),
+        "小米": ("小米", "xiaomi"), "荣耀": ("荣耀", "honor"),
+        "微博粉丝通": ("微博", "weibo"), "喜马拉雅": ("喜马拉雅", "ximalaya"), "CPA": ("cpa",),
+    }
+    available = {slot["platform"] for slot in slots}
+    fields = flatten_context(context)
+    explicit = []
+    for key in ("platform", "platforms", "平台", "渠道平台", "channel", "channels", "渠道", "渠道列表"):
+        value = fields.get(key)
+        explicit.extend(value if isinstance(value, list) else [value] if value else [])
+    for values in (explicit, raw_context_strings(fields)):
+        text = " ".join(str(value).casefold() for value in values)
+        matches = [name for name, names in aliases.items() if name in available and any(
+            re.search(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])", text)
+            for alias in names
+        )]
+        if matches:
+            return matches
+    return []
+
+
 def split_image_marker(value: Any) -> tuple[int | None, str]:
     text = str(value or "").strip()
     if not text:
@@ -434,6 +458,9 @@ def constrained_slots_for_context(context: dict[str, Any] | None = None, path: P
     desired_form = normalize_desired_image_form(context)
     desired_channels = normalize_desired_channels(context)
     slots = load_platform_slots(path)
+    desired_platforms = normalize_desired_platforms(context, slots)
+    if desired_platforms:
+        slots = [slot for slot in slots if slot["platform"] in desired_platforms]
     slots = apply_context_image_form(slots, desired_form)
     return apply_context_channels(slots, desired_channels)
 

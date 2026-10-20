@@ -25,7 +25,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from logo_reference import logo_prompt_rule, validate_asset_reference_bindings, validate_logo_prompt_rule  # noqa: E402
-from kie_model import MODEL, RESOLUTION, ASPECT_RATIOS, ESTIMATED_CREDITS_PER_IMAGE, CROP_REVIEW_THRESHOLD_PERCENT, normalize_resolution, nearest_aspect_ratio, geometry_report  # noqa: E402
+from kie_model import MODEL, RESOLUTION, ASPECT_RATIOS, ESTIMATED_CREDITS_PER_IMAGE, normalize_resolution, nearest_aspect_ratio, geometry_report, cover_crop_report  # noqa: E402
 
 
 DEFAULT_API_BASE = "https://api.kie.ai"
@@ -325,7 +325,18 @@ def load_task_state(path: Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise KieError(f"invalid KIE task state {path}: {exc}", 1)
-    return value if isinstance(value, dict) else {}
+    if not isinstance(value, dict) or not value:
+        raise KieError(f"invalid KIE task state {path}: expected a non-empty JSON object", 1)
+    return value
+
+
+def load_output_state(output: Path) -> dict[str, Any]:
+    state = load_task_state(task_state_path(output))
+    if output.exists() and not state:
+        raise ValueError("existing output has no task state; use a new output path")
+    if state and not state.get("task_id"):
+        raise KieError(f"previous KIE task submission was uncertain; refusing to create a duplicate for {output}", 3)
+    return state
 
 
 UPLOAD_CACHE: dict[str, str] = {}
@@ -489,12 +500,11 @@ def output_geometry(path: Path, target_size: str) -> dict[str, Any]:
     result: dict[str, Any] = {"actual_width": width, "actual_height": height, "review_findings": []}
     if target_size:
         target_width, target_height = map(int, target_size.split("x"))
-        source_ratio, target_ratio = width / height, target_width / target_height
-        crop = 1 - min(source_ratio / target_ratio, target_ratio / source_ratio)
+        crop_report = cover_crop_report(width, height, target_width, target_height)
         scale = max(target_width / width, target_height / height)
-        result.update({"actual_crop_percent": round(crop * 100, 2), "delivery_scale": round(scale, 3)})
-        if round(crop * 100, 2) >= CROP_REVIEW_THRESHOLD_PERCENT:
-            result["review_findings"].append(f"比例差距较大：交付预计裁切 {crop * 100:.1f}%，请确认生成后的构图、文字和 Logo 完整。")
+        result.update({"actual_crop_percent": crop_report["crop_percent"], "delivery_scale": round(scale, 3)})
+        if crop_report["needs_safe_area"]:
+            result["review_findings"].append(f"比例差距较大：交付预计裁切 {crop_report['crop_percent']:.1f}%，请确认生成后的构图、文字和 Logo 完整。")
         if scale >= 1.25:
             result["review_findings"].append(f"1K 原图交付时需放大约 {scale:.2f} 倍，请检查小字与边缘清晰度。")
     return result
@@ -552,6 +562,9 @@ def run(args) -> int:
             log("WARN", f"quality={legacy_quality} is deprecated and ignored; KIE resolution={resolution} is used")
         requested_ratio = str(payload.get("aspect_ratio") or "").strip()
         size_label, aspect_ratio = generation_geometry(str(payload.get("size") or "").strip(), requested_ratio)
+        frame_layout_path = payload.get("frame_layout_path")
+        if size_label and geometry_report(*map(int, size_label.split("x")))["needs_safe_area"] and not frame_layout_path:
+            raise ValueError("预计裁切达到6%：缺少 frame_layout_path，先准备白底蓝框布局。")
 
         skill_dir = SCRIPT_DIR.parent
         project_root = find_project_root(SCRIPT_DIR)
@@ -571,7 +584,6 @@ def run(args) -> int:
         oversized = [str(path) for path in reference_paths if path.stat().st_size <= 0 or path.stat().st_size > MAX_REFERENCE_BYTES]
         if oversized:
             raise ValueError("reference image must be between 1 byte and 10MB: " + ", ".join(oversized))
-        frame_layout_path = payload.get("frame_layout_path")
         if frame_layout_path:
             from blue_frame import validate_layout
             frame_layout_path = resolve_reference_path(frame_layout_path, project_root, skill_dir)
@@ -589,9 +601,7 @@ def run(args) -> int:
         model = MODEL
         fingerprint = request_fingerprint(model, prompt, reference_paths, aspect_ratio, resolution)
         state_path = task_state_path(output)
-        state = load_task_state(state_path)
-        if output.exists() and not state:
-            raise ValueError("existing output has no task state; use a new output path")
+        state = load_output_state(output)
         if state and state.get("fingerprint") != fingerprint:
             raise ValueError(f"existing KIE task state does not match this request; use a new output path: {state_path}")
 

@@ -68,8 +68,11 @@ def execute(args):
             # The dependency and its future path are validated now. Its actual
             # bytes/fingerprint are checked only after this batch creates it.
             refs = render.normalize_reference_items(job.get("references") or job.get("reference_images") or [])
+            render.normalize_resolution(job.get("resolution"))
+            render.validate_legacy_quality(job.get("quality"))
             render.validate_reference_labels(job["prompt"], refs)
             render.generation_geometry(str(job.get("size") or ""), str(job.get("aspect_ratio") or ""))
+            render.load_output_state(Path(job["output"]).expanduser().resolve())
             if job.get("frame_layout_path"):
                 from blue_frame import prompt_rule
                 if prompt_rule("参考图1") not in job["prompt"]:

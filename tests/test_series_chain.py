@@ -91,6 +91,24 @@ def test_invalid_triptych_is_rejected_before_any_paid_task(tmp_path, monkeypatch
         direct_batch.execute(args)
 
 
+@pytest.mark.parametrize('conflict',['output_without_receipt','invalid_quality','invalid_state','uncertain_state'])
+def test_branch_static_failures_are_found_before_paying_for_base(tmp_path,monkeypatch,conflict):
+    args,jobs=triptych(tmp_path,monkeypatch)
+    output=Path(jobs[1]['output']);output.parent.mkdir(parents=True)
+    if conflict=='output_without_receipt':
+        Image.new('RGB',(60,40),'white').save(output)
+    elif conflict=='invalid_quality':
+        jobs[1]['quality']='invalid'
+    else:
+        state=[] if conflict=='invalid_state' else {'status':'submitting','fingerprint':'unknown'}
+        render.task_state_path(output).write_text(json.dumps(state))
+    args.manifest.write_text(json.dumps({'request_id':'chain','jobs':jobs},ensure_ascii=False))
+    monkeypatch.setattr(render,'request_json',lambda *a,**k:pytest.fail('paid before branch preflight'))
+    args.validate_only=False;args.approved_in_current_task=True
+    with pytest.raises((ValueError,render.KieError)):
+        direct_batch.execute(args)
+
+
 def test_blue_frame_branches_inherit_raw_base_without_extra_guide(tmp_path, monkeypatch):
     import blue_frame
     args, jobs = triptych(tmp_path, monkeypatch)

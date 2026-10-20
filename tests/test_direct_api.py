@@ -141,6 +141,34 @@ def test_six_percent_review_boundary_applies_before_and_after_generation(tmp_pat
     assert not render.output_geometry(source,'941x1000')['review_findings']
 
 
+def test_generated_crop_review_does_not_round_up_to_threshold(tmp_path):
+    from PIL import Image
+    source=tmp_path/'wide.png'
+    Image.new('RGB',(2100,900),'white').save(source)
+    below=render.output_geometry(source,'21934x10000')
+    above=render.output_geometry(source,'21933x10000')
+    assert not any('裁切' in item for item in below['review_findings'])
+    assert any('裁切' in item for item in above['review_findings'])
+
+
+@pytest.mark.parametrize('size,allowed',[('720x1559',False),('1200x480',False),('690x360',False),('320x210',True)])
+def test_standalone_render_enforces_blue_frame_before_network(tmp_path,monkeypatch,size,allowed):
+    setup(tmp_path,monkeypatch)
+    monkeypatch.setattr(render,'request_json',lambda *a,**k:pytest.fail('network reached'))
+    request=args(tmp_path);request.aspect_ratio=None;request.size=size;request.validate_only=True
+    assert render.run(request)==(0 if allowed else 1)
+
+
+@pytest.mark.parametrize('invalid_state',[[],{},None,'broken'])
+def test_invalid_saved_state_never_creates_another_task(tmp_path,monkeypatch,invalid_state):
+    setup(tmp_path,monkeypatch)
+    request=args(tmp_path)
+    path=render.task_state_path(Path(request.output));path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(invalid_state))
+    monkeypatch.setattr(render,'request_json',lambda *a,**k:pytest.fail('duplicate paid task'))
+    assert render.run(request)==1
+
+
 def test_config_matches_request_ratio_for_every_existing_placement():
     import interactive_server
     from kie_model import geometry_report

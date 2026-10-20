@@ -33,6 +33,28 @@ def test_six_percent_boundary():
     assert geometry_report(941,1000,'1:1')['adaptation_mode']=='cover'
 
 
+def test_routing_compares_unrounded_crop_at_six_percent():
+    # Both round to 6.00%, but only the second really reaches the threshold.
+    assert not geometry_report(21934,10000)['needs_safe_area']
+    assert geometry_report(21933,10000)['needs_safe_area']
+    assert geometry_report(329,150)['needs_safe_area']  # exactly 6%, nearest 21:9
+
+
+@pytest.mark.parametrize('width,height', [(720,1559),(1200,480),(690,360)])
+def test_nested_blue_frames_are_reviewed_instead_of_delivered(tmp_path,width,height):
+    layout=blue_frame.prepare_layout(width,height,tmp_path/'layout')
+    spec=json.loads(Path(layout['frame_layout_path']).read_text())
+    image=cv2.imread(layout['reference']['path'])
+    x1,y1,x2,y2=spec['frame_outer_xyxy_inclusive']
+    cv2.rectangle(image,(x1+12,y1+12),(x2-12,y2-12),(214,99,22),6)
+    source=tmp_path/'03_候选/raw.png';source.parent.mkdir()
+    cv2.imwrite(str(source),image)
+    metadata=blue_frame.attach_result({},source,layout['frame_layout_path'])
+    assert metadata['frame_status']=='needs_review'
+    assert metadata['candidate_filepath']==str(source)
+    assert not (source.parent/'框内预览').exists()
+
+
 def test_moved_frame_is_detected_and_blue_content_is_preserved(tmp_path):
     result=blue_frame.prepare_layout(720,1559,tmp_path)
     spec=json.loads(Path(result['frame_layout_path']).read_text())

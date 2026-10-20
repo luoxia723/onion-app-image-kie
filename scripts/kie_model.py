@@ -30,27 +30,40 @@ def nearest_aspect_ratio(width: int, height: int) -> str:
     return min(ASPECT_RATIOS, key=lambda label: abs(math.log(target / ASPECT_RATIOS[label])))
 
 
+def cover_crop_report(source_width: int, source_height: int, width: int, height: int) -> dict:
+    if min(source_width, source_height, width, height) <= 0:
+        raise ValueError("image dimensions must be positive")
+    source_extent = source_width * height
+    target_extent = width * source_height
+    removed = abs(source_extent - target_extent)
+    extent = max(source_extent, target_extent)
+    # Compare before division/rounding: a displayed 6.00% may still be below 6%.
+    needs_review = removed * 100 >= extent * CROP_REVIEW_THRESHOLD_PERCENT
+    return {
+        "crop_percent": round(removed * 100 / extent, 2),
+        "crop_axis": ("左右" if source_extent > target_extent else "上下") if removed else "无",
+        "needs_safe_area": needs_review,
+    }
+
+
 def geometry_report(width: int, height: int, aspect_ratio: str | None = None) -> dict:
     ratio = aspect_ratio or nearest_aspect_ratio(width, height)
     if ratio not in ASPECT_RATIOS:
         raise ValueError(f"unsupported Sunburst 1K aspect_ratio: {ratio}")
-    target = width / height
-    source = ASPECT_RATIOS[ratio]
-    crop = max(0.0, 1 - min(target / source, source / target))
-    axis = "左右" if source > target else "上下"
-    fraction = round(crop * 100, 2)
+    report = cover_crop_report(*map(int, ratio.split(":")), width, height)
+    fraction = report["crop_percent"]
+    axis = report["crop_axis"]
+    needs_review = report["needs_safe_area"]
     return {
         "aspect_ratio": ratio,
         "resolution": RESOLUTION,
-        "crop_percent": fraction,
-        "crop_axis": axis if crop > 1e-9 else "无",
-        "needs_safe_area": fraction >= CROP_REVIEW_THRESHOLD_PERCENT,
-        "adaptation_mode": "blue_frame" if fraction >= CROP_REVIEW_THRESHOLD_PERCENT else "cover",
+        **report,
+        "adaptation_mode": "blue_frame" if needs_review else "cover",
         "adaptation_note": (
             "比例一致，生成后按交付像素缩放"
-            if crop < 1e-9 else
+            if axis == "无" else
             f"常规适配预计裁切 {fraction:.2f}%；使用白底蓝框生成，OpenCV去框后拉伸至目标尺寸，生成后请确认效果"
-            if fraction >= CROP_REVIEW_THRESHOLD_PERCENT else
+            if needs_review else
             f"预计裁切{axis}合计 {fraction:.2f}%；文字和 Logo 需留在保留区域"
         ),
     }

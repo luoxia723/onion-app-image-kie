@@ -69,3 +69,25 @@ def test_form_filters_match_current_table_only():
     triple={s['platform'] for s in slots if s['image_form']=='三图'}
     assert double=={'OPPO','小米'}
     assert triple=={'vivo','OPPO','小米','荣耀'}
+
+
+@pytest.mark.parametrize('context',[
+    {'channel':'OPPO','image_form':'三图'},
+    {'platform':'oppo','image_form':'三图'},
+    {'user_request':'OPPO三图文案，从左到右'},
+    {'channel':'应用商店','platform':'OPPO','image_form':'三图'},
+    {'channel':'OPPO','image_form':'三图','user_request':'这次用OPPO，不用vivo'},
+])
+def test_oppo_context_cannot_save_another_platform(context):
+    slots=interactive_server.constrained_slots_for_context(context)
+    enabled=[s for s in slots if s['enabled']]
+    assert [(s['platform'],s['target_size']) for s in enabled]==[('OPPO','320x210')]
+    with pytest.raises(ValueError,match='unknown placement'):
+        interactive_server.normalize_config_result(
+            {'delivery_name':'OPPO三图','placement_ids':['vivo-app-slot-slot-320x211']},
+            interactive_server.slots_by_id(context=context))
+
+
+def test_multiple_requested_platforms_preserve_category_and_form_filters():
+    slots=interactive_server.constrained_slots_for_context({'platforms':['OPPO','vivo'],'channel':'应用商店','image_form':'三图'})
+    assert {s['platform'] for s in slots if s['enabled']}=={'OPPO','vivo'}

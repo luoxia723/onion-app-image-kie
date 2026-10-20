@@ -170,8 +170,7 @@ def line_band(mask, axis, expected, span, radius):
     if not len(candidates):
         raise ValueError(f'未找到可靠的{axis}方向长框线，停止自动裁切。')
     groups = np.split(candidates, np.flatnonzero(np.diff(candidates) > 1) + 1)
-    groups = sorted(groups, key=lambda group: abs(float(np.mean(group)) - expected))
-    if len(groups) > 1 and abs(float(np.mean(groups[1])) - expected) - abs(float(np.mean(groups[0])) - expected) < 4:
+    if len(groups) > 1:
         raise ValueError('出现多个相近候选框线，停止自动裁切。')
     group = groups[0]
     lo, hi = int(group[0]), int(group[-1])
