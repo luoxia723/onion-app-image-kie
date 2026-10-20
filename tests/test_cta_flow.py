@@ -122,6 +122,9 @@ def test_server_respects_explicit_placement_cta_policy(policy,cta):
 
 def test_cta_validation_also_applies_when_copy_metadata_is_absent():
     from series_chain import validate_series
-    cfg=configured();cfg['copy_refs']=[]
-    job={'job_id':'one','set_id':'one','slot':1,'prompt':'学生在学习。行动文案为“立即体验”。','depends_on':[]}
+    from cta_rules import prompt_rule
+    cfg=configured();d=visual.plan_directions(cfg)['directions'][0]
+    prompt=compose(cfg,d,references=[build_logo_reference(cfg)])
+    cfg['copy_refs']=[]
+    job={'job_id':'one','set_id':'one','slot':1,'prompt':prompt.replace(prompt_rule(cfg['cta']),'行动文案为“立即体验”。'),'depends_on':[]}
     with pytest.raises(ValueError,match='as a button'):validate_series({'jobs':[job]},cfg)

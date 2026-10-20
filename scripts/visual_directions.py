@@ -33,7 +33,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format", "cta_render_mode"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format", "cta_render_mode", "visual_contract_version"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -403,6 +403,10 @@ def validate_visual_plan(manifest, config):
         if positive_format(config):
             validate_paragraph(job["prompt"])
         direction = directions[job["set_id"]]
+        if config.get("visual_contract_version"):
+            product_action = (direction.get("learner_story") or {}).get("product_action", "").rstrip("。")
+            if product_action and product_action not in job["prompt"]:
+                raise ValueError("confirmed product action must reach the final prompt")
         key = "base_prompt_rule" if int(job.get("slot") or 1) == 1 else "branch_prompt_rule"
         if job.get("visual_direction_id") != direction["direction_id"] or direction[key] not in job["prompt"]:
             raise ValueError("visual direction must be used in every base and inherited by its branches")

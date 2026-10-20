@@ -59,7 +59,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
 python scripts/visual_directions.py --config <02_过程/image-config-result.json> --output <02_过程/visual-plan.json>
 ```
 
-建议用`positive_prompt.compose(config, direction, slot, references, frame_label)`合成一段正向Prompt，frame_label仅在实际使用蓝框时传入。首张Prompt包含 `base_prompt_rule`，其中已经包含图1动作。图2/3的Prompt包含同套 `branch_prompt_rule`，再加入各自的 `slot_prompt_rules["2"]` 或 `["3"]`。清单顶层填写 `visual_plan_path`，每张绑定对应 `visual_direction_id`；首张IP和字体使用计划中的路径。付费前检查整套覆盖、配置指纹、逐张动作与实际素材绑定。同套分支仍只引用本套首张原始PNG。
+建议用`positive_prompt.compose(config, direction, slot, references, frame_label)`合成一段正向Prompt，frame_label仅在实际使用蓝框时传入。首张Prompt包含 `base_prompt_rule`，其中已经包含图1动作。图2/3的Prompt包含同套 `branch_prompt_rule`，再加入各自的 `slot_prompt_rules["2"]` 或 `["3"]`。清单顶层填写 `visual_plan_path`，每张绑定对应 `visual_direction_id`；首张IP和字体使用计划中的路径。新配置visual_contract_version=visual_rules_v1，最终Prompt还须包含[七类视觉约束](prompt-rules.md#必须进入最终prompt的七类视觉约束)中的适用要求。付费前检查整套覆盖、配置指纹、逐张动作、实际素材绑定及视觉约束传入。同套分支仍只引用本套首张原始PNG。
 
 ## 风格库按需参考
 

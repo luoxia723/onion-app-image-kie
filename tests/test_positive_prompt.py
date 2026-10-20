@@ -38,7 +38,8 @@ def jobs_for(cfg):
     d = visual.plan_directions(cfg)['directions'][0]
     jobs = []
     for slot in range(1, cfg['placements'][0]['image_count'] + 1):
-        refs = [logo_reference.build_logo_reference(cfg)] if slot == 1 else [{'label': '参考图1', 'path': '/tmp/base.png'}]
+        refs = ([logo_reference.build_logo_reference(cfg)] +
+                ([{'label': '参考图2', 'role': '标题字体参考', 'path': d['font_reference_path']}] if d['font_reference_path'] else [])) if slot == 1 else [{'label': '参考图1', 'path': '/tmp/base.png'}]
         jobs.append({'job_id': f'job{slot}', 'set_id': d['set_id'], 'slot': slot,
                      'visual_direction_id': d['direction_id'], 'ui_text': d['screen_text'],
                      'copy_text': '\n'.join(t for t in positive.approved_copy(cfg['copy_refs'][0], slot, len(d['slot_prompt_rules'])) if t),
@@ -53,6 +54,7 @@ def test_new_saved_config_selects_positive_format():
     cfg = interactive_server.normalize_config_result({'delivery_name': '格式', 'placement_ids': ['oppo-rich-horizontal-big-1280x720']}, interactive_server.slots_by_id())
     assert cfg['prompt_format'] == positive.FORMAT
     assert cfg['learner_story_required']
+    assert cfg['visual_contract_version'] == positive.VISUAL_CONTRACT_VERSION
 
 
 @pytest.mark.parametrize('count', [1, 2, 3])
@@ -140,7 +142,7 @@ def test_asset_roles_and_complete_ad_reference_are_explicit(count):
     refs = [logo_reference.build_logo_reference(cfg),
             {'label': '参考图2', 'role': '标题字体参考', 'path': d['font_reference_path']}]
     base = positive.compose(cfg, d, references=refs)
-    assert '原样呈现参考图1的完整Logo' in base and '参考图2用于标题字形参考' in base
+    assert '原样呈现参考图1的完整Logo' in base and '参考图2仅用于标题字形和排版参考' in base
     assert '完整广告成图' not in base
     for slot in range(2, count + 1):
         branch = positive.compose(cfg, d, slot, [{'label': '参考图1', 'path': '/tmp/base.png'}])
@@ -191,3 +193,90 @@ def test_logo_prompt_keeps_the_complete_mark_wordmark_and_original_geometry():
     assert not re.search(r'不得|不要|禁止|不能', rule)
     previous = logo_reference.PREVIOUS_POSITIVE_LOGO_TEMPLATE.format(label='参考图1')
     assert logo_reference.has_logo_rule(previous, '参考图1', '左上角')
+
+
+@pytest.mark.parametrize('count', [1, 2, 3])
+def test_restored_rules_reach_every_model_prompt_as_positive_single_paragraphs(tmp_path, count):
+    import render
+    cfg = configuration(count)
+    cfg.update(visual_contract_version=positive.VISUAL_CONTRACT_VERSION, font_reference_enabled=True)
+    d, jobs = jobs_for(cfg)
+    for job in jobs:
+        prompt = job['prompt']
+        request = render.build_create_request('https://example.invalid', 'test-key', prompt, '16:9', '1K', ['https://example.invalid/ref.png'])
+        sent = json.loads(request.data)['input']['prompt']
+        assert '横版' in sent and '独立广告图' in sent and '一个连续完整的场景' in sent
+        assert '广告正文仅使用本张确认文案' in sent and '具体数字' in sent
+        assert '背景明度、自然留白和布局调整解决' in sent
+        assert '\n' not in sent and not re.search(r'不得|不要|禁止|不能|白名单', sent)
+        if job['slot'] == 1:
+            assert '示例字句在本图由确认文案完整替换' in sent
+            assert '字面宽窄与排版密度' in sent and '插画画风用于人物与场景' in sent
+            assert '独立可见边界仅由原版标识自身构成' in sent
+            assert '描边与附属元素逐项沿用原图' in sent
+        else:
+            assert '首张文案所在区域在本图完整替换' in sent
+            assert '文案区仅保留本张确认内容' in sent
+            assert '首张已确定的字体体系' in sent
+    validate_series({'jobs': jobs}, cfg)
+    logo_reference.validate_manifest_logo({'jobs': jobs}, cfg)
+
+
+@pytest.mark.parametrize('missing', ['task', 'font', 'contrast', 'content', 'logo_background', 'branch_copy', 'branch_font'])
+def test_missing_restored_rule_is_rejected_before_submission(missing):
+    cfg = configuration(2)
+    cfg.update(visual_contract_version=positive.VISUAL_CONTRACT_VERSION, font_reference_enabled=True)
+    d, jobs = jobs_for(cfg)
+    job = jobs[1] if missing.startswith('branch') else jobs[0]
+    rules = {'task': positive.task_rule(cfg), 'font': positive.font_rule('参考图2'),
+             'contrast': positive.readability_rule(), 'content': positive.CONTENT_RULE,
+             'logo_background': logo_reference.logo_prompt_rule(),
+             'branch_copy': positive.branch_title_rule(job['copy_text']),
+             'branch_font': positive.inherited_font_rule()}
+    job['prompt'] = job['prompt'].replace(rules[missing], '')
+    with pytest.raises(ValueError):
+        logo_reference.validate_manifest_logo({'jobs': jobs}, cfg)
+        validate_series({'jobs': jobs}, cfg)
+
+
+def test_contract_version_is_optional_for_frozen_prompts_and_part_of_new_fingerprints():
+    cfg = configuration()
+    before = visual.config_fingerprint(cfg)
+    positive.validate_visual_contract(cfg, '旧任务原提示词', [])
+    cfg['visual_contract_version'] = positive.VISUAL_CONTRACT_VERSION
+    assert visual.config_fingerprint(cfg) != before
+    with pytest.raises(ValueError): positive.validate_visual_contract(cfg, '旧任务原提示词', [])
+    cfg['visual_contract_version'] = 'unknown'
+    with pytest.raises(ValueError, match='unsupported'): positive.validate_visual_contract(cfg, '旧任务原提示词', [])
+
+
+def test_source_logo_background_rule_remains_resumable_for_the_previous_version():
+    cfg = configuration(); cfg['learner_story_required'] = True
+    previous = logo_reference.PREVIOUS_COMPLETE_LOGO_TEMPLATE.format(label='参考图1')
+    job = {'slot': 1, 'prompt': previous, 'references': [logo_reference.build_logo_reference(cfg)]}
+    logo_reference.validate_manifest_logo({'jobs': [job]}, cfg)
+    cfg['visual_contract_version'] = positive.VISUAL_CONTRACT_VERSION
+    with pytest.raises(ValueError, match='Logo'): logo_reference.validate_manifest_logo({'jobs': [job]}, cfg)
+
+
+@pytest.mark.parametrize('width,height,category,expected', [(474,768,'应用商店','竖版应用商店'), (320,320,'信息流','方版信息流'), (1280,720,'学习机','横版学习机')])
+def test_prompt_task_keeps_channel_context_without_technical_dimensions(width,height,category,expected):
+    cfg = configuration(); cfg['placements'][0].update(target_width=width,target_height=height,category=category)
+    rule = positive.task_rule(cfg)
+    assert expected in rule and not re.search(r'\d|KB|1K', rule)
+
+
+def test_confirmed_product_help_reaches_each_prompt_and_is_not_only_plan_metadata(tmp_path):
+    cfg = configuration(3);cfg['visual_contract_version']=positive.VISUAL_CONTRACT_VERSION
+    cfg['visual_concepts'][0]['learner_story']={
+        'protagonist':'一位原创初中女生','pain_point':'她拿不准先补哪部分数学。',
+        'product_action':'根据学习目标与现有基础形成每日学习安排',
+        'visible_change':'对照当天任务开始练习'}
+    plan=visual.plan_directions(cfg);d,jobs=jobs_for(cfg)
+    path=tmp_path/'plan.json';path.write_text(json.dumps(plan))
+    manifest={'visual_plan_path':str(path),'jobs':jobs}
+    visual.validate_visual_plan(manifest,cfg)
+    fact=cfg['visual_concepts'][0]['learner_story']['product_action']
+    assert all(fact in job['prompt'] for job in jobs)
+    jobs[1]['prompt']=jobs[1]['prompt'].replace(fact,'')
+    with pytest.raises(ValueError,match='product action'):visual.validate_visual_plan(manifest,cfg)

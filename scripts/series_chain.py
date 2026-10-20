@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 from logo_reference import normalize_job_references
-from positive_prompt import enabled as positive_format, approved_copy, validate_paragraph
+from positive_prompt import enabled as positive_format, approved_copy, validate_paragraph, validate_visual_contract
 
 
 def text_rule(text, logo="洋葱学园", cta="", ui_text=None):
@@ -33,15 +33,16 @@ def validate_series(manifest, config):
         if base.get("base_job_id") or (count > 1 and base.get("depends_on")):
             raise ValueError("the base must not depend on a branch")
         for job in group:
+            slot = int(job.get("slot") or 1)
             if positive_format(config):
                 validate_paragraph(job["prompt"])
+                validate_visual_contract(config, job["prompt"], normalize_job_references(job), slot, job.get("copy_text", ""))
                 if config.get("cta") and config["cta"] not in job["prompt"]:
                     raise ValueError("prompt must include the approved CTA")
                 if config.get("cta") and config.get("cta_render_mode") == "button":
                     from cta_rules import prompt_rule as cta_rule
                     if cta_rule(config["cta"]) not in job["prompt"]:
                         raise ValueError("prompt must render the configured CTA as a button")
-            slot = int(job.get("slot") or 1)
             copies = config.get("copy_refs") or []
             if copies and (count > 1 or positive_format(config)):
                 copy_id = job.get("copy_draft_id")
