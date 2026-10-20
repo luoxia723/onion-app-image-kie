@@ -1,0 +1,21 @@
+{
+  "title": "生图skill 在投渠道尺寸明细",
+  "url": "https://guanghe.feishu.cn/wiki/OPOMwZi9xiQUt9kwkI6c3JRDnPe",
+  "sheet_id": "09238a",
+  "revision": 105,
+  "checked_on": "2026-10-19",
+  "range": "A1:F20",
+  "annotated_csv": "[row=1] 渠道,图片类型,图片尺寸长✖️宽,图片大小,备注,素材\n[row=2] 华为,jpg、png,单图：984×422 ,<200kb,,\n[row=3] vivo,jpg、jpeg、png,搜索三图：320×211,≦80kb,,vivo.zip\n[row=4] oppo,jpg、jpeg、png,横版大图：1280 x 720,<500kb,,\n[row=5] ,,竖版两图：474 x 768,,,\n[row=6] ,,横版三图：320 x 210,,,\n[row=7] 小米,jpg，jpeg.png,大图 960*540,<500kb,,\n[row=8] ,,横版二图960*540,<500kb,,\n[row=9] ,,搜索三图320*320,<300kb,,\n[row=10] ,,小图 480*320,<500kb,,\n[row=11] 荣耀,PNG/JPG/JPEG静态图片,大图文（16:9）：1280*720 px,≤500kb,,\n[row=12] ,,三图文（9:16）：1080*1920 px（三张）,,,\n[row=13] 微博粉丝通,jpg、jpeg、png,1280×720,≦5M,,\n[row=14] 喜马拉雅,jpg、jpeg、png,1280x720、720×1280、1200×480、1000×1000、720x1559,<150kb,720×1280、720x1559这两个尺寸素材logo需要放在上方中间，放左上角计划会被拒审,博今.zip\n[row=15] cpa,jpg、jpeg、png,690*360   ,＜500kb,,\n[row=16] ,,1080*1920,＜800kb,,\n[row=17] ,,,,,\n[row=18] ,,,,,\n[row=19] ,,,,,\n[row=20] ,,,,,",
+  "merged_cells": [
+    "A15:A16",
+    "A11:A12",
+    "A4:A6",
+    "A7:A10",
+    "B15:B16",
+    "B4:B6",
+    "B11:B12",
+    "B7:B10",
+    "D4:D6",
+    "D11:D12"
+  ]
+}

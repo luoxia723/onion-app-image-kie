@@ -293,7 +293,7 @@
       <h2>投放场景</h2>
       <div id="category-tabs" class="tabs"></div>
       <h2>具体版位</h2>
-      <div class="hint">单选。一次任务只选择一个具体版位；用户不选尺寸，卡片内展示目标尺寸、gpt 出图尺寸、压缩上限和一期支持状态。</div>
+      <div class="hint">单选。一次任务只选择一个具体版位；用户不选尺寸，卡片内展示目标尺寸、生成比例、1K档位、压缩上限和支持状态。</div>
       <div id="placement-warning" class="placement-warning"></div>
       <div id="slot-grid" class="slot-grid"></div>
     </section>
@@ -328,7 +328,7 @@
           <span>启用洋葱专属字体参考</span>
           <input id="fontEnabled" type="checkbox" checked>
         </label>
-        <div class="hint">启用后生成时从字体参考库完全随机抽取，不需要人工选择具体哪张。</div>
+        <div class="hint">每套随机选择一张字体参考。同套后续图片沿用首张字体。</div>
       </div>
       <div id="ctaField" class="field hidden">
         <label for="cta">CTA</label>
@@ -465,13 +465,14 @@
         <button class="option ${state.selectedSlotIds.includes(slot.id) ? "active" : ""} ${slot.enabled === false ? "disabled" : ""}" onclick="toggleSlot('${slot.id}')" ${slot.enabled === false ? "disabled" : ""}>
           <strong>${slot.platform} · ${slot.name}</strong>
           <span>${slot.sub_channel || ""}</span>
-          <span>目标 ${slot.target_size || "-"} / gpt ${slot.render_size || "-"} / &lt;${slot.maxFileSizeKb || "-"}KB</span>
+          <span>目标 ${slot.target_size || "-"} / 生成 ${slot.render_aspect_ratio || "-"} · ${slot.resolution || "1K"} / &lt;${slot.maxFileSizeKb || "-"}KB</span>
+          <span>${slot.geometry?.adaptation_note || ""}</span>
           <span>${slot.imageForm} / ${slot.directness_label || slot.directness || ""}</span>
           ${slot.disabled_reason ? `<span>暂不可选：${slot.disabled_reason}</span>` : ""}
           <div class="badges">
-            <span class="badge">target_size</span>
-            <span class="badge">render_size</span>
-            <span class="badge">disabled_reason</span>
+            <span class="badge">正式交付尺寸</span>
+            <span class="badge">Sunburst 1K</span>
+            <span class="badge">${slot.enabled === false ? "暂不可选" : "可用"}</span>
           </div>
         </button>
       `).join("");
@@ -536,12 +537,15 @@
         ["场景", state.category],
         ["文案数", `${COPY_COUNT} 条`],
         ["版位", slots.length ? slots.map(slot => `${slot.platform} · ${slot.name}`).join("；") : "请先选择至少一个版位"],
-        ["尺寸", slots.length ? slots.map(slot => `${slot.target_size} ← gpt ${slot.render_size}`).join("；") : "-"],
+        ["尺寸", slots.length ? slots.map(slot => `${slot.target_size} ← ${slot.render_aspect_ratio} · 1K`).join("；") : "-"],
+        ["比例适配", slots.length ? slots.map(slot => slot.geometry?.adaptation_note || "-").join("；") : "-"],
+        ["生图配置", "GPT Image 2.5 Sunburst · 1K"],
+        ["费用估算", `每张 ${DATA.estimatedCreditsPerImage || 3} 积分，按账号截图估算`],
         ["压缩", slots.length ? slots.map(slot => slot.maxFileSizeKb ? `<${slot.maxFileSizeKb}KB` : "默认 200KB").join("；") : "-"],
         ["Logo", logo.label],
         ["IP", ip.random ? "随机：每张重新抽取" : ip.label],
         ["模式", "直接生图"],
-        ["字体参考", state.fontEnabled ? "启用：每张随机抽取" : "不启用"],
+        ["字体参考", state.fontEnabled ? "启用：每套统一字体" : "不启用"],
         ["屏幕界面", state.uiReferenceRequired ? "需要：保存后回到 Codex 上传截图" : "不展示可识别 UI"],
         ["图片套数", `${state.sets} 套`],
         ["预计图组数", slots.length ? `${COPY_COUNT} × ${slots.length} × ${state.sets || 0} = ${Number.isFinite(estimatedGroups) ? estimatedGroups : 0} / ${MAX_GROUP_COUNT}` : "-"],
@@ -630,6 +634,9 @@
         render_width: slot.render_width,
         render_height: slot.render_height,
         render_size: slot.render_size,
+        aspect_ratio: slot.render_aspect_ratio,
+        model: DATA.model,
+        resolution: DATA.resolution,
         target_kb: slot.maxFileSizeKb || 200,
         sets: setCount,
         logo: logo.value,
@@ -641,7 +648,7 @@
         ip_reference_path: ip.path,
         font_reference_enabled: state.fontEnabled,
         font_reference_randomized: state.fontEnabled,
-        font_prompt_rule: state.fontEnabled ? "每张图从洋葱专属字体参考中随机抽取；学习字体气质、描边和排版节奏，与当前画面融合；不要求完全一致，不复制参考图里的示例文字。" : "不启用字体参考图。",
+        font_prompt_rule: state.fontEnabled ? "每套选择一张字体参考，仅传给首张；同套后续图片通过首张PNG继承，不复制示例文字。" : "不启用字体参考图。",
         cta: allowsCta ? state.cta.trim() : "",
         screen_ui_reference_required: state.uiReferenceRequired,
         ui_reference_required: state.uiReferenceRequired,

@@ -164,6 +164,7 @@ def export_spec(job: dict[str, Any], placement: dict[str, Any]) -> dict[str, Any
         "target_width": width,
         "target_height": height,
         "target_kb": target_kb,
+        "file_size_operator": placement.get("file_size_operator", "le"),
     }
 
 
@@ -174,7 +175,9 @@ def verify_delivery(path: Path, spec: dict[str, Any]) -> dict[str, Any]:
         dimensions = [image.width, image.height]
     byte_count = path.stat().st_size
     expected = [int(spec["target_width"]), int(spec["target_height"])]
-    if image_format != "JPEG" or dimensions != expected or byte_count > int(spec["target_kb"]) * 1024:
+    limit = int(spec["target_kb"]) * 1024
+    oversized = byte_count >= limit if spec.get("file_size_operator") == "lt" else byte_count > limit
+    if image_format != "JPEG" or dimensions != expected or oversized:
         raise ValueError(
             f"delivery verification failed: {path} "
             f"format={image_format} dimensions={dimensions} bytes={byte_count}"
@@ -223,6 +226,14 @@ def prepare_accepted_deliveries(selection_result: Path) -> dict[str, Any]:
         matched_jobs = jobs_for_candidate(candidate_id, len(sources), jobs)
         for image_position, (source, job) in enumerate(zip(sources, matched_jobs), start=1):
             spec = export_spec(job, placement)
+            frame_processing = None
+            if job.get("frame_layout_path"):
+                from blue_frame import process_candidate
+                original = Path(str(job['output'])).expanduser().resolve()
+                if paths['candidate'].resolve() not in original.parents:
+                    raise ValueError('frame source must stay under 03_候选')
+                frame_processing = process_candidate(original, job['frame_layout_path'])
+                source = Path(frame_processing['candidate_filepath'])
             source_sha256 = file_sha256(source)
             delivery = paths["delivery"] / (
                 f"{file_stem}_方案{scheme_position:03d}_图{image_position:02d}_{version}.jpg"
@@ -237,7 +248,7 @@ def prepare_accepted_deliveries(selection_result: Path) -> dict[str, Any]:
                 compress(
                     str(source),
                     str(delivery),
-                    target_kb=int(spec["target_kb"]),
+                    target_kb=int(spec["target_kb"]) - (1 / 1024 if spec.get("file_size_operator") == "lt" else 0),
                     target_width=int(spec["target_width"]),
                     target_height=int(spec["target_height"]),
                 )
@@ -252,6 +263,7 @@ def prepare_accepted_deliveries(selection_result: Path) -> dict[str, Any]:
                     "source_sha256": source_sha256,
                     "delivery": str(delivery),
                     "reused_existing": reused,
+                    **({"frame_processing": frame_processing} if frame_processing else {}),
                     **spec,
                     **verification,
                 }
@@ -261,7 +273,7 @@ def prepare_accepted_deliveries(selection_result: Path) -> dict[str, Any]:
         "schema_version": "onion_app_image_local_delivery_v1",
         "task_id": str(task_index.get("task_id") or selection.get("request_id") or ""),
         "version": version,
-        "processor": "local-pillow",
+        "processor": "local-opencv+pillow" if any(item.get("frame_processing") for item in records) else "local-pillow",
         "selection_result": str(paths["selection"]),
         "selection_sha256": selection_sha256,
         "accepted_scheme_count": len(schemes),

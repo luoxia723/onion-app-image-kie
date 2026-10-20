@@ -52,7 +52,9 @@ def test_assets_and_placement_rules_are_complete() -> None:
         assert (SKILL_DIR / asset["path"]).is_file(), asset["path"]
 
     slots = interactive_server.load_platform_slots()
-    assert len(slots) == 102
+    assert len(slots) == 19
+    assert len({slot['platform'] for slot in slots}) == 8
+    assert all(slot['enabled'] for slot in slots)
     assert {slot["image_form"] for slot in slots} >= {"单图", "双图", "三图"}
 
 
@@ -117,6 +119,8 @@ def test_render_validate_only_needs_no_key_or_paid_approval() -> None:
         [
             sys.executable,
             str(SCRIPTS / "render.py"),
+            "--reference",
+            str(SKILL_DIR / "assets/font-references/字体参考-01.png"),
             "--prompt",
             "竖版教育广告海报，主标题：第一题就卡住？副标题：拍一下，分步骤看懂。",
             "--aspect-ratio",
@@ -133,7 +137,7 @@ def test_render_validate_only_needs_no_key_or_paid_approval() -> None:
     payload = json.loads(result.stdout)
     assert payload["valid"] is True
     assert payload["provider"] == "kie"
-    assert payload["model"] == "gpt-image-2-text-to-image"
+    assert payload["model"] == "gpt-image-2-5-sunburst-image-to-image"
 
 
 def test_paid_render_and_batch_require_current_approval(tmp_path: Path) -> None:
@@ -142,6 +146,8 @@ def test_paid_render_and_batch_require_current_approval(tmp_path: Path) -> None:
         [
             sys.executable,
             str(SCRIPTS / "render.py"),
+            "--reference",
+            str(SKILL_DIR / "assets/font-references/字体参考-01.png"),
             "--prompt",
             "教育广告海报测试",
             "--aspect-ratio",
@@ -168,7 +174,7 @@ def test_paid_render_and_batch_require_current_approval(tmp_path: Path) -> None:
                         "set_id": "set-1",
                         "slot": 1,
                         "prompt": "教育广告海报测试",
-                        "resolution": "2K",
+                        "resolution": "1K",
                         "aspect_ratio": "1:1",
                         "references": [],
                         "output": str(RUNTIME_ROOT / "batch-gate.png"),

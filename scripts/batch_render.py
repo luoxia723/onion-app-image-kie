@@ -23,11 +23,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_RENDER_SCRIPT = SCRIPT_DIR / "render.py"
 DEFAULT_CONCURRENCY = 3
 DEFAULT_FALLBACK_CONCURRENCY = 1
-PROVIDER = "kie-gpt-image-2"
-RESOLUTION = "2K"
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from logo_reference import validate_manifest_logo  # noqa: E402
+from kie_model import PROVIDER, RESOLUTION, normalize_resolution, geometry_report  # noqa: E402
 
 
 def repository_root(start: Path = SCRIPT_DIR) -> Path:
@@ -63,13 +62,6 @@ def local_concurrency(manifest: dict[str, Any], cli_value: int | None, env_name:
         if manifest.get(key) is not None:
             return clean_int(manifest.get(key), default)
     return clean_int(os.environ.get(env_name), default)
-
-
-def normalize_resolution(value: Any) -> str:
-    resolution = str(value or RESOLUTION).strip().upper()
-    if resolution != RESOLUTION:
-        raise ValueError("resolution must be 2K")
-    return resolution
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
@@ -124,6 +116,10 @@ def write_render_input(job: dict[str, Any]) -> Path:
     }
     if job.get("quality"):
         payload["quality"] = str(job["quality"])
+    if job.get("frame_layout_path"):
+        payload["frame_layout_path"] = str(job["frame_layout_path"])
+    if job.get("base_image_path"):
+        payload["base_image_path"] = str(job["base_image_path"])
     if job.get("size"):
         payload["size"] = str(job["size"])
     elif job.get("aspect_ratio"):
@@ -235,6 +231,21 @@ def set_results(jobs: list[dict[str, Any]], job_status: dict[str, str]) -> list[
                 "images": [str(Path(str(job["output"])).expanduser().resolve()) for job in group if job_status.get(str(job["job_id"])) in {"completed", "skipped"}],
             }
         )
+        findings = []
+        for job in group:
+            if job.get("size"):
+                try:
+                    width, height = map(int, str(job["size"]).split("x"))
+                except ValueError:
+                    continue
+                geometry = geometry_report(width, height)
+                if geometry["needs_safe_area"]:
+                    findings.append(
+                        "白底蓝框适配，去框拉伸后请确认效果。" if job.get("frame_layout_path") else
+                        "比例适配需重点确认：" + geometry["adaptation_note"] + "；生成后请确认效果。"
+                    )
+        if findings:
+            sets[-1]["review_findings"] = list(dict.fromkeys(findings))
     return sets
 
 

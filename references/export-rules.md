@@ -1,6 +1,6 @@
 # 压缩与导出
 
-用户提交选择结果后，运行`scripts/prepare_accepted_deliveries.py`一次处理全部采纳图片；脚本内部调用本地`scripts/image_compress.py`，按每张图已保存版位的精确宽高做cover居中裁切、转为JPEG并压到KB上限，再校验格式、像素、字节数和SHA-256。原图、候选图与采纳交付图分开保存。默认交付`04_交付`目录，不自动生成 ZIP；只有用户明确要求“打包”时才生成。
+用户提交选择结果后，运行`scripts/prepare_accepted_deliveries.py`一次处理全部采纳图片。常规模式按已保存版位宽高做cover居中裁切；有`frame_layout_path`的job先调用[白底蓝框适配](blue-frame-adaptation.md)的OpenCV处理，从原图识别实际框线、裁到内侧再拉伸到精确目标像素。已去框的图不再对原图做cover裁切；检测失败保留诊断，不写成正式交付。随后统一用`scripts/image_compress.py`转JPEG、压到KB上限，并校验格式、像素、字节数和SHA-256。原图、预览与交付图分开保存。默认交付`04_交付`目录，用户要求打包时才生成ZIP。
 
 有精确宽高时不得为了减小体积继续缩小像素；无法同时满足目标尺寸和KB上限时明确失败，不把超限文件写成正式交付。本地处理不按采纳图片数量向用户重复取得压缩授权。Pillow精确版本由`requirements.txt`锁定。
 

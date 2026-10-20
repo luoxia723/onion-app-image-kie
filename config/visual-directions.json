@@ -1,0 +1,2227 @@
+{
+  "schema_version": "onion_visual_catalog_v1",
+  "styles": [
+    {
+      "id": "craft-clay",
+      "name": "黏土手作",
+      "name_en": "Craft Clay",
+      "family": "craft",
+      "prompt": "将人物与道具表现为手工捏制的柔软实体，圆润体块之间有清楚连接，局部保留指压和工具痕；空间像真实搭建的微型场景，表面呈微哑光的材料颗粒与温和不规则边缘。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装结构及标识，发型用成束黏土塑形，标识以完整薄片贴附。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-craft clay"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "黏土手作",
+        "Craft Clay"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "cross-stitch-imagery",
+      "name": "十字绣图像",
+      "name_en": "Cross-stitch imagery",
+      "family": "craft",
+      "prompt": "整幅插画由可见交叉针脚在规则布底上构成，色线形成大形与柔和明暗，统一纤维触感；足够细的针格保住IP五官。只把插画绣出来，标题和原版Logo不刺绣化。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。针格须足够细，以保证IP五官与服装轮廓清楚；文字不绣化。",
+      "source_ids": [
+        "vam-embroidery"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "十字绣图像",
+        "Cross-stitch imagery"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "freestyle-surface-embroidery",
+      "name": "自由表面刺绣",
+      "name_en": "Freestyle surface embroidery",
+      "family": "craft",
+      "prompt": "顺着角色轮廓和衣褶走向铺排丝线，长短针形成明暗，物件色面有连续线材光泽，底布纹理清楚但不抢眼；线的方向和密度统一，IP身份特征准确。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。线材沿角色结构方向铺排，不使角色外貌变成无关玩偶。",
+      "source_ids": [
+        "vam-embroidery",
+        "github-mk-styles"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-mk-styles": "MK Embroidery"
+      },
+      "alias_ids": [
+        "embroidery"
+      ],
+      "aliases": [
+        "刺绣",
+        "Embroidery"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "自由表面刺绣",
+        "Freestyle surface embroidery",
+        "刺绣",
+        "Embroidery"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "gyotaku",
+      "name": "实物拓印画法",
+      "name_en": "Gyotaku",
+      "family": "craft",
+      "prompt": "借鉴拓印时接触与留痕的材料逻辑，以不均匀墨迹、细纹与纸面空隙塑造物体表面；人物与学习道具仍有完整轮廓，空间简洁，整体像将实体纹理转印到吸墨纸上。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装与标识，拓印纹理作用于表面，不加入无关鱼形或改变人物形体。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Gyotaku"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "scope_note": "取鱼拓的接触印制机制作为非鱼题材的广告适配，不自动增加鱼形。",
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "实物拓印画法",
+        "Gyotaku"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "kirigami",
+      "name": "立体剪纸",
+      "name_en": "Kirigami",
+      "family": "craft",
+      "prompt": "以剪切后翻折竖起的纸片构建人物与学习环境，轮廓干净，转角和连接处说明纸张结构；空间像展开的立体纸模型，表面保持纸纤维与折痕，层次来自真实的切口和支撑。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型服装与标识，主体关键形状保留完整，切口不穿过五官和识别图形。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "papercraft-kirigami"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "立体剪纸",
+        "Kirigami"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "mokume-gane",
+      "name": "木纹金属",
+      "name_en": "Mokume-gane",
+      "family": "craft",
+      "prompt": "以多层金属压合后呈现的流动纹理组织人物与道具表面，造型保持清楚，层纹随曲面转折；空间像经过精细制作的金属浮雕，纹理与实体结构一致，呈温润而非镜面的材料质感。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，金属层纹避开五官与标识边界，不让纹理改变识别形状。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Mokume-gane"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "木纹金属",
+        "Mokume-gane"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "mosaic",
+      "name": "马赛克镶嵌",
+      "name_en": "Mosaic",
+      "family": "craft",
+      "prompt": "以大小有节奏变化的细小镶片组成完整人物与环境，镶片走向跟随形体结构，片缝清楚可见；空间通过块面明暗与前后遮挡建立，表面有陶石材料的轻微不规则与手工铺设感。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，面部使用更细镶片，标识边界完整，避免块面分割造成变形。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK mosaic"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "马赛克镶嵌",
+        "Mosaic"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "origami",
+      "name": "折纸",
+      "name_en": "Origami",
+      "family": "craft",
+      "prompt": "让人物、书本与道具由连续折面形成，折脊、谷线和纸角共同说明体积，表面保持完整纸张的质感；空间像真实搭建的折纸场景，几何轮廓统一，细节用折线而非写实纹理表达。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装及标识，五官使用清楚的纸面绘制细节，服装不因折纸化变成别的款式。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-origami"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "折纸",
+        "Origami"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "paper-mache",
+      "name": "纸浆塑形",
+      "name_en": "Paper Mache",
+      "family": "craft",
+      "prompt": "用纸浆堆塑的实体体块塑造人物与道具，轮廓略带手工起伏，表面可见细小纤维和覆盖痕迹；空间像布置好的手作模型，形体厚实而轻盈，层层糊制的边缘构成材料特点。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装及标识，控制面部表面起伏，服装标识以完整清楚的表面图形呈现。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "papercraft-paper mache"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "纸浆塑形",
+        "Paper Mache"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "paper-quilling",
+      "name": "衍纸",
+      "name_en": "Paper Quilling",
+      "family": "craft",
+      "prompt": "用卷曲、折弯与并排的纸条构成人物和场景，形体边缘可见纸条截面，内部以疏密不同的卷纸填充；空间呈可触摸的浅浮雕，纸层之间保留细小投影和手工拼装关系。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，用较细纸条塑造五官，标识做完整清楚的纸面图形。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "papercraft-paper quilling"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "衍纸",
+        "Paper Quilling"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "paper_collage",
+      "name": "剪纸拼贴",
+      "name_en": "Cut-paper collage",
+      "family": "craft",
+      "prompt": "用清楚的纸片剪裁边缘与重叠层次建立人物、桌面和道具，纸面颜色完整，微小投影展示厚度；细节简洁但IP脸部可辨。不拼入报纸文字、不把Logo剪碎，不贴成多个互不相关画风。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "moma-art-glossary"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "alias_ids": [
+        "cut-paper-collage"
+      ],
+      "aliases": [
+        "纸艺拼贴"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "剪纸拼贴",
+        "Cut-paper collage",
+        "纸艺拼贴"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "papercut-shadow-box",
+      "name": "分层纸雕",
+      "name_en": "Layered Papercut",
+      "family": "craft",
+      "prompt": "以一层层切割纸片构成人物、桌面和背景，轮廓清楚，纸层厚度与间距产生自然的空间顺序；材料表面微哑，切边保持整洁，整幅像可从侧面看见层叠结构的纸雕场景。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装和标识，人物识别区使用独立细层，标识不被纸层遮挡。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "papercraft-papercut shadow box"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "分层纸雕",
+        "Layered Papercut"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "raised-work-textile-relief",
+      "name": "立体浮绣",
+      "name_en": "Raised-work textile relief",
+      "family": "craft",
+      "prompt": "角色和学习物件以软垫浮起，边缘针脚与分层布片形成真实浅浮雕，侧向柔光显出厚度；触觉柔软、空间层次稳定。保持IP体型，不把角色改成无关布偶；Logo与字体仍按原版独立呈现。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。浮起的布料体积跟随原IP体型，不擅自改造成另一款布偶。",
+      "source_ids": [
+        "vam-embroidery"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "立体浮绣",
+        "Raised-work textile relief"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "scrimshaw",
+      "name": "精细刻纹浅浮雕",
+      "name_en": "Scrimshaw",
+      "family": "craft",
+      "prompt": "以细密刻线和点刻在温润浅色材料上塑造人物与器物，明暗由线条疏密逐步叠加；空间像一件被精细刻绘的浅浮雕，轮廓准确，表面呈细腻磨制与手工刻痕的对照。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装及标识，用更精细刻线表现脸部，标识仍是原有完整图形。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Scrimshaw"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "scope_note": "借鉴刻线视觉语言，不要求或生成真实动物骨材。",
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "精细刻纹浅浮雕",
+        "Scrimshaw"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "shibori",
+      "name": "绞缬染织",
+      "name_en": "Shibori",
+      "family": "craft",
+      "prompt": "借助织物捆扎、折叠与染液渗透形成的边界语言表现人物和场景，图形既有规则重复也有自然扩散；空间趋于平面，表面可见布纹与染色浓淡，轮廓保留手工织染感。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，染织纹理用于大面与背景，五官及标识区维持清楚稳定。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Shibori"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "绞缬染织",
+        "Shibori"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "stained-glass",
+      "name": "彩色玻璃",
+      "name_en": "Stained Glass",
+      "family": "craft",
+      "prompt": "以相互镶嵌的透光玻璃色块组织人物和环境，深色接缝明确划分形体，块面大小随结构变化；空间由色块叠合与前后轮廓建立，表面可见轻微玻璃纹理和铅条连接感。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装与标识，面部采用较大完整玻璃块，接缝避开五官关键部位。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "misc-stained glass"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "彩色玻璃",
+        "Stained Glass"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "vitreous-enamel",
+      "name": "珐琅",
+      "name_en": "Vitreous Enamel",
+      "family": "craft",
+      "prompt": "用清楚的金属分隔边和圆润饱满的釉面色块塑造人物与道具，体积像精工烧制的浅浮雕；空间关系简洁，表面呈玻璃质釉层的厚度与温润反射，边缘连接精确。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装与标识，用细金属线限定识别特征，标识以完整釉面图形保留。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Vitreous Enamel"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "珐琅",
+        "Vitreous Enamel"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "acrylic",
+      "name": "丙烯绘画",
+      "name_en": "Acrylic Painting",
+      "family": "medium",
+      "prompt": "以不透明颜料的覆盖、干刷与清晰色块塑造人物和场景，边缘可在硬朗与松动之间变化；空间用有力的前后层次建立，表面保留局部堆色和画布上的刷痕。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型原服装与标识，面部用受控笔触表达，衣褶可概括但不改服装款式。",
+      "source_ids": [
+        "github-milehigh-styler"
+      ],
+      "source_entry_names": {
+        "github-milehigh-styler": "Acrylic Painting"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "丙烯绘画",
+        "Acrylic Painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "alcohol-ink",
+      "name": "酒精墨水",
+      "name_en": "Alcohol Ink",
+      "family": "medium",
+      "prompt": "用透明墨色的流动边界、自然聚散与层层扩散形成画面语言，背景带有细腻的液体沉积感；人物和关键道具维持清楚造型，色层之间呈流动而有组织的浅层空间。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装及标识，液体扩散作用于大色面和背景，识别区保留稳定线面。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Alcohol Ink Art"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "酒精墨水",
+        "Alcohol Ink"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "aquatint",
+      "name": "飞尘腐蚀版画",
+      "name_en": "Aquatint",
+      "family": "medium",
+      "prompt": "以细密的腐蚀颗粒与受控线条塑造明暗，色面像由金属版上的微小纹理印出；人物和道具轮廓准确，空间通过颗粒浓淡与层次交叠展开，保留压印纸张的实体触感。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装和标识，五官用更细致线条表达，服装标识保留清楚边界。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Aquatint Print"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "飞尘腐蚀版画",
+        "Aquatint"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "bromoil-print",
+      "name": "溴油印相",
+      "name_en": "Bromoil Print",
+      "family": "medium",
+      "prompt": "让画面呈手工刷敷油墨的摄影印相质地，人物体积完整，局部边缘有柔和的颗粒过渡；空间像经过人工选择性加深的纸上影像，表面保留墨迹轻重与纸纤维的变化。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，用受控颗粒表现材质，面部与标识维持准确清晰。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Bromoil Print"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "溴油印相",
+        "Bromoil Print"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "charcoal-tonal-drawing",
+      "name": "炭笔素描",
+      "name_en": "Charcoal tonal drawing",
+      "family": "medium",
+      "prompt": "黑灰炭粉块面、擦拭形成的柔光和有方向的线条塑造角色与物件，纸纹可见，少量高光由留白形成。保持IP特有轮廓与关键标记；若原色是强制身份条件，该方向应降低优先级而不是擅自去色。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。炭笔主导笔触和明暗，必须保留的服装/标识原色以局部设色保留；不可用去色覆盖品牌身份约束。",
+      "source_ids": [
+        "moma-charcoal",
+        "github-milehigh-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-milehigh-styler": "Charcoal Drawing"
+      },
+      "alias_ids": [
+        "charcoal"
+      ],
+      "aliases": [
+        "炭笔素描",
+        "Charcoal Drawing"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "炭笔素描",
+        "Charcoal tonal drawing",
+        "Charcoal Drawing"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "chromolithography",
+      "name": "彩色石版印刷",
+      "name_en": "Chromolithography",
+      "family": "medium",
+      "prompt": "以层层套印的平整色面和细密颗粒塑造人物与道具，边缘清楚又有手工印制的细微差异；空间呈传统印刷插画的层次，色层覆盖关系和纸面质地带来温润而扎实的效果。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装及标识，套印差异只作用于辅助边缘，面部和标识避免错位。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Chromolithography"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "彩色石版印刷",
+        "Chromolithography"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "color-linocut",
+      "name": "彩色油毡版画",
+      "name_en": "Color linocut",
+      "family": "medium",
+      "prompt": "少量套色、厚实简洁轮廓和圆润刀口贯穿角色与场景，边缘有轻微手工节奏，纸面保持干净；用大块造型表达身份，避免满屏细密刻痕。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-print"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "彩色油毡版画",
+        "Color linocut"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "cyanotype",
+      "name": "蓝晒",
+      "name_en": "Cyanotype",
+      "family": "medium",
+      "prompt": "用感光印相般的深色底与明亮形体建立画面，轮廓边缘保留轻微渗透，细节呈接触印制的自然层次；人物和道具以清楚的正负形关系组织，表面有感光纸的纤维与沉积感。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，以明暗形状维持识别；需要保留的标识不被简化成空白块。必须保留的角色身份色在关键区域局部原色呈现，深蓝感光语言用于其余区域；Logo仍保持原版。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Cyanotype Print"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "蓝晒",
+        "Cyanotype"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "encaustic",
+      "name": "蜡画",
+      "name_en": "Encaustic Painting",
+      "family": "medium",
+      "prompt": "以半透明蜡层覆盖、局部刮刻和温润堆叠塑造形体，人物与道具在柔和层次间清楚浮现；空间由蜡层遮叠和边缘深浅形成，表面保留凝固、擦磨与材料厚度。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，关键轮廓清晰，蜡层不遮盖五官或服装识别图形。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Encaustic Paint"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "蜡画",
+        "Encaustic Painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "engraved-line-illustration",
+      "name": "铜版雕刻线描",
+      "name_en": "Engraved line illustration",
+      "family": "medium",
+      "prompt": "以细密而规律的排线和交叉线塑造体积，外轮廓准确，纸面浅色，物件结构具有手工图解感。保留足够疏朗空间；标题和Logo不改成雕刻排线。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-print",
+        "getty-hatched"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "铜版雕刻线描",
+        "Engraved line illustration"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "expressive-ink",
+      "name": "写意水墨",
+      "name_en": "Expressive ink painting",
+      "family": "medium",
+      "prompt": "以简练毛笔线造型，墨色浓淡和干湿笔触组织体积，淡墨层次与大块留白形成空间；不依赖写实投影，纸纤维质感轻微可见。IP五官和发型轮廓清楚，不新增题字、落款或印章。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。水墨简化不得省略角色辨识线；必须保留的身份色以局部原色设色呈现。",
+      "source_ids": [
+        "met-chinese-painting"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "写意水墨",
+        "Expressive ink painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "fine-line-mineral-color",
+      "name": "工细设色",
+      "name_en": "Fine-line mineral-color painting",
+      "family": "medium",
+      "prompt": "细而稳定的轮廓线、层层柔和设色、克制的矿物色感与丝绢底；以精细衣褶和道具纹理形成秩序，背景层次舒展。沿用IP原服装，不自动换成古装。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。延续原服装与现代物件，不擅自改成古装人物。",
+      "source_ids": [
+        "met-chinese-painting"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "工细设色",
+        "Fine-line mineral-color painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "glazed-oil-painting",
+      "name": "罩染油画",
+      "name_en": "Glazed oil painting",
+      "family": "medium",
+      "prompt": "薄层色彩反复叠加，边缘柔硬有序，暗部透亮、亮部细腻，空间由渐进色层与稳定光源塑造；角色轮廓和表情完整，避免厚涂刀痕主导。这与厚涂油画应为两个具体视觉分支。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "getty-conserving-canvas"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "罩染油画",
+        "Glazed oil painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "graphic_screenprint",
+      "name": "丝网套色",
+      "name_en": "Screenprint poster illustration",
+      "family": "medium",
+      "prompt": "有限专色、厚实平涂、清楚硬边和局部半调组织整张插画，微小套印手感保持克制；重点动作具有强辨识度。不让套色错位影响文案和Logo。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-print"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "alias_ids": [
+        "screenprint-poster-illustration"
+      ],
+      "aliases": [
+        "丝网印刷海报"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "丝网套色",
+        "Screenprint poster illustration",
+        "丝网印刷海报"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "halftone-print",
+      "name": "半色调网点印刷",
+      "name_en": "Halftone Print",
+      "family": "medium",
+      "prompt": "用规律可见的网点大小与间距表达人物和物体的明暗，外轮廓采用清楚的印刷线；空间依靠稳定的透视与分区层次建立，表面呈纸张吸墨后的颗粒与色层覆盖关系。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型服装及标识，五官与标识使用细网点或实线，避免粗网点造成识别丢失。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK Halftone print"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "半色调网点印刷",
+        "Halftone Print"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "impasto-oil-painting",
+      "name": "厚涂油画",
+      "name_en": "Impasto oil painting",
+      "family": "medium",
+      "prompt": "宽笔与调色刀留下起伏颜料脊，实体色块建立角色与道具，光照使笔触有触觉感；局部精细描绘脸部和识别标记。主视觉必须具有颜料行为，不只是加一层画布纹理。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。厚笔触不能抹掉脸部、发型和服装识别标记。",
+      "source_ids": [
+        "getty-conserving-canvas"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "厚涂油画",
+        "Impasto oil painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "line-art",
+      "name": "钢笔线描",
+      "name_en": "Line Art",
+      "family": "medium",
+      "prompt": "用有轻重变化的钢笔轮廓与受控排线说明人物结构、动作和道具体积，线条之间保留充足呼吸；前后空间依靠疏密、遮挡与线重变化建立，表面呈清楚的纸上墨迹。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装结构和标识，以精准轮廓保留识别点，不用密排线覆盖五官。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-line art"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "钢笔线描",
+        "Line Art"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "lithographic-crayon-illustration",
+      "name": "石版画粉蜡笔感",
+      "name_en": "Lithographic crayon illustration",
+      "family": "medium",
+      "prompt": "颗粒蜡笔线与柔和擦染结合，色层薄而稳定，人物和学习道具具有手绘石版海报感；浅空间、明快轮廓、轻微纸面肌理。不要自动增加复古招贴标题。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-print"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "石版画粉蜡笔感",
+        "Lithographic crayon illustration"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "monochrome-woodcut",
+      "name": "黑白木刻",
+      "name_en": "Monochrome woodcut",
+      "family": "medium",
+      "prompt": "以深色实体和刀刻留白构成版画图像，方向性刻痕取代柔和渐变，角色动作和物件轮廓简洁有力。用于IP广告时允许服装身份色局部保留，Logo和文字不做木刻化处理。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。黑白木刻主导环境和造型；若IP身份必须保留原色，则角色局部保留原色，作为单色版画启发的商业适配；不可强制全画面去色。",
+      "source_ids": [
+        "vam-print",
+        "github-milehigh-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-milehigh-styler": "Woodcut"
+      },
+      "alias_ids": [
+        "woodcut"
+      ],
+      "aliases": [
+        "木刻版画",
+        "Woodcut"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "黑白木刻",
+        "Monochrome woodcut",
+        "木刻版画",
+        "Woodcut"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "oil-painting",
+      "name": "油画",
+      "name_en": "Oil Painting",
+      "family": "medium",
+      "prompt": "以不透明颜料的细腻罩染与局部厚涂塑造人物和学习道具，体积转折扎实，轮廓有选择地清晰或融入环境；空间依靠层层色面和前后关系展开，表面保留画布纹理与受控笔触。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型原服装和标识，用油彩塑造体积而不改变五官比例，标识边缘清楚。",
+      "source_ids": [
+        "github-milehigh-styler"
+      ],
+      "source_entry_names": {
+        "github-milehigh-styler": "Oil Painting"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "油画",
+        "Oil Painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "one-line",
+      "name": "连续单线绘画",
+      "name_en": "One-line Art",
+      "family": "medium",
+      "prompt": "以连续而有节奏的单一线迹组织人物和道具，让轮廓在转折、停顿与呼应中说明动作；空间通过线的交叠和少量平整色面交代，纸面保持轻盈，形体简洁但关系完整。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型与服装特征，连续线概括主体，标识可用独立清楚的完整图形保留。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK One Line Art"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "连续单线绘画",
+        "One-line Art"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "opaque-gouache",
+      "name": "不透明水粉",
+      "name_en": "Opaque gouache",
+      "family": "medium",
+      "prompt": "以柔厚不透明色面覆盖底纸，哑光表面、可见刷痕和干净色块边缘形成绘本般整体；阴影用简化色块，避免透明水彩式大面积渗漏。角色和场景统一水粉画法。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-watercolour"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "不透明水粉",
+        "Opaque gouache"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "soft-pastel",
+      "name": "软粉彩",
+      "name_en": "Soft pastel",
+      "family": "medium",
+      "prompt": "粉质颗粒、柔软叠色和局部排线共同塑造体积，光线温柔，暗部保留彩色颗粒；硬轮廓仅用于身份和动作要点，整张维持粉彩触感。不要把粉彩等同于只换成浅色调。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "getty-pastel"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "软粉彩",
+        "Soft pastel"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "watercolor_illustration",
+      "name": "透明水彩",
+      "name_en": "Transparent watercolor",
+      "family": "medium",
+      "prompt": "透明色层交叠，保留纸白高光和自然水痕；轻铅笔结构辅助轮廓，远处湿边与近处清晰边交替。IP识别特征清楚，不能把字和Logo冲淡成水迹。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-watercolour",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-watercolor"
+      },
+      "alias_ids": [
+        "watercolor",
+        "transparent-watercolor"
+      ],
+      "aliases": [
+        "水彩",
+        "Watercolor",
+        "清透水彩"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "透明水彩",
+        "Transparent watercolor",
+        "水彩",
+        "Watercolor",
+        "清透水彩"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "action-painting-gesture",
+      "name": "行动绘画笔势",
+      "name_en": "Action-painting gesture",
+      "family": "movement",
+      "prompt": "整张场景以少量有方向的宽笔势和控制良好的洒点建立能量，角色、道具采用同材质的可辨具象处理；颜料动作呼应IP动作。文字区、脸部和Logo不覆盖飞溅。登记为行动绘画启发适配。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。宽笔势和洒点主要组织场景，IP面部和标识不被颜料遮挡。",
+      "source_ids": [
+        "moma-action-painting",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-abstract expressionism"
+      },
+      "alias_ids": [
+        "abstract-expressionism"
+      ],
+      "aliases": [
+        "抽象表现主义",
+        "Abstract Expressionism"
+      ],
+      "scope_note": "选择抽象表现主义中的动作笔势分支，保留具象IP，是广告适配。",
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "行动绘画笔势",
+        "Action-painting gesture",
+        "抽象表现主义",
+        "Abstract Expressionism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "color-field-atmosphere",
+      "name": "色域绘画空间",
+      "name_en": "Color-field atmosphere",
+      "family": "movement",
+      "prompt": "大面积缓慢渗化的色域形成安静空间，细微边缘与色层让画面有呼吸感，IP与少量任务物件清楚浮现。广告需要可读焦点，因此这是色域启发适配；不要把背景的低对比要求套用到标题。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。大色域组织环境，IP和标题仍有明确焦点；不是纯色域作品。",
+      "source_ids": [
+        "moma-art-glossary"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "色域绘画空间",
+        "Color-field atmosphere"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "constructivist-visual-construction",
+      "name": "构成主义视觉工程",
+      "name_en": "Constructivist visual construction",
+      "family": "movement",
+      "prompt": "以交叠几何板块、强方向线和清晰结构关系组织场景，有限色面、硬边界和工业纸板质感形成构成秩序；IP作为稳定叙事中心。没有政治符号，不用随机大字填满画面。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。避免无关政治符号，以IP和学习目标作为叙事核心。",
+      "source_ids": [
+        "moma-constructivism",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-constructivist"
+      },
+      "alias_ids": [
+        "constructivism"
+      ],
+      "aliases": [
+        "构成主义",
+        "Constructivism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "构成主义视觉工程",
+        "Constructivist visual construction",
+        "构成主义",
+        "Constructivism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "cubist-faceted-construction",
+      "name": "立体主义平面切分",
+      "name_en": "Cubist faceted construction",
+      "family": "movement",
+      "prompt": "将书本、桌面和背景分解成相互穿插的几何平面，形成浅空间和多视点节奏；保留角色连续外轮廓与正常五官。此为保留具象IP的立体主义启发适配，不把脸拆成多重眼睛。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。背景与道具可分面，脸部不做多视点解剖或增加眼睛。",
+      "source_ids": [
+        "met-cubism",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-cubist"
+      },
+      "alias_ids": [
+        "cubism"
+      ],
+      "aliases": [
+        "立体主义",
+        "Cubism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "立体主义平面切分",
+        "Cubist faceted construction",
+        "立体主义",
+        "Cubism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "de-stijl-rectilinear",
+      "name": "风格派矩形秩序",
+      "name_en": "De Stijl rectilinear",
+      "family": "movement",
+      "prompt": "直角线与长方色面构成有节奏的视觉平衡，颜色数量克制，画面以平面关系取代写实深景；在几何环境中保留清楚具象IP。登记为风格派启发的商业适配。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。矩形秩序用于环境，具象角色作为商业适配例外保留。",
+      "source_ids": [
+        "moma-art-glossary",
+        "github-mk-styles"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-mk-styles": "MK de-stijl"
+      },
+      "alias_ids": [
+        "de-stijl"
+      ],
+      "aliases": [
+        "风格派",
+        "De Stijl"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "风格派矩形秩序",
+        "De Stijl rectilinear",
+        "风格派",
+        "De Stijl"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "expressionist-painting",
+      "name": "表现主义笔触",
+      "name_en": "Expressionist painting",
+      "family": "movement",
+      "prompt": "笔触有力，场景轮廓略带张力，背景色彩对比强调从困惑到主动的情绪变化；角色姿态具有明确动势。保留IP比例和五官，避免畸变、恐惧表情或压迫阴影。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。张力来自笔触和姿态，不通过脸型或体型畸变实现。",
+      "source_ids": [
+        "moma-art-glossary",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-expressionist"
+      },
+      "alias_ids": [
+        "expressionism"
+      ],
+      "aliases": [
+        "表现主义",
+        "Expressionism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "表现主义笔触",
+        "Expressionist painting",
+        "表现主义",
+        "Expressionism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "fauvist-color-planes",
+      "name": "野兽派色面",
+      "name_en": "Fauvist color-plane painting",
+      "family": "movement",
+      "prompt": "用果断笔触和高饱和色面塑造环境，明暗由冷暖色对比形成，空间压缩而富表现力；IP保持原本肤色与服装识别色，非自然色主要落在背景、道具和光影。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。原肤色和服装识别色保持，非自然强色主要用于背景与光影。",
+      "source_ids": [
+        "met-fauvism"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "野兽派色面",
+        "Fauvist color-plane painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "futurist-motion-painting",
+      "name": "未来主义动态",
+      "name_en": "Futurist motion painting",
+      "family": "movement",
+      "prompt": "连续斜向线、重复轮廓和流动几何面表现学习动作的速度，人物与道具共享一个清楚的运动方向；中心轮廓稳定，避免复制角色手脚。借动态画法，不带入历史政治主题。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。速度由背景和道具重复线表现，不复制角色肢体。",
+      "source_ids": [
+        "moma-futurism"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "未来主义动态",
+        "Futurist motion painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "impressionist-light-painting",
+      "name": "印象派光色",
+      "name_en": "Impressionist light painting",
+      "family": "movement",
+      "prompt": "断续但有方向的色笔触、明亮空气感、彩色阴影和瞬时日光贯穿人物及环境；远景边缘柔化，近景表情和任务道具保持可辨。标题与Logo使用清晰、干净的原有呈现。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "met-impressionism",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-impressionist"
+      },
+      "alias_ids": [
+        "impressionism"
+      ],
+      "aliases": [
+        "印象派",
+        "Impressionism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "印象派光色",
+        "Impressionist light painting",
+        "印象派",
+        "Impressionism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "minimalist-geometric",
+      "name": "极简几何雕塑感",
+      "name_en": "Minimalist geometric",
+      "family": "movement",
+      "prompt": "少量简洁实体、哑光工业材质、清楚间距和大块空白组成画面；保留一个明确动作的IP和必要学习道具，阴影轻而有体积。采用极简视觉启发，避免把“少内容”冒充完整历史流派复现。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。极简背景不削去角色必要特征；声明为具象IP适配。",
+      "source_ids": [
+        "moma-art-glossary"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "极简几何雕塑感",
+        "Minimalist geometric"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "neo-impressionist-pointillism",
+      "name": "新印象派点彩",
+      "name_en": "Neo-Impressionist pointillism",
+      "family": "movement",
+      "prompt": "选择精密点彩这一分支，以有规律的小色点形成明暗和环境，轮廓由色点密度逐渐聚合；整体明亮有秩序。IP脸部和小图标减少点的颗粒干扰，字区完全保持干净。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "met-neo-impressionism",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-pointillism"
+      },
+      "alias_ids": [
+        "pointillism"
+      ],
+      "aliases": [
+        "点彩",
+        "Pointillism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "新印象派点彩",
+        "Neo-Impressionist pointillism",
+        "点彩",
+        "Pointillism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "op-art-optical-geometry",
+      "name": "欧普几何视错觉",
+      "name_en": "Op-art optical geometry",
+      "family": "movement",
+      "prompt": "规则重复线和几何网格形成轻微深度错觉，围绕学习道具构成有秩序的节奏；角色轮廓与标题区域保持稳定平整，减少高频密纹。不要让视错觉扭曲IP脸部或削弱文字辨认。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。视错觉只在环境中受控使用，不扭曲人脸或文字。",
+      "source_ids": [
+        "moma-op-art"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "欧普几何视错觉",
+        "Op-art optical geometry"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "pop-graphic",
+      "name": "波普广告图像",
+      "name_en": "Pop graphic",
+      "family": "movement",
+      "prompt": "粗而清楚的角色轮廓、果断平涂色块、少量规则印刷网点与日常学习物件构成轻快商业图像；整体统一而利落。网点只进插画，禁止从示例继承对话框文字或口号。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "moma-pop-art",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-pop art"
+      },
+      "alias_ids": [
+        "pop-art"
+      ],
+      "aliases": [
+        "波普艺术",
+        "Pop Art"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "波普广告图像",
+        "Pop graphic",
+        "波普艺术",
+        "Pop Art"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "renaissance",
+      "name": "文艺复兴绘画",
+      "name_en": "Renaissance Painting",
+      "family": "movement",
+      "prompt": "以稳定的人体比例和清晰的体积转折塑造角色，环境遵循有秩序的透视与前后关系；轮廓柔和而准确，颜料层细密叠加，学习道具像静物一样具备扎实结构。",
+      "supports_ip": true,
+      "ip_adaptation": "沿用原有脸型发型服装与标识，用细腻体积塑形表达原IP，不替换成历史人物或古装。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-renaissance"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "文艺复兴绘画",
+        "Renaissance Painting"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "surrealist-dream-scene",
+      "name": "超现实梦境",
+      "name_en": "Surrealist dream scene",
+      "family": "movement",
+      "prompt": "以清楚可辨的物体构造不可能但连贯的空间，例如书页形成阶梯、任务卡悬浮成路径；光影统一，现实材质与梦境尺度形成反差。角色身份保持现实连续性，避免无意义怪物和新增标语。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。超现实尺度与物件关系用于场景，角色身体结构保持连续。",
+      "source_ids": [
+        "met-surrealism",
+        "moma-surrealism",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-surrealist"
+      },
+      "alias_ids": [
+        "surrealism"
+      ],
+      "aliases": [
+        "超现实主义",
+        "Surrealism"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "超现实梦境",
+        "Surrealist dream scene",
+        "超现实主义",
+        "Surrealism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "afrofuturism",
+      "name": "非洲未来主义",
+      "name_en": "Afrofuturism",
+      "family": "visual_language",
+      "prompt": "将雕塑式几何结构、富有节奏的纹样与未来技术形体结合，环境具有完整的结构秩序；人物与器物由饱满块面塑形，材质可见织物、陶土与金属之间的对照和连接。",
+      "supports_ip": true,
+      "ip_adaptation": "保留原IP的脸型发型服装及标识，风格落在场景、道具和表面结构，不改角色身份。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK afrofuturism"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "非洲未来主义",
+        "Afrofuturism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "art-deco-geometric",
+      "name": "装饰艺术几何",
+      "name_en": "Art Deco geometric",
+      "family": "visual_language",
+      "prompt": "修长简化造型、阶梯式轮廓、秩序鲜明的几何边框与少量放射线；大色面搭配克制金属细节，浅景深空间和清爽表面形成精致感。装饰集中于场景，不改造品牌标识。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "vam-art-deco",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-art deco"
+      },
+      "alias_ids": [
+        "art-deco"
+      ],
+      "aliases": [
+        "装饰艺术",
+        "Art Deco"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "装饰艺术几何",
+        "Art Deco geometric",
+        "装饰艺术",
+        "Art Deco"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "art-nouveau-organic",
+      "name": "新艺术有机曲线",
+      "name_en": "Art Nouveau organic",
+      "family": "visual_language",
+      "prompt": "流动植物曲线、柔韧轮廓和扁平化色面贯穿整张场景，弧线围绕角色和学习道具形成连续节奏；不使用厚重写实阴影。装饰避开标题与IP脸部。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "moma-art-nouveau",
+        "github-twri-styler"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-art nouveau"
+      },
+      "alias_ids": [
+        "art-nouveau"
+      ],
+      "aliases": [
+        "新艺术",
+        "Art Nouveau"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "新艺术有机曲线",
+        "Art Nouveau organic",
+        "新艺术",
+        "Art Nouveau"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "atompunk",
+      "name": "原子时代未来",
+      "name_en": "Atompunk",
+      "family": "visual_language",
+      "prompt": "以原子时代的圆润工业造型、轨道式装饰和实体仪表构建设想中的未来学习环境；人物与道具轮廓饱满，浅层空间整洁明快，表面呈搪瓷、塑料与金属的实体触感。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型及原服装标识，将未来语言用于道具和环境，不替换角色制服。",
+      "source_ids": [
+        "github-mk-styles"
+      ],
+      "source_entry_names": {
+        "github-mk-styles": "MK atompunk"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "原子时代未来",
+        "Atompunk"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "bauhaus-functional-geometry",
+      "name": "包豪斯功能几何",
+      "name_en": "Bauhaus functional geometry",
+      "family": "visual_language",
+      "prompt": "以圆、矩形和简化工业体块构成学习空间，角色结构简洁，色面边缘清楚，装饰减少，间距与视觉平衡明确。背景与道具使用功能化造型；标题仍沿用指定字体，不自行换成历史西文字体。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。",
+      "source_ids": [
+        "met-bauhaus",
+        "github-mk-styles"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-mk-styles": "MK bauhaus-style"
+      },
+      "alias_ids": [
+        "bauhaus"
+      ],
+      "aliases": [
+        "包豪斯视觉",
+        "Bauhaus"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "包豪斯功能几何",
+        "Bauhaus functional geometry",
+        "包豪斯视觉",
+        "Bauhaus"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "comic-book",
+      "name": "漫画印刷",
+      "name_en": "Comic Book",
+      "family": "visual_language",
+      "prompt": "用有力度的勾线、清楚的明暗块面与局部印刷网点塑造人物和道具，动作具有连贯的叙事张力；空间透视明确，背景简化为节奏化结构，表面保留纸本漫画的印刷感。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装和标识，以动作与表情变化叙事，不替换角色的五官比例。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-comic book"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "漫画印刷",
+        "Comic Book"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "commercial_anime",
+      "name": "精致商业动漫",
+      "prompt": "清晰线稿、利落色块与柔和体积光，人物表情明确，背景细节克制。",
+      "supports_ip": true,
+      "name_en": "Commercial Anime",
+      "family": "visual_language",
+      "source_ids": [
+        "project-original-presets"
+      ],
+      "description_origin": "project_authored",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "精致商业动漫",
+        "Commercial Anime"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "cyberpunk",
+      "name": "赛博朋克",
+      "name_en": "Cyberpunk",
+      "family": "visual_language",
+      "prompt": "将模块化电子结构、透明信息面板与实体机械连接成高密度环境，人物轮廓清楚，空间有明显纵深；表面区分玻璃、聚合物与金属，技术细节形成统一的工业语言。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型服装及标识，电子化主要作用于环境和工具，不改造成机械面孔。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "futuristic-cybernetic"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "赛博朋克",
+        "Cyberpunk"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "flat_editorial",
+      "name": "平面编辑插画",
+      "prompt": "以平面轮廓、概括阴影和干净色块构成画面，减少透视和材质细节，保持IP脸型、发型、体型和服装识别。",
+      "supports_ip": true,
+      "name_en": "Flat Editorial",
+      "family": "visual_language",
+      "source_ids": [
+        "project-original-presets"
+      ],
+      "description_origin": "project_authored",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "平面编辑插画",
+        "Flat Editorial"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "isometric_miniature",
+      "name": "微缩立体模型",
+      "prompt": "人物与道具采用精细微缩模型的统一实体质感，体块连接、边缘厚度和微小接缝可见；在简洁立体场景中保持完整人物识别，镜头服从本套布局，不把等距投影本身当成全部风格。",
+      "supports_ip": true,
+      "name_en": "Miniature diorama",
+      "family": "visual_language",
+      "source_ids": [
+        "project-original-presets"
+      ],
+      "description_origin": "project_authored",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "aliases": [
+        "等距微缩场景"
+      ],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "微缩立体模型",
+        "Miniature diorama",
+        "等距微缩场景"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "low-poly",
+      "name": "低多边形",
+      "name_en": "Low Poly",
+      "family": "visual_language",
+      "prompt": "将人物、桌面与道具转化为清楚可见的多边形体块，用平整切面交代体积转折；空间像简洁搭建的立体模型，材料依靠面之间的差异表达，保持整体结构和轮廓的统一。",
+      "supports_ip": true,
+      "ip_adaptation": "锁定脸型发型服装及标识，面部切面保持适度，标识以完整表面图形附着。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-lowpoly"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "低多边形",
+        "Low Poly"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "manga",
+      "name": "日式漫画",
+      "name_en": "Manga",
+      "family": "visual_language",
+      "prompt": "以流畅而精确的线稿、选择性的黑面和细致网纹组织画面，人物表情与动作清楚，环境线条有稳定透视；形体在写意与结构之间平衡，表面呈纸上墨线与网纸的统一质地。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型服装和标识，沿用原有五官设计，漫画化主要表现在线稿与明暗方式。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "misc-manga"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "日式漫画",
+        "Manga"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "painterly_light",
+      "name": "叙事绘本插画",
+      "prompt": "以凝练的手绘轮廓、柔厚的概括色块和轻微纸上笔触组织人物与场景，造型带温和体积，空间舒展而有明确叙事焦点；以清楚的表情和动作推动画面，不只增加光效。",
+      "supports_ip": true,
+      "name_en": "Narrative storybook illustration",
+      "family": "visual_language",
+      "source_ids": [
+        "project-original-presets"
+      ],
+      "description_origin": "project_authored",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "aliases": [
+        "叙事光影插画"
+      ],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "叙事绘本插画",
+        "Narrative storybook illustration",
+        "叙事光影插画"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "pixel-art",
+      "name": "像素艺术",
+      "name_en": "Pixel Art",
+      "family": "visual_language",
+      "prompt": "以可辨识的像素网格搭建人物和场景，轮廓用阶梯式色块转折，体积以有限层次的像素簇表达；空间结构简洁一致，纹理由图案节奏形成，避免模糊的平滑涂抹。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型和服装主结构，像素尺度要足以呈现关键标识，标识不以随机点代替。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "sai-pixel art"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "像素艺术",
+        "Pixel Art"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "psychedelic",
+      "name": "迷幻视觉",
+      "name_en": "Psychedelic Art",
+      "family": "visual_language",
+      "prompt": "用连续弯曲的轮廓、波纹形色面与层层套叠的图形构成流动视觉，人物和道具有统一的有机线势；空间通过图形穿插展开，表面带平版印刷般的均匀质地。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型和服装轮廓清楚，波纹主要围绕角色展开，服装标识不变形。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-psychedelic"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "迷幻视觉",
+        "Psychedelic Art"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "retro-futurism",
+      "name": "复古未来主义",
+      "name_en": "Retro Futurism",
+      "family": "visual_language",
+      "prompt": "用早期太空想象中的流线外壳、实体按键与圆角机器描绘学习场景，人物和道具具有清楚体积；透视空间像搭建的未来展示场，表面呈旧式工业材料的温润实体感。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装和标识，用复古技术造型改变学习工具，角色服饰沿用原资产。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "futuristic-retro futurism"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "复古未来主义",
+        "Retro Futurism"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "soft_3d",
+      "name": "柔和3D",
+      "prompt": "人物和场景采用统一的柔和三维体积、哑光材质与柔光，保留所选IP身份与服装，不改成另一个角色。",
+      "supports_ip": true,
+      "name_en": "Soft 3D",
+      "family": "visual_language",
+      "source_ids": [
+        "project-original-presets"
+      ],
+      "description_origin": "project_authored",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "柔和3D",
+        "Soft 3D"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "steampunk",
+      "name": "蒸汽朋克",
+      "name_en": "Steampunk",
+      "family": "visual_language",
+      "prompt": "以可读的机械传动、管道与铆接结构构建学习器具和环境，人物和物体采用扎实的手绘体积；空间层层展开，金属、皮革和木材有清楚触感，机械细节服务场景功能。",
+      "supports_ip": true,
+      "ip_adaptation": "保留脸型发型原服装与标识，机械装饰放在道具和背景，不擅加面罩或遮挡面部。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "artstyle-steampunk"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "蒸汽朋克",
+        "Steampunk"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "ukiyo-e-color-woodblock",
+      "name": "浮世绘彩色木版",
+      "name_en": "Ukiyo-e color woodblock",
+      "family": "visual_language",
+      "prompt": "以清晰墨线和分层平涂色块组织角色与道具，空间偏平面，采用清楚的前后遮挡和富节奏的轮廓；轻微纸质与套印手感。只借画法，不套用名作海浪或旧式画中文字。",
+      "supports_ip": true,
+      "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。使用所选IP轮廓与衣着，仅转换版画线色；不搬用名作构图。",
+      "source_ids": [
+        "met-ukiyo-e",
+        "github-mk-styles"
+      ],
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "source_entry_names": {
+        "github-mk-styles": "MK Ukiyo-e"
+      },
+      "alias_ids": [
+        "ukiyo-e"
+      ],
+      "aliases": [
+        "浮世绘木版",
+        "Ukiyo-e"
+      ],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "浮世绘彩色木版",
+        "Ukiyo-e color woodblock",
+        "浮世绘木版",
+        "Ukiyo-e"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "vaporwave",
+      "name": "蒸汽波",
+      "name_en": "Vaporwave",
+      "family": "visual_language",
+      "prompt": "用早期数码界面的图形、光滑几何体与复古三维空间构成带有怀旧意味的虚拟场景；人物以清晰轮廓嵌入其中，平面符号和立体物体相互叠合，材质呈刻意的数字合成感。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装和标识，数码处理用于场景及道具，面部不加入故障碎片。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "futuristic-vaporwave"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "蒸汽波",
+        "Vaporwave"
+      ],
+      "verified_on": "2026-10-19"
+    },
+    {
+      "id": "zentangle",
+      "name": "禅绕绘画",
+      "name_en": "Zentangle",
+      "family": "visual_language",
+      "prompt": "用细密、重复而有规则的手绘纹样填充清楚的形体分区，曲线与几何图案相互交织；空间由纹样密度和留白产生，整体保持钢笔绘制的精确边缘与耐心细作的纸面质感。",
+      "supports_ip": true,
+      "ip_adaptation": "保持脸型发型服装与标识，纹样用于衣物大面和背景，五官及标识区保持简明。",
+      "source_ids": [
+        "github-twri-styler"
+      ],
+      "source_entry_names": {
+        "github-twri-styler": "misc-zentangle"
+      },
+      "description_origin": "original_synthesis",
+      "verification_status": "text_reviewed",
+      "image_validated": false,
+      "aliases": [],
+      "alias_ids": [],
+      "adaptation_status": "project_advertising_adaptation",
+      "search_terms": [
+        "禅绕绘画",
+        "Zentangle"
+      ],
+      "verified_on": "2026-10-19"
+    }
+  ],
+  "layouts": [
+    {
+      "id": "text_left_subject_right",
+      "name": "左文右主体",
+      "prompt": "左侧为主要文字区，右侧为角色或动作主视觉；底部道具辅助叙事，给Logo留出既定位置。",
+      "framing_ids": [
+        "eye_level_medium",
+        "three_quarter_medium"
+      ]
+    },
+    {
+      "id": "title_top_scene_bottom",
+      "name": "上文下景",
+      "prompt": "主标题在上部形成清楚阅读区，下部用一个完整场景承接动作；Logo与标题留出独立自然间距。",
+      "framing_ids": [
+        "wide_scene",
+        "eye_level_medium"
+      ]
+    },
+    {
+      "id": "subject_left_text_right",
+      "name": "左主体右文",
+      "prompt": "主视觉在左侧中下部，文字在右侧形成大而完整的阅读区；左上Logo保持原位，角色不得遮挡。",
+      "framing_ids": [
+        "eye_level_medium",
+        "three_quarter_medium"
+      ]
+    },
+    {
+      "id": "central_title_corner_subject",
+      "name": "中心大字角落角色",
+      "prompt": "中央由主文案形成主要阅读焦点，角色与关键动作集中在下方一侧；避免把主文案做成新的Logo。",
+      "framing_ids": [
+        "eye_level_medium",
+        "wide_scene"
+      ]
+    },
+    {
+      "id": "diagonal_action_path",
+      "name": "斜向动作构图",
+      "prompt": "用人物视线、手势和少量道具形成斜向阅读动线，在另一侧保留连续的完整文字区；只用一帧，不分漫画格。",
+      "framing_ids": [
+        "three_quarter_medium",
+        "wide_scene"
+      ]
+    },
+    {
+      "id": "tabletop_overview",
+      "name": "桌面俯视构图",
+      "prompt": "以桌面任务、手部动作和道具为主视觉，角色从画面侧上方入镜并露出可识别的脸部；主标题在清楚留白中。",
+      "framing_ids": [
+        "tabletop_oblique"
+      ]
+    }
+  ],
+  "framings": [
+    {
+      "id": "eye_level_medium",
+      "prompt": "平视中景，能同时看清表情、手部和关键道具。"
+    },
+    {
+      "id": "three_quarter_medium",
+      "prompt": "侧前方中景，保留人物面部识别与动作关系。"
+    },
+    {
+      "id": "wide_scene",
+      "prompt": "稍远景，交代空间和动作，角色仍保持可识别。"
+    },
+    {
+      "id": "tabletop_oblique",
+      "prompt": "从斜上方观察桌面，保留人物面部或清晰侧脸，避免只剩手臂。"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "home_study",
+      "name": "家庭学习角",
+      "prompt": "简洁的家庭学习角，用少量书本或纸面道具承接已确认的学习动作。"
+    },
+    {
+      "id": "quiet_corner",
+      "name": "安静阅读角",
+      "prompt": "明亮安静的阅读空间，只保留支持当前动作的必要环境。"
+    },
+    {
+      "id": "abstract_learning_stage",
+      "name": "抽象学习舞台",
+      "prompt": "用简洁几何舞台和少量实体道具表现已确认动作，不形成虚构产品界面。"
+    },
+    {
+      "id": "paper_planning_space",
+      "name": "纸面任务空间",
+      "prompt": "以纸张、卡片和铅笔组织当前动作，不显示未经确认的文字、数字或APP结构。"
+    }
+  ],
+  "palettes": [
+    {
+      "id": "mint_ink",
+      "name": "浅薄荷与墨绿",
+      "prompt": "浅薄荷和乳白为底，深墨绿为普通文案主色，少量暖黄强调。"
+    },
+    {
+      "id": "cream_coral",
+      "name": "奶油与珊瑚橙",
+      "prompt": "奶油白为底，深棕黑普通文案，珊瑚橙作少量辅助色。"
+    },
+    {
+      "id": "lavender_navy",
+      "name": "浅紫与藏青",
+      "prompt": "浅紫白为底，藏青普通文案，少量明黄点缀。"
+    },
+    {
+      "id": "sky_cobalt",
+      "name": "浅天蓝与钴蓝",
+      "prompt": "浅天蓝和白色为底，深钴蓝普通文案，少量暖色引导。"
+    },
+    {
+      "id": "sand_olive",
+      "name": "浅沙与橄榄绿",
+      "prompt": "浅沙白为底，深橄榄绿普通文案，克制暖黄辅助。"
+    },
+    {
+      "id": "white_charcoal",
+      "name": "乳白与炭黑",
+      "prompt": "自然乳白为底，炭黑普通文案，仅用一种克制的明亮强调色。"
+    }
+  ],
+  "style_sources_path": "visual-style-sources.json",
+  "library_status": "source_reviewed_not_image_validated",
+  "library_updated_on": "2026-10-19"
+}

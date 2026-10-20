@@ -31,8 +31,24 @@ LOGO_BACKGROUND_CONFLICTS = (
 )
 
 
-def logo_prompt_rule(label: str = "参考图1") -> str:
-    return LOGO_PROMPT_TEMPLATE.format(label=str(label).strip() or "参考图1")
+def logo_position(config: dict[str, Any]) -> str:
+    placements = config.get("placements") or []
+    placement = placements[0] if placements else {}
+    platform = str(placement.get("platform") or config.get("platform") or "").strip().casefold()
+    width = placement.get("target_width") or config.get("target_width")
+    height = placement.get("target_height") or config.get("target_height")
+    size = f"{width}x{height}"
+    if not width or not height:
+        size = str(placement.get("target_size") or config.get("target_size") or "").lower().replace("×", "x").replace(" ", "")
+    if platform in {"喜马拉雅", "ximalaya"} and size in {"720x1280", "720x1559"}:
+        return "上方居中"
+    return "左上角"
+
+
+def logo_prompt_rule(label: str = "参考图1", position: str = "左上角") -> str:
+    if position not in {"左上角", "上方居中"}:
+        raise ValueError("unsupported Logo position")
+    return LOGO_PROMPT_TEMPLATE.replace("左上角", position).format(label=str(label).strip() or "参考图1")
 
 
 def load_asset_manifest(path: Path = ASSET_MANIFEST) -> list[dict[str, Any]]:
@@ -157,7 +173,7 @@ def validate_logo_prompt_rule(prompt: str, reference_items: list[dict[str, Any]]
     for item in logo_reference_items(reference_items):
         label = str(item.get("label") or "参考图1")
         required = logo_prompt_rule(label)
-        if required not in prompt:
+        if not any(logo_prompt_rule(label, position) in prompt for position in ("左上角", "上方居中")):
             raise ValueError(f"prompt 缺少 {label} 的 Logo 保真约束：{required}")
         conflict = next((value for value in LOGO_BACKGROUND_CONFLICTS if value in prompt), None)
         if conflict:
@@ -211,4 +227,11 @@ def validate_manifest_logo(manifest: dict[str, Any], config: dict[str, Any]) -> 
                 f"{job_id} Logo path 与配置不匹配：{first.get('path')} != {selected_reference['path']}"
             )
         validate_logo_prompt_rule(str(job.get("prompt") or ""), [first])
+        prompt = str(job.get("prompt") or "")
+        position = logo_position(config)
+        if logo_prompt_rule("参考图1", position) not in prompt:
+            raise ValueError(f"{job_id} Logo 必须放在{position}")
+        other_position = "左上角" if position == "上方居中" else "上方居中"
+        if logo_prompt_rule("参考图1", other_position) in prompt:
+            raise ValueError(f"{job_id} Logo 位置指令冲突")
     return selection

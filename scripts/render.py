@@ -8,7 +8,6 @@ import base64
 import hashlib
 import io
 import json
-import math
 import mimetypes
 import os
 from pathlib import Path
@@ -26,13 +25,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from logo_reference import logo_prompt_rule, validate_asset_reference_bindings, validate_logo_prompt_rule  # noqa: E402
+from kie_model import MODEL, RESOLUTION, ASPECT_RATIOS, ESTIMATED_CREDITS_PER_IMAGE, CROP_REVIEW_THRESHOLD_PERCENT, normalize_resolution, nearest_aspect_ratio, geometry_report  # noqa: E402
 
 
 DEFAULT_API_BASE = "https://api.kie.ai"
 DEFAULT_UPLOAD_BASE = "https://kieai.redpandaai.co"
-TEXT_MODEL = "gpt-image-2-text-to-image"
-EDIT_MODEL = "gpt-image-2-image-to-image"
-RESOLUTION = "2K"
 RESOLUTION_CHOICES = {RESOLUTION}
 LEGACY_QUALITY_CHOICES = {"low", "medium", "high"}
 ENV_FILE = Path.home() / ".config" / "onion-app-image-kie" / ".env"
@@ -41,32 +38,6 @@ MAX_REFERENCE_IMAGES = 8
 MAX_REFERENCE_BYTES = 10 * 1024 * 1024
 DEFAULT_POLL_TIMEOUT = 900
 
-ASPECT_RATIOS = {
-    "1:1": 1.0,
-    "3:2": 3 / 2,
-    "2:3": 2 / 3,
-    "4:3": 4 / 3,
-    "3:4": 3 / 4,
-    "16:9": 16 / 9,
-    "9:16": 9 / 16,
-    "2:1": 2.0,
-    "1:2": 0.5,
-    "21:9": 21 / 9,
-}
-
-# Kept only to preserve useful size_label metadata when callers use a ratio.
-RATIO_SIZE_LABELS = {
-    "1:1": "1024x1024",
-    "3:2": "1536x1024",
-    "2:3": "1024x1536",
-    "4:3": "1365x1024",
-    "3:4": "1024x1365",
-    "16:9": "2048x1152",
-    "9:16": "1152x2048",
-    "2:1": "2048x1024",
-    "1:2": "1024x2048",
-    "21:9": "2389x1024",
-}
 
 
 class KieError(Exception):
@@ -174,13 +145,6 @@ def validate_size_label(size: str) -> str:
     return f"{int(match.group(1))}x{int(match.group(2))}"
 
 
-def normalize_resolution(value: str | None) -> str:
-    resolution = str(value or RESOLUTION).strip().upper()
-    if resolution != RESOLUTION:
-        raise ValueError("resolution must be 2K")
-    return resolution
-
-
 def validate_legacy_quality(value: str | None) -> str | None:
     if value is None or not str(value).strip():
         return None
@@ -190,21 +154,20 @@ def validate_legacy_quality(value: str | None) -> str | None:
     return quality
 
 
-def nearest_aspect_ratio(width: int, height: int) -> str:
-    target = width / height
-    return min(ASPECT_RATIOS, key=lambda label: abs(math.log(target / ASPECT_RATIOS[label])))
-
-
 def generation_geometry(explicit_size: str, requested_ratio: str) -> tuple[str, str]:
     if explicit_size:
         size_label = validate_size_label(explicit_size)
         width, height = (int(part) for part in size_label.split("x", 1))
-        return size_label, nearest_aspect_ratio(width, height)
+        selected = nearest_aspect_ratio(width, height)
+        if requested_ratio and requested_ratio != selected:
+            raise ValueError(f"aspect_ratio conflicts with target size; expected {selected}")
+        return size_label, selected
     if requested_ratio not in ASPECT_RATIOS:
         raise ValueError(
             f"aspect_ratio must be one of {', '.join(sorted(ASPECT_RATIOS))}, or pass --size WIDTHxHEIGHT"
         )
-    return RATIO_SIZE_LABELS[requested_ratio], requested_ratio
+    # KIE returns the actual pixel dimensions; 1K is a tier, not exact dimensions.
+    return "", requested_ratio
 
 
 def json_request(url: str, api_key: str, payload: dict[str, Any] | None = None, *, method: str = "POST") -> urllib.request.Request:
@@ -227,14 +190,16 @@ def build_create_request(
     resolution: str,
     input_urls: list[str] | None = None,
 ) -> urllib.request.Request:
-    model = EDIT_MODEL if input_urls else TEXT_MODEL
-    task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": resolution}
-    if input_urls:
-        task_input["input_urls"] = input_urls
+    normalize_resolution(resolution)
+    if aspect_ratio not in ASPECT_RATIOS:
+        raise ValueError("unsupported Sunburst 1K aspect_ratio")
+    if not input_urls:
+        raise ValueError("Sunburst image-to-image requires at least one reference image; no model fallback is allowed")
+    task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": RESOLUTION, "background": "opaque", "input_urls": input_urls}
     return json_request(
         f"{api_base.rstrip('/')}/api/v1/jobs/createTask",
         api_key,
-        {"model": model, "input": task_input},
+        {"model": MODEL, "input": task_input},
     )
 
 
@@ -517,6 +482,24 @@ def load_input(args: argparse.Namespace) -> dict[str, Any]:
     return payload
 
 
+def output_geometry(path: Path, target_size: str) -> dict[str, Any]:
+    from PIL import Image
+    with Image.open(path) as image:
+        width, height = image.size
+    result: dict[str, Any] = {"actual_width": width, "actual_height": height, "review_findings": []}
+    if target_size:
+        target_width, target_height = map(int, target_size.split("x"))
+        source_ratio, target_ratio = width / height, target_width / target_height
+        crop = 1 - min(source_ratio / target_ratio, target_ratio / source_ratio)
+        scale = max(target_width / width, target_height / height)
+        result.update({"actual_crop_percent": round(crop * 100, 2), "delivery_scale": round(scale, 3)})
+        if round(crop * 100, 2) >= CROP_REVIEW_THRESHOLD_PERCENT:
+            result["review_findings"].append(f"比例差距较大：交付预计裁切 {crop * 100:.1f}%，请确认生成后的构图、文字和 Logo 完整。")
+        if scale >= 1.25:
+            result["review_findings"].append(f"1K 原图交付时需放大约 {scale:.2f} 倍，请检查小字与边缘清晰度。")
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-json", help="JSON with prompt/reference_images/aspect_ratio or size/resolution")
@@ -573,6 +556,8 @@ def run(args) -> int:
         skill_dir = SCRIPT_DIR.parent
         project_root = find_project_root(SCRIPT_DIR)
         reference_items = normalize_reference_items(list(payload.get("reference_images", [])))
+        if not reference_items:
+            raise ValueError("Sunburst image-to-image requires at least one original Logo, IP, font or UI reference image")
         validate_reference_labels(prompt, reference_items)
         validate_asset_reference_bindings(reference_items)
         validate_logo_prompt_rule(prompt, reference_items)
@@ -586,6 +571,12 @@ def run(args) -> int:
         oversized = [str(path) for path in reference_paths if path.stat().st_size <= 0 or path.stat().st_size > MAX_REFERENCE_BYTES]
         if oversized:
             raise ValueError("reference image must be between 1 byte and 10MB: " + ", ".join(oversized))
+        frame_layout_path = payload.get("frame_layout_path")
+        if frame_layout_path:
+            from blue_frame import validate_layout
+            frame_layout_path = resolve_reference_path(frame_layout_path, project_root, skill_dir)
+            validate_layout(frame_layout_path, size_label, reference_items, reference_paths, prompt,
+                            inherited_base=payload.get("base_image_path"))
 
         output = Path(args.output).expanduser()
         if not output.is_absolute():
@@ -595,7 +586,7 @@ def run(args) -> int:
         ).resolve()
         if output != runtime_root and runtime_root not in output.parents:
             raise ValueError(f"output must stay under {runtime_root}")
-        model = EDIT_MODEL if reference_paths else TEXT_MODEL
+        model = MODEL
         fingerprint = request_fingerprint(model, prompt, reference_paths, aspect_ratio, resolution)
         state_path = task_state_path(output)
         state = load_task_state(state_path)
@@ -614,6 +605,9 @@ def run(args) -> int:
             "provider": "kie",
             "model": model,
             "resolution": resolution,
+            "estimated_credits": ESTIMATED_CREDITS_PER_IMAGE,
+            "pricing_basis": "user-account-region-screenshot; actual billing is provider-controlled",
+            "geometry": geometry_report(*map(int, size_label.split("x")), aspect_ratio) if size_label else {"aspect_ratio": aspect_ratio, "resolution": resolution},
             "endpoint": "/api/v1/jobs/createTask",
             "reference_images": [item["path"] for item in reference_items],
             "reference_image_labels": [
@@ -624,6 +618,8 @@ def run(args) -> int:
             "prompt_used": prompt,
             "task_state_path": str(state_path),
         }
+        if frame_layout_path:
+            metadata["frame_layout_path"] = str(frame_layout_path)
         if args.validate_only:
             print(json.dumps(metadata, ensure_ascii=False, indent=2))
             return 0
@@ -643,6 +639,10 @@ def run(args) -> int:
         if state.get("status") == "downloaded" and output.is_file():
             if state.get("sha256") == sha256_file(output):
                 metadata.update({"task_id": state.get("task_id"), "sha256": state["sha256"], "byte_count": output.stat().st_size})
+                metadata.update(output_geometry(output, size_label))
+                if frame_layout_path:
+                    from blue_frame import attach_result
+                    attach_result(metadata, output, frame_layout_path)
                 print(json.dumps(metadata, ensure_ascii=False))
                 return 0
         result_url = str(state.get("result_url") or "")
@@ -697,6 +697,10 @@ def run(args) -> int:
         state.update({"status": "downloaded", "task_id": task_id, "result_url": result_url, "sha256": sha256_file(saved)})
         atomic_write_json(state_path, state)
         metadata.update({"filepath": str(saved), "task_id": task_id, "valid": True, "sha256": sha256_file(saved), "byte_count": saved.stat().st_size})
+        metadata.update(output_geometry(saved, size_label))
+        if frame_layout_path:
+            from blue_frame import attach_result
+            attach_result(metadata, saved, frame_layout_path)
         print(json.dumps(metadata, ensure_ascii=False, indent=2))
         return 0
     except ValueError as exc:

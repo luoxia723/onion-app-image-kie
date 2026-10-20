@@ -35,6 +35,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from build_selection_page import normalize_sets  # noqa: E402
 from logo_reference import canonical_logo_fields  # noqa: E402
+from kie_model import MODEL, RESOLUTION, ESTIMATED_CREDITS_PER_IMAGE, geometry_report  # noqa: E402
 
 IMAGE_SETS_FILE = "image-sets.json"
 MAX_BATCH_GROUP_COUNT = 100
@@ -72,155 +73,6 @@ def resolve_output_dir(value: str | None, request_id: str) -> Path:
             "output directory must stay under .runtime/策略Agent产物 or 工作区/产物"
         )
     return output
-
-
-FALLBACK_SLOTS = [
-    {
-        "id": "oppo_app_store_single_16_9_big",
-        "platform": "OPPO",
-        "name": "富媒体 - 横版大图",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 1280,
-        "height": 720,
-        "maxFileSizeKb": 150,
-        "notes": "可加 Logo",
-    },
-    {
-        "id": "oppo_app_store_double_9_16",
-        "platform": "OPPO",
-        "name": "富媒体 - 横版两图",
-        "channel": "应用商店",
-        "imageForm": "双图",
-        "ratio": "9:16",
-        "width": 474,
-        "height": 768,
-        "maxFileSizeKb": 150,
-    },
-    {
-        "id": "oppo_app_store_triple_3_2",
-        "platform": "OPPO",
-        "name": "富媒体 - 横版三图",
-        "channel": "应用商店",
-        "imageForm": "三图",
-        "ratio": "3:2",
-        "width": 320,
-        "height": 210,
-        "maxFileSizeKb": 100,
-    },
-    {
-        "id": "oppo_app_store_single_16_9_banner",
-        "platform": "OPPO",
-        "name": "竞价 banner",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 1280,
-        "height": 720,
-        "maxFileSizeKb": 150,
-        "notes": "不加 Logo",
-    },
-    {
-        "id": "vivo_app_store_triple_9_16",
-        "platform": "vivo",
-        "name": "商店搜索 - 首位三图",
-        "channel": "应用商店",
-        "imageForm": "三图",
-        "ratio": "9:16",
-        "width": 1080,
-        "height": 1920,
-        "maxFileSizeKb": 150,
-    },
-    {
-        "id": "vivo_app_store_single_root_2_1",
-        "platform": "vivo",
-        "name": "搜索富媒体 - 单图文",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 202,
-        "height": 142,
-        "maxFileSizeKb": 50,
-    },
-    {
-        "id": "vivo_app_store_triple_3_2",
-        "platform": "vivo",
-        "name": "搜索富媒体 - 三图",
-        "channel": "应用商店",
-        "imageForm": "三图",
-        "ratio": "3:2",
-        "width": 320,
-        "height": 211,
-        "maxFileSizeKb": 80,
-    },
-    {
-        "id": "vivo_app_store_single_16_11",
-        "platform": "vivo",
-        "name": "顶部 banner",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 720,
-        "height": 498,
-        "maxFileSizeKb": 150,
-    },
-    {
-        "id": "xiaomi_app_store_single_16_9",
-        "platform": "小米",
-        "name": "搜索大图 / 二图 / 横版三图",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 960,
-        "height": 540,
-        "maxFileSizeKb": 500,
-    },
-    {
-        "id": "xiaomi_app_store_triple_1_1",
-        "platform": "小米",
-        "name": "搜索三图",
-        "channel": "应用商店",
-        "imageForm": "三图",
-        "ratio": "1:1",
-        "width": 320,
-        "height": 320,
-        "maxFileSizeKb": 300,
-    },
-    {
-        "id": "xiaomi_app_store_single_16_9_rich",
-        "platform": "小米",
-        "name": "富媒体大图",
-        "channel": "应用商店",
-        "imageForm": "单图",
-        "ratio": "16:9",
-        "width": 960,
-        "height": 540,
-        "maxFileSizeKb": 500,
-    },
-    {
-        "id": "passthrough_information_feed_single_original",
-        "platform": "原图直出",
-        "name": "信息流原图直出",
-        "channel": "信息流",
-        "imageForm": "单图",
-        "ratio": "1:1",
-        "width": None,
-        "height": None,
-        "maxFileSizeKb": 999999,
-    },
-    {
-        "id": "passthrough_learning_device_single_original",
-        "platform": "原图直出",
-        "name": "学习机单图原图直出",
-        "channel": "学习机",
-        "imageForm": "单图",
-        "ratio": "1:1",
-        "width": None,
-        "height": None,
-        "maxFileSizeKb": 999999,
-    },
-]
 
 
 RATIO_MAP = {
@@ -286,12 +138,12 @@ def find_free_port(preferred: int) -> int:
 def load_platform_slots(path: Path | None = None) -> list[dict[str, Any]]:
     source = path or DEFAULT_CHANNEL_RULES
     if not source or not source.exists():
-        return FALLBACK_SLOTS
+        return []
 
     data = json.loads(source.read_text(encoding="utf-8"))
     if isinstance(data.get("placements"), list):
         slots = [normalize_channel_placement(slot) for slot in data["placements"]]
-        return slots or FALLBACK_SLOTS
+        return slots
 
     slots: list[dict[str, Any]] = []
     for platform in data.get("platforms", []):
@@ -331,7 +183,7 @@ def load_platform_slots(path: Path | None = None) -> list[dict[str, Any]]:
                     }
                 )
             )
-    return slots or FALLBACK_SLOTS
+    return slots
 
 
 def normalize_channel_placement(slot: dict[str, Any]) -> dict[str, Any]:
@@ -344,6 +196,7 @@ def normalize_channel_placement(slot: dict[str, Any]) -> dict[str, Any]:
     render_size = slot.get("render_size") or (f"{render_width}x{render_height}" if render_width and render_height else "")
     image_form = slot.get("image_form") or slot.get("imageForm") or "单图"
     max_kb = slot.get("max_file_size_kb", slot.get("maxFileSizeKb"))
+    geometry = geometry_report(int(target_width), int(target_height)) if target_width and target_height else {}
     return {
         "id": slot.get("id"),
         "category": category,
@@ -365,18 +218,25 @@ def normalize_channel_placement(slot: dict[str, Any]) -> dict[str, Any]:
         "render_width": render_width,
         "render_height": render_height,
         "render_size": render_size,
+        "render_aspect_ratio": geometry.get("aspect_ratio", ""),
+        "resolution": RESOLUTION,
+        "geometry": geometry,
         "maxFileSizeKb": max_kb,
         "max_file_size_kb": max_kb,
+        "file_size_operator": slot.get("file_size_operator") or "le",
         "format": slot.get("format") or "",
         "directness": slot.get("directness") or "unknown",
-        "directness_label": slot.get("directness_label") or "",
+        "directness_label": ("生成后需确认效果" if geometry.get("needs_safe_area") else "正常适配，无额外确认") if geometry else "",
         "postprocess": slot.get("postprocess") or "",
         "logo_policy": slot.get("logo_policy") or "optional",
+        "logo_position": slot.get("logo_position") or "左上角",
         "cta_policy": slot.get("cta_policy") or "forbidden",
         "enabled": bool(slot.get("enabled", True)),
         "disabled_reason": slot.get("disabled_reason") or "",
         "notes": slot.get("notes") or "",
         "source": slot.get("source") or "",
+        "source_row": slot.get("source_row"),
+        "source_revision": slot.get("source_revision"),
     }
 
 
@@ -650,19 +510,9 @@ def no_placement_explanation(
 
     messages: list[str] = []
     if desired_channels and all(channel == "学习机" for channel in desired_channels):
-        messages.append("当前渠道锁定为学习机，学习机一期仅支持单图版位")
+        messages.append("当前在投表未包含学习机版位，旧版位保持停用")
     if not rules_loaded:
-        messages.append("版位规则未加载，当前使用兜底版位")
-
-    by_id = {str(slot.get("id")): slot for slot in slots}
-    huawei_double = by_id.get("huawei-app-slot-slot-480x422")
-    if huawei_double:
-        huawei_channel = huawei_double.get("channel") or huawei_double.get("category")
-        if huawei_double.get("enabled") is False:
-            reason = huawei_double.get("disabled_reason") or "未注明原因"
-            messages.append(f"华为双图版位当前不可选：{reason}")
-        elif desired_channels and huawei_channel not in desired_channels:
-            messages.append("华为双图版位存在且可用，但被当前渠道隐藏；请切换到应用商店")
+        messages.append("当前渠道规则未加载，旧版位保持停用")
 
     reasons = []
     for slot in slots:
@@ -954,6 +804,9 @@ def build_config_payload(
         "fontOptions": load_font_options(),
         "logoOptions": logo_options,
         "defaultLogoIndex": default_logo_index(context, logo_options),
+        "model": MODEL,
+        "resolution": RESOLUTION,
+        "estimatedCreditsPerImage": ESTIMATED_CREDITS_PER_IMAGE,
         "categories": categories or ["应用商店", "信息流", "学习机"],
         "diagnostics": diagnostics,
     }
@@ -1097,6 +950,11 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result["render_width"] = first["render_width"]
     result["render_height"] = first["render_height"]
     result["render_size"] = first["render_size"]
+    result["aspect_ratio"] = first["render_aspect_ratio"]
+    result["model"] = MODEL
+    result["resolution"] = RESOLUTION
+    result["geometry"] = first["geometry"]
+    result["estimated_credits_per_image"] = ESTIMATED_CREDITS_PER_IMAGE
     result["target_kb"] = first["max_file_size_kb"] or 200
     result["sets"] = parse_set_count(body.get("sets"))
     result["copy_count"] = parse_positive_int(body.get("copy_count") or body.get("copyCount"), 1)
@@ -1122,6 +980,15 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result.update(logo_fields)
     result["ip_random"] = bool(body.get("ip_random") or body.get("ip") == "随机")
     result["font_reference_randomized"] = bool(body.get("font_reference_enabled", body.get("fontEnabled", True)))
+    result["font_reference_scope"] = "set"
+    result["visual_diversity_enabled"] = bool(body.get("visual_diversity_enabled", True))
+    result["visual_diversity_mode"] = body.get("visual_diversity_mode", "open")
+    if result["visual_diversity_mode"] not in {"open", "preset"}:
+        raise ValueError("visual_diversity_mode must be open or preset")
+    result["font_prompt_rule"] = (
+        "每套从洋葱专属字体参考中选择一张，仅传给首张；同套后续图片通过首张PNG继承字体，不重新随机或重复传入；不复制示例文字。"
+        if result["font_reference_randomized"] else "不启用字体参考图。"
+    )
     screen_ui_required = bool(
         body.get("screen_ui_reference_required")
         or body.get("screenUiReferenceRequired")
