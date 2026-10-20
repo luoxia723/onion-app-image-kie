@@ -1,12 +1,12 @@
-"""Pinned KIE Flare 1K request policy and aspect-ratio adaptation."""
+"""Pinned KIE Sunburst 1K request policy and aspect-ratio adaptation."""
 from __future__ import annotations
 
 import math
 
-MODEL = "gpt-image-2-5-flare-image-to-image"
-PROVIDER = "kie-gpt-image-2-5-flare"
+MODEL = "gpt-image-2-5-sunburst-image-to-image"
+PROVIDER = "kie-gpt-image-2-5-sunburst"
 RESOLUTION = "1K"
-ESTIMATED_CREDITS_PER_IMAGE = 3  # Carried-over account/region estimate, not a verified Flare quote.
+ESTIMATED_CREDITS_PER_IMAGE = 3  # User's account/region screenshot, not a billing guarantee.
 CROP_REVIEW_THRESHOLD_PERCENT = 6.0
 ASPECT_RATIOS = {
     "1:1": 1.0, "3:2": 3 / 2, "2:3": 2 / 3,
@@ -49,7 +49,7 @@ def cover_crop_report(source_width: int, source_height: int, width: int, height:
 def geometry_report(width: int, height: int, aspect_ratio: str | None = None) -> dict:
     ratio = aspect_ratio or nearest_aspect_ratio(width, height)
     if ratio not in ASPECT_RATIOS:
-        raise ValueError(f"unsupported Flare 1K aspect_ratio: {ratio}")
+        raise ValueError(f"unsupported Sunburst 1K aspect_ratio: {ratio}")
     report = cover_crop_report(*map(int, ratio.split(":")), width, height)
     fraction = report["crop_percent"]
     axis = report["crop_axis"]
