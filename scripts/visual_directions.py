@@ -224,7 +224,7 @@ def plan_content_concepts(config, seed=None):
                                   "主体、道具与光线形成统一空间，标题位于清晰留白并具有鲜明阅读层级。",
                                   IP_RULE if ip else "", ui_rule)
             inherited = "画风、场景、主体设定和字体" + ("、Logo及其位置" if config.get("logo_asset_id") or config.get("logo") not in (None, "", "不用") else "")
-            branch_rule = f"延续参考图1的{inherited}，推进当前画面的故事。"
+            branch_rule = f"以本套已生成的第1张广告成图（参考图1）为基础，保持本套{inherited}，呈现当前文案对应的动作与状态。"
         else:
             slot_rules = {str(i): f"本张动作与情绪[{direction_id}/图{i}]：{action}" for i, action in enumerate(actions, 1)}
             style_rule = (f"画风定调：{style['style_name']}；{style['style_prompt']}\n" if style else
