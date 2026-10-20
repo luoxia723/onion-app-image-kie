@@ -10,7 +10,7 @@
 
 内部设计层级以[艺术定调](art-direction.md)为准：画风→世界与场景→故事→构图→光色材质。新配置还需在visual_concepts.art_direction中保存这五层决定；最终沿用之前的自然画面叙述方式，将这些决定提炼合并为一段正向描述，不输出分层分析、文字白名单或负面提示段。新配置使用prompt_format=positive_paragraph_v1。
 
-从[Prompt规则](prompt-rules.md)中的创意链出发，先讲清楚学生处于哪个学习瞬间、卡在哪里、产品做了什么，以及变化如何被看见。每张都让人物通过姿势、视线、表情和学习动作参与这个过程：有IP使用选定IP，无IP使用普通原创学生；为人物表演与具体痛点保留画面空间。新配置learner_story_required=true，每套显式填写learner_story的protagonist、pain_point、product_action、visible_change。
+从[Prompt规则](prompt-rules.md)中的创意链出发，先讲清楚学生处于哪个学习瞬间、卡在哪里、产品做了什么，以及变化如何被看见。每张都让人物通过姿势、视线、表情和学习动作参与这个过程：有IP使用选定IP，无IP默认使用普通原创初中生；为人物表演与具体痛点保留画面空间。新配置learner_story_required=true，每套显式填写learner_story的protagonist、pain_point、product_action、visible_change。
 
 每套由Agent整体编写视觉方案，把人物、道具、光线、配色、镜头和文字的位置放在同一个设计里考虑。按[通用规划的APP适配](scene-planning-app.md)将当前文案转成可见证据，联合检查手部动作、道具支撑、视线与镜头是否相容；共用空间写入prompt，各张独立的动作、状态和必要机位写入slot_actions。小版位仍检查缩小后的可读性，同时保留表达内容所需的动作和空间层次；不要把大字、单一姿势、极简背景当成所有方案的固定构图。
 
