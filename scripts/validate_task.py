@@ -26,7 +26,10 @@ def validate(data: dict) -> list[str]:
         errors.append("approved_copy_required")
     if not isinstance(data.get("placements"), list) or len(data["placements"]) != 1:
         errors.append("exactly_one_placement_required")
-    if data.get("ui_required") is True and not data.get("ui_references"):
+    ui_mode = data.get("screen_ui_mode") or ("reference" if data.get("ui_required") else "conceptual")
+    if ui_mode not in {"reference", "conceptual", "none"}:
+        errors.append("screen_ui_mode_invalid")
+    if ui_mode == "reference" and not data.get("ui_references"):
         errors.append("ui_reference_required")
     if not isinstance(data.get("candidate_count"), int) or data.get("candidate_count", 0) < 1:
         errors.append("candidate_count_invalid")

@@ -25,7 +25,8 @@
         "黏土手作",
         "Craft Clay"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "将主体与道具表现为手工捏制的柔软实体，圆润体块之间有清楚连接，局部保留指压和工具痕，空间像真实搭建的微型场景，表面呈微哑光的材料颗粒与温和不规则边缘。"
     },
     {
       "id": "cross-stitch-imagery",
@@ -48,7 +49,8 @@
         "十字绣图像",
         "Cross-stitch imagery"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "整幅插画由可见交叉针脚在规则布底上构成，色线形成大形与柔和明暗，统一纤维触感，只把插画绣出来，标题和原版Logo不刺绣化。"
     },
     {
       "id": "freestyle-surface-embroidery",
@@ -82,7 +84,8 @@
         "刺绣",
         "Embroidery"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "顺着主体轮廓和表面纹理走向铺排丝线，长短针形成明暗，物件色面有连续线材光泽，底布纹理清楚但不抢眼，线的方向和密度统一。"
     },
     {
       "id": "gyotaku",
@@ -109,7 +112,8 @@
         "实物拓印画法",
         "Gyotaku"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "借鉴拓印时接触与留痕的材料逻辑，以不均匀墨迹、细纹与纸面空隙塑造物体表面，主体与学习道具仍有完整轮廓，空间简洁，整体像将实体纹理转印到吸墨纸上。"
     },
     {
       "id": "kirigami",
@@ -135,7 +139,8 @@
         "立体剪纸",
         "Kirigami"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以剪切后翻折竖起的纸片构建主体与学习环境，轮廓干净，转角和连接处说明纸张结构，空间像展开的立体纸模型，表面保持纸纤维与折痕，层次来自真实的切口和支撑。"
     },
     {
       "id": "mokume-gane",
@@ -161,7 +166,8 @@
         "木纹金属",
         "Mokume-gane"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以多层金属压合后呈现的流动纹理组织主体与道具表面，造型保持清楚，层纹随曲面转折，空间像经过精细制作的金属浮雕，纹理与实体结构一致，呈温润而非镜面的材料质感。"
     },
     {
       "id": "mosaic",
@@ -187,7 +193,8 @@
         "马赛克镶嵌",
         "Mosaic"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以大小有节奏变化的细小镶片组成完整主体与环境，镶片走向跟随形体结构，片缝清楚可见，空间通过块面明暗与前后遮挡建立，表面有陶石材料的轻微不规则与手工铺设感。"
     },
     {
       "id": "origami",
@@ -213,7 +220,8 @@
         "折纸",
         "Origami"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "让主体、书本与道具由连续折面形成，折脊、谷线和纸角共同说明体积，表面保持完整纸张的质感，空间像真实搭建的折纸场景，几何轮廓统一，细节用折线而非写实纹理表达。"
     },
     {
       "id": "paper-mache",
@@ -239,7 +247,8 @@
         "纸浆塑形",
         "Paper Mache"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用纸浆堆塑的实体体块塑造主体与道具，轮廓略带手工起伏，表面可见细小纤维和覆盖痕迹，空间像布置好的手作模型，形体厚实而轻盈，层层糊制的边缘构成材料特点。"
     },
     {
       "id": "paper-quilling",
@@ -265,7 +274,8 @@
         "衍纸",
         "Paper Quilling"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用卷曲、折弯与并排的纸条构成主体和场景，形体边缘可见纸条截面，内部以疏密不同的卷纸填充，空间呈可触摸的浅浮雕，纸层之间保留细小投影和手工拼装关系。"
     },
     {
       "id": "paper_collage",
@@ -293,7 +303,8 @@
         "Cut-paper collage",
         "纸艺拼贴"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用清楚的纸片剪裁边缘与重叠层次建立主体、桌面和道具，纸面颜色完整，微小投影展示厚度，不拼入报纸文字、不把Logo剪碎，不贴成多个互不相关画风。"
     },
     {
       "id": "papercut-shadow-box",
@@ -319,7 +330,8 @@
         "分层纸雕",
         "Layered Papercut"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以一层层切割纸片构成主体、桌面和背景，轮廓清楚，纸层厚度与间距产生自然的空间顺序，材料表面微哑，切边保持整洁，整幅像可从侧面看见层叠结构的纸雕场景。"
     },
     {
       "id": "raised-work-textile-relief",
@@ -342,7 +354,8 @@
         "立体浮绣",
         "Raised-work textile relief"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "主体和学习物件以软垫浮起，边缘针脚与分层布片形成真实浅浮雕，侧向柔光显出厚度，触觉柔软、空间层次稳定，Logo与字体仍按原版独立呈现。"
     },
     {
       "id": "scrimshaw",
@@ -369,7 +382,8 @@
         "精细刻纹浅浮雕",
         "Scrimshaw"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以细密刻线和点刻在温润浅色材料上塑造主体与器物，明暗由线条疏密逐步叠加，空间像一件被精细刻绘的浅浮雕，轮廓准确，表面呈细腻磨制与手工刻痕的对照。"
     },
     {
       "id": "shibori",
@@ -395,7 +409,8 @@
         "绞缬染织",
         "Shibori"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "借助织物捆扎、折叠与染液渗透形成的边界语言表现主体和场景，图形既有规则重复也有自然扩散，空间趋于平面，表面可见布纹与染色浓淡，轮廓保留手工织染感。"
     },
     {
       "id": "stained-glass",
@@ -421,7 +436,8 @@
         "彩色玻璃",
         "Stained Glass"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以相互镶嵌的透光玻璃色块组织主体和环境，深色接缝明确划分形体，块面大小随结构变化，空间由色块叠合与前后轮廓建立，表面可见轻微玻璃纹理和铅条连接感。"
     },
     {
       "id": "vitreous-enamel",
@@ -447,7 +463,8 @@
         "珐琅",
         "Vitreous Enamel"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用清楚的金属分隔边和圆润饱满的釉面色块塑造主体与道具，体积像精工烧制的浅浮雕，空间关系简洁，表面呈玻璃质釉层的厚度与温润反射，边缘连接精确。"
     },
     {
       "id": "acrylic",
@@ -473,7 +490,8 @@
         "丙烯绘画",
         "Acrylic Painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以不透明颜料的覆盖、干刷与清晰色块塑造主体和场景，边缘可在硬朗与松动之间变化，空间用有力的前后层次建立，表面保留局部堆色和画布上的刷痕。"
     },
     {
       "id": "alcohol-ink",
@@ -499,7 +517,8 @@
         "酒精墨水",
         "Alcohol Ink"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用透明墨色的流动边界、自然聚散与层层扩散形成画面语言，背景带有细腻的液体沉积感，主体和关键道具维持清楚造型，色层之间呈流动而有组织的浅层空间。"
     },
     {
       "id": "aquatint",
@@ -525,7 +544,8 @@
         "飞尘腐蚀版画",
         "Aquatint"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以细密的腐蚀颗粒与受控线条塑造明暗，色面像由金属版上的微小纹理印出，主体和道具轮廓准确，空间通过颗粒浓淡与层次交叠展开，保留压印纸张的实体触感。"
     },
     {
       "id": "bromoil-print",
@@ -551,7 +571,8 @@
         "溴油印相",
         "Bromoil Print"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "让画面呈手工刷敷油墨的摄影印相质地，主体体积完整，局部边缘有柔和的颗粒过渡，空间像经过人工选择性加深的纸上影像，表面保留墨迹轻重与纸纤维的变化。"
     },
     {
       "id": "charcoal-tonal-drawing",
@@ -584,7 +605,8 @@
         "Charcoal tonal drawing",
         "Charcoal Drawing"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "黑灰炭粉块面、擦拭形成的柔光和有方向的线条塑造主体与物件，纸纹可见，少量高光由留白形成。"
     },
     {
       "id": "chromolithography",
@@ -610,7 +632,8 @@
         "彩色石版印刷",
         "Chromolithography"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以层层套印的平整色面和细密颗粒塑造主体与道具，边缘清楚又有手工印制的细微差异，空间呈传统印刷插画的层次，色层覆盖关系和纸面质地带来温润而扎实的效果。"
     },
     {
       "id": "color-linocut",
@@ -633,7 +656,8 @@
         "彩色油毡版画",
         "Color linocut"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "少量套色、厚实简洁轮廓和圆润刀口贯穿主体与场景，边缘有轻微手工节奏，纸面保持干净，避免满屏细密刻痕。"
     },
     {
       "id": "cyanotype",
@@ -659,7 +683,8 @@
         "蓝晒",
         "Cyanotype"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用感光印相般的深色底与明亮形体建立画面，轮廓边缘保留轻微渗透，细节呈接触印制的自然层次，主体和道具以清楚的正负形关系组织，表面有感光纸的纤维与沉积感。"
     },
     {
       "id": "encaustic",
@@ -685,7 +710,8 @@
         "蜡画",
         "Encaustic Painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以半透明蜡层覆盖、局部刮刻和温润堆叠塑造形体，主体与道具在柔和层次间清楚浮现，空间由蜡层遮叠和边缘深浅形成，表面保留凝固、擦磨与材料厚度。"
     },
     {
       "id": "engraved-line-illustration",
@@ -709,7 +735,8 @@
         "铜版雕刻线描",
         "Engraved line illustration"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以细密而规律的排线和交叉线塑造体积，外轮廓准确，纸面浅色，物件结构具有手工图解感，保留足够疏朗空间，标题和Logo不改成雕刻排线。"
     },
     {
       "id": "expressive-ink",
@@ -732,14 +759,15 @@
         "写意水墨",
         "Expressive ink painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以简练毛笔线造型，墨色浓淡和干湿笔触组织体积，淡墨层次与大块留白形成空间，不依赖写实投影，纸纤维质感轻微可见，不新增题字、落款或印章。"
     },
     {
       "id": "fine-line-mineral-color",
       "name": "工细设色",
       "name_en": "Fine-line mineral-color painting",
       "family": "medium",
-      "prompt": "细而稳定的轮廓线、层层柔和设色、克制的矿物色感与丝绢底；以精细衣褶和道具纹理形成秩序，背景层次舒展。沿用IP原服装，不自动换成古装。",
+      "prompt": "细而稳定的轮廓线、层层柔和设色、克制的矿物色感与丝绢底；以精细衣褶和道具纹理形成秩序，背景层次舒展。保留IP原服装的主要识别特征，可加入少量古风纹样、配饰或材质。",
       "supports_ip": true,
       "ip_adaptation": "保持所选IP的脸型、发型、体型、参考服装和关键标识；整体采用该主风格的材料与造型语言，不改变角色身份。原版Logo原样保留，标题继续服从独立字体参考。同套首张定调，后两张引用首张改变动作状态。延续原服装与现代物件，不擅自改成古装人物。",
       "source_ids": [
@@ -755,7 +783,8 @@
         "工细设色",
         "Fine-line mineral-color painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "细而稳定的轮廓线、层层柔和设色、克制的矿物色感与丝绢底，以精细表面纹理和道具纹理形成秩序，背景层次舒展。"
     },
     {
       "id": "glazed-oil-painting",
@@ -778,7 +807,8 @@
         "罩染油画",
         "Glazed oil painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "薄层色彩反复叠加，边缘柔硬有序，暗部透亮、亮部细腻，空间由渐进色层与稳定光源塑造，主体轮廓和表情完整，避免厚涂刀痕主导，这与厚涂油画应为两个具体视觉分支。"
     },
     {
       "id": "graphic_screenprint",
@@ -806,7 +836,8 @@
         "Screenprint poster illustration",
         "丝网印刷海报"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "有限专色、厚实平涂、清楚硬边和局部半调组织整张插画，微小套印手感保持克制，重点动作具有强辨识度，不让套色错位影响文案和Logo。"
     },
     {
       "id": "halftone-print",
@@ -832,7 +863,8 @@
         "半色调网点印刷",
         "Halftone Print"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用规律可见的网点大小与间距表达主体和物体的明暗，外轮廓采用清楚的印刷线，空间依靠稳定的透视与分区层次建立，表面呈纸张吸墨后的颗粒与色层覆盖关系。"
     },
     {
       "id": "impasto-oil-painting",
@@ -855,7 +887,8 @@
         "厚涂油画",
         "Impasto oil painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "宽笔与调色刀留下起伏颜料脊，实体色块建立主体与道具，光照使笔触有触觉感，局部精细描绘关键结构和识别标记，主视觉必须具有颜料行为，不只是加一层画布纹理。"
     },
     {
       "id": "line-art",
@@ -881,7 +914,8 @@
         "钢笔线描",
         "Line Art"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用有轻重变化的钢笔轮廓与受控排线说明主体结构、动作和道具体积，线条之间保留充足呼吸，前后空间依靠疏密、遮挡与线重变化建立，表面呈清楚的纸上墨迹。"
     },
     {
       "id": "lithographic-crayon-illustration",
@@ -904,7 +938,8 @@
         "石版画粉蜡笔感",
         "Lithographic crayon illustration"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "颗粒蜡笔线与柔和擦染结合，色层薄而稳定，主体和学习道具具有手绘石版海报感，浅空间、明快轮廓、轻微纸面肌理，不要自动增加复古招贴标题。"
     },
     {
       "id": "monochrome-woodcut",
@@ -938,7 +973,8 @@
         "木刻版画",
         "Woodcut"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以深色实体和刀刻留白构成版画图像，方向性刻痕取代柔和渐变，主体动作和物件轮廓简洁有力，Logo和文字不做木刻化处理。"
     },
     {
       "id": "oil-painting",
@@ -964,7 +1000,8 @@
         "油画",
         "Oil Painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以不透明颜料的细腻罩染与局部厚涂塑造主体和学习道具，体积转折扎实，轮廓有选择地清晰或融入环境，空间依靠层层色面和前后关系展开，表面保留画布纹理与受控笔触。"
     },
     {
       "id": "one-line",
@@ -990,7 +1027,8 @@
         "连续单线绘画",
         "One-line Art"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以连续而有节奏的单一线迹组织主体和道具，让轮廓在转折、停顿与呼应中说明动作，空间通过线的交叠和少量平整色面交代，纸面保持轻盈，形体简洁但关系完整。"
     },
     {
       "id": "opaque-gouache",
@@ -1013,7 +1051,8 @@
         "不透明水粉",
         "Opaque gouache"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以柔厚不透明色面覆盖底纸，哑光表面、可见刷痕和干净色块边缘形成绘本般整体，阴影用简化色块，避免透明水彩式大面积渗漏，主体和场景统一水粉画法。"
     },
     {
       "id": "soft-pastel",
@@ -1036,7 +1075,8 @@
         "软粉彩",
         "Soft pastel"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "粉质颗粒、柔软叠色和局部排线共同塑造体积，光线温柔，暗部保留彩色颗粒，整张维持粉彩触感，不要把粉彩等同于只换成浅色调。"
     },
     {
       "id": "watercolor_illustration",
@@ -1073,7 +1113,8 @@
         "Watercolor",
         "清透水彩"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "透明色层交叠，保留纸白高光和自然水痕，轻铅笔结构辅助轮廓，远处湿边与近处清晰边交替，不能把字和Logo冲淡成水迹。"
     },
     {
       "id": "action-painting-gesture",
@@ -1108,7 +1149,8 @@
         "抽象表现主义",
         "Abstract Expressionism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "整张场景以少量有方向的宽笔势和控制良好的洒点建立能量，主体、道具采用同材质的可辨具象处理，文字区、关键结构和Logo不覆盖飞溅，登记为行动绘画启发适配。"
     },
     {
       "id": "color-field-atmosphere",
@@ -1131,7 +1173,8 @@
         "色域绘画空间",
         "Color-field atmosphere"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "大面积缓慢渗化的色域形成安静空间，细微边缘与色层让画面有呼吸感，广告需要可读焦点，因此这是色域启发适配，不要把背景的低对比要求套用到标题。"
     },
     {
       "id": "constructivist-visual-construction",
@@ -1165,7 +1208,8 @@
         "构成主义",
         "Constructivism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以交叠几何板块、强方向线和清晰结构关系组织场景，有限色面、硬边界和工业纸板质感形成构成秩序，没有政治符号，不用随机大字填满画面。"
     },
     {
       "id": "cubist-faceted-construction",
@@ -1199,7 +1243,8 @@
         "立体主义",
         "Cubism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "将书本、桌面和背景分解成相互穿插的几何平面，形成浅空间和多视点节奏，不把脸拆成多重眼睛。"
     },
     {
       "id": "de-stijl-rectilinear",
@@ -1233,7 +1278,8 @@
         "风格派",
         "De Stijl"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "直角线与长方色面构成有节奏的视觉平衡，颜色数量克制，画面以平面关系取代写实深景，登记为风格派启发的商业适配。"
     },
     {
       "id": "expressionist-painting",
@@ -1267,7 +1313,8 @@
         "表现主义",
         "Expressionism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "笔触有力，场景轮廓略带张力，背景色彩对比强调从困惑到主动的情绪变化，主体姿态具有明确动势，避免畸变、恐惧表情或压迫阴影。"
     },
     {
       "id": "fauvist-color-planes",
@@ -1290,7 +1337,8 @@
         "野兽派色面",
         "Fauvist color-plane painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用果断笔触和高饱和色面塑造主体与环境，明暗由冷暖色对比形成，空间压缩而富表现力；主视觉和配色可自由设计，原版Logo与文字保持清楚。"
     },
     {
       "id": "futurist-motion-painting",
@@ -1313,7 +1361,8 @@
         "未来主义动态",
         "Futurist motion painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "连续斜向线、重复轮廓和流动几何面表现学习动作的速度，主体与道具共享一个清楚的运动方向，中心轮廓稳定，避免复制主体手脚，借动态画法，不带入历史政治主题。"
     },
     {
       "id": "impressionist-light-painting",
@@ -1347,7 +1396,8 @@
         "印象派",
         "Impressionism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "断续但有方向的色笔触、明亮空气感、彩色阴影和瞬时日光贯穿主体及环境，远景边缘柔化，近景表情和任务道具保持可辨，标题与Logo使用清晰、干净的原有呈现。"
     },
     {
       "id": "minimalist-geometric",
@@ -1370,7 +1420,8 @@
         "极简几何雕塑感",
         "Minimalist geometric"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "少量简洁实体、哑光工业材质、清楚间距和大块空白组成画面，阴影轻而有体积，采用极简视觉启发，避免把“少内容”冒充完整历史流派复现。"
     },
     {
       "id": "neo-impressionist-pointillism",
@@ -1404,7 +1455,8 @@
         "点彩",
         "Pointillism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "选择精密点彩这一分支，以有规律的小色点形成明暗和环境，轮廓由色点密度逐渐聚合，整体明亮有秩序，字区完全保持干净。"
     },
     {
       "id": "op-art-optical-geometry",
@@ -1427,7 +1479,8 @@
         "欧普几何视错觉",
         "Op-art optical geometry"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "规则重复线和几何网格形成轻微深度错觉，围绕学习道具构成有秩序的节奏，主体轮廓与标题区域保持稳定平整，减少高频密纹。"
     },
     {
       "id": "pop-graphic",
@@ -1461,7 +1514,8 @@
         "波普艺术",
         "Pop Art"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "粗而清楚的主体轮廓、果断平涂色块、少量规则印刷网点与日常学习物件构成轻快商业图像，整体统一而利落，网点只进插画，禁止从示例继承对话框文字或口号。"
     },
     {
       "id": "renaissance",
@@ -1470,7 +1524,7 @@
       "family": "movement",
       "prompt": "以稳定的人体比例和清晰的体积转折塑造角色，环境遵循有秩序的透视与前后关系；轮廓柔和而准确，颜料层细密叠加，学习道具像静物一样具备扎实结构。",
       "supports_ip": true,
-      "ip_adaptation": "沿用原有脸型发型服装与标识，用细腻体积塑形表达原IP，不替换成历史人物或古装。",
+      "ip_adaptation": "沿用原有脸型发型服装与标识，用细腻体积塑形表达原IP，不替换成其他人物，可少量加入对应时代的服装细节。",
       "source_ids": [
         "github-twri-styler"
       ],
@@ -1487,7 +1541,8 @@
         "文艺复兴绘画",
         "Renaissance Painting"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以稳定的人体比例和清晰的体积转折塑造主体，环境遵循有秩序的透视与前后关系，轮廓柔和而准确，颜料层细密叠加，学习道具像静物一样具备扎实结构。"
     },
     {
       "id": "surrealist-dream-scene",
@@ -1522,7 +1577,8 @@
         "超现实主义",
         "Surrealism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以清楚可辨的物体构造不可能但连贯的空间，例如书页形成阶梯、任务卡悬浮成路径，光影统一，现实材质与梦境尺度形成反差，避免无意义怪物和新增标语。"
     },
     {
       "id": "afrofuturism",
@@ -1531,7 +1587,7 @@
       "family": "visual_language",
       "prompt": "将雕塑式几何结构、富有节奏的纹样与未来技术形体结合，环境具有完整的结构秩序；人物与器物由饱满块面塑形，材质可见织物、陶土与金属之间的对照和连接。",
       "supports_ip": true,
-      "ip_adaptation": "保留原IP的脸型发型服装及标识，风格落在场景、道具和表面结构，不改角色身份。",
+      "ip_adaptation": "保留原IP的脸型发型服装及标识，风格可用于场景、道具、表面结构与少量配饰，不改角色身份。",
       "source_ids": [
         "github-mk-styles"
       ],
@@ -1548,7 +1604,8 @@
         "非洲未来主义",
         "Afrofuturism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "将雕塑式几何结构、富有节奏的纹样与未来技术形体结合，环境具有完整的结构秩序，主体与器物由饱满块面塑形，材质可见织物、陶土与金属之间的对照和连接。"
     },
     {
       "id": "art-deco-geometric",
@@ -1582,7 +1639,8 @@
         "装饰艺术",
         "Art Deco"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "修长简化造型、阶梯式轮廓、秩序鲜明的几何边框与少量放射线，大色面搭配克制金属细节，浅景深空间和清爽表面形成精致感，装饰集中于场景，不改造品牌标识。"
     },
     {
       "id": "art-nouveau-organic",
@@ -1616,7 +1674,8 @@
         "新艺术",
         "Art Nouveau"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "流动植物曲线、柔韧轮廓和扁平化色面贯穿整张场景，弧线围绕主体和学习道具形成连续节奏，不使用厚重写实阴影。"
     },
     {
       "id": "atompunk",
@@ -1625,7 +1684,7 @@
       "family": "visual_language",
       "prompt": "以原子时代的圆润工业造型、轨道式装饰和实体仪表构建设想中的未来学习环境；人物与道具轮廓饱满，浅层空间整洁明快，表面呈搪瓷、塑料与金属的实体触感。",
       "supports_ip": true,
-      "ip_adaptation": "锁定脸型发型及原服装标识，将未来语言用于道具和环境，不替换角色制服。",
+      "ip_adaptation": "锁定脸型发型及原服装标识，未来元素可用于道具、环境与少量服装细节，保留原制服的主要识别轮廓。",
       "source_ids": [
         "github-mk-styles"
       ],
@@ -1642,7 +1701,8 @@
         "原子时代未来",
         "Atompunk"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以原子时代的圆润工业造型、轨道式装饰和实体仪表构建设想中的未来学习环境，主体与道具轮廓饱满，浅层空间整洁明快，表面呈搪瓷、塑料与金属的实体触感。"
     },
     {
       "id": "bauhaus-functional-geometry",
@@ -1676,7 +1736,8 @@
         "包豪斯视觉",
         "Bauhaus"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以圆、矩形和简化工业体块构成学习空间，主体结构简洁，色面边缘清楚，装饰减少，间距与视觉平衡明确，背景与道具使用功能化造型，标题仍沿用指定字体，不自行换成历史西文字体。"
     },
     {
       "id": "comic-book",
@@ -1702,7 +1763,8 @@
         "漫画印刷",
         "Comic Book"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用有力度的勾线、清楚的明暗块面与局部印刷网点塑造主体和道具，动作具有连贯的叙事张力，空间透视明确，背景简化为节奏化结构，表面保留纸本漫画的印刷感。"
     },
     {
       "id": "commercial_anime",
@@ -1717,7 +1779,7 @@
       "description_origin": "project_authored",
       "verification_status": "text_reviewed",
       "image_validated": false,
-      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，允许少量对应画风或时代的纹样、材质和配饰融入，保留身份与年龄。",
       "aliases": [],
       "alias_ids": [],
       "adaptation_status": "project_advertising_adaptation",
@@ -1725,7 +1787,8 @@
         "精致商业动漫",
         "Commercial Anime"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "清晰线稿、利落色块与柔和体积光，主体表情明确，背景细节克制。"
     },
     {
       "id": "cyberpunk",
@@ -1751,7 +1814,8 @@
         "赛博朋克",
         "Cyberpunk"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "将模块化电子结构、透明信息面板与实体机械连接成高密度环境，主体轮廓清楚，空间有明显纵深，表面区分玻璃、聚合物与金属，技术细节形成统一的工业语言。"
     },
     {
       "id": "flat_editorial",
@@ -1766,7 +1830,7 @@
       "description_origin": "project_authored",
       "verification_status": "text_reviewed",
       "image_validated": false,
-      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，允许少量对应画风或时代的纹样、材质和配饰融入，保留身份与年龄。",
       "aliases": [],
       "alias_ids": [],
       "adaptation_status": "project_advertising_adaptation",
@@ -1774,7 +1838,8 @@
         "平面编辑插画",
         "Flat Editorial"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以平面轮廓、概括阴影和干净色块构成画面，减少透视和材质细节。"
     },
     {
       "id": "isometric_miniature",
@@ -1789,7 +1854,7 @@
       "description_origin": "project_authored",
       "verification_status": "text_reviewed",
       "image_validated": false,
-      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，允许少量对应画风或时代的纹样、材质和配饰融入，保留身份与年龄。",
       "aliases": [
         "等距微缩场景"
       ],
@@ -1800,7 +1865,8 @@
         "Miniature diorama",
         "等距微缩场景"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "主体与道具采用精细微缩模型的统一实体质感，体块连接、边缘厚度和微小接缝可见，在简洁立体场景中保持完整主体识别，镜头服从本套布局，不把等距投影本身当成全部风格。"
     },
     {
       "id": "low-poly",
@@ -1826,7 +1892,8 @@
         "低多边形",
         "Low Poly"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "将主体、桌面与道具转化为清楚可见的多边形体块，用平整切面交代体积转折，空间像简洁搭建的立体模型，材料依靠面之间的差异表达，保持整体结构和轮廓的统一。"
     },
     {
       "id": "manga",
@@ -1852,7 +1919,8 @@
         "日式漫画",
         "Manga"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以流畅而精确的线稿、选择性的黑面和细致网纹组织画面，主体表情与动作清楚，环境线条有稳定透视，形体在写意与结构之间平衡，表面呈纸上墨线与网纸的统一质地。"
     },
     {
       "id": "painterly_light",
@@ -1867,7 +1935,7 @@
       "description_origin": "project_authored",
       "verification_status": "text_reviewed",
       "image_validated": false,
-      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，允许少量对应画风或时代的纹样、材质和配饰融入，保留身份与年龄。",
       "aliases": [
         "叙事光影插画"
       ],
@@ -1878,7 +1946,8 @@
         "Narrative storybook illustration",
         "叙事光影插画"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以凝练的手绘轮廓、柔厚的概括色块和轻微纸上笔触组织主体与场景，造型带温和体积，空间舒展而有明确叙事焦点，以清楚的表情和动作推动画面，不只增加光效。"
     },
     {
       "id": "pixel-art",
@@ -1904,7 +1973,8 @@
         "像素艺术",
         "Pixel Art"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以可辨识的像素网格搭建主体和场景，轮廓用阶梯式色块转折，体积以有限层次的像素簇表达，空间结构简洁一致，纹理由图案节奏形成，避免模糊的平滑涂抹。"
     },
     {
       "id": "psychedelic",
@@ -1930,7 +2000,8 @@
         "迷幻视觉",
         "Psychedelic Art"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用连续弯曲的轮廓、波纹形色面与层层套叠的图形构成流动视觉，主体和道具有统一的有机线势，空间通过图形穿插展开，表面带平版印刷般的均匀质地。"
     },
     {
       "id": "retro-futurism",
@@ -1939,7 +2010,7 @@
       "family": "visual_language",
       "prompt": "用早期太空想象中的流线外壳、实体按键与圆角机器描绘学习场景，人物和道具具有清楚体积；透视空间像搭建的未来展示场，表面呈旧式工业材料的温润实体感。",
       "supports_ip": true,
-      "ip_adaptation": "保持脸型发型服装和标识，用复古技术造型改变学习工具，角色服饰沿用原资产。",
+      "ip_adaptation": "保持脸型发型服装和标识，用复古技术造型改变学习工具，原服饰保留主要配色和识别轮廓，可加入少量对应风格的细节。",
       "source_ids": [
         "github-twri-styler"
       ],
@@ -1956,7 +2027,8 @@
         "复古未来主义",
         "Retro Futurism"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用早期太空想象中的流线外壳、实体按键与圆角机器描绘学习场景，主体和道具具有清楚体积，透视空间像搭建的未来展示场，表面呈旧式工业材料的温润实体感。"
     },
     {
       "id": "soft_3d",
@@ -1971,7 +2043,7 @@
       "description_origin": "project_authored",
       "verification_status": "text_reviewed",
       "image_validated": false,
-      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，只转换整幅画面的表现语言，不改身份或年龄。",
+      "ip_adaptation": "保留原版角色脸型、发型、体型、服装与关键标识，允许少量对应画风或时代的纹样、材质和配饰融入，保留身份与年龄。",
       "aliases": [],
       "alias_ids": [],
       "adaptation_status": "project_advertising_adaptation",
@@ -1979,7 +2051,8 @@
         "柔和3D",
         "Soft 3D"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "主体和场景采用统一的柔和三维体积、哑光材质与柔光。"
     },
     {
       "id": "steampunk",
@@ -1988,7 +2061,7 @@
       "family": "visual_language",
       "prompt": "以可读的机械传动、管道与铆接结构构建学习器具和环境，人物和物体采用扎实的手绘体积；空间层层展开，金属、皮革和木材有清楚触感，机械细节服务场景功能。",
       "supports_ip": true,
-      "ip_adaptation": "保留脸型发型原服装与标识，机械装饰放在道具和背景，不擅加面罩或遮挡面部。",
+      "ip_adaptation": "保留脸型发型原服装与标识，机械元素可用于道具背景，也可少量融入扣件、袖口或腰带，面部与标识保持清楚。",
       "source_ids": [
         "github-twri-styler"
       ],
@@ -2005,7 +2078,8 @@
         "蒸汽朋克",
         "Steampunk"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以可读的机械传动、管道与铆接结构构建学习器具和环境，主体和物体采用扎实的手绘体积，空间层层展开，金属、皮革和木材有清楚触感，机械细节服务场景功能。"
     },
     {
       "id": "ukiyo-e-color-woodblock",
@@ -2039,7 +2113,8 @@
         "浮世绘木版",
         "Ukiyo-e"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "以清晰墨线和分层平涂色块组织主体与道具，空间偏平面，采用清楚的前后遮挡和富节奏的轮廓，轻微纸质与套印手感，只借画法，不套用名作海浪或旧式画中文字。"
     },
     {
       "id": "vaporwave",
@@ -2065,7 +2140,8 @@
         "蒸汽波",
         "Vaporwave"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用早期数码界面的图形、光滑几何体与复古三维空间构成带有怀旧意味的虚拟场景，主体以清晰轮廓嵌入其中，平面符号和立体物体相互叠合，材质呈刻意的数字合成感。"
     },
     {
       "id": "zentangle",
@@ -2091,7 +2167,8 @@
         "禅绕绘画",
         "Zentangle"
       ],
-      "verified_on": "2026-10-19"
+      "verified_on": "2026-10-19",
+      "no_ip_prompt": "用细密、重复而有规则的手绘纹样填充清楚的形体分区，曲线与几何图案相互交织，空间由纹样密度和留白产生，整体保持钢笔绘制的精确边缘与耐心细作的纸面质感。"
     }
   ],
   "layouts": [

@@ -164,3 +164,17 @@ def test_tampered_base_stops_branches_before_more_paid_calls(tmp_path, monkeypat
     with pytest.raises(ValueError, match='receipt'):
         direct_batch.execute(args)
     assert submissions == ['j1']
+
+
+def test_explicit_screen_labels_extend_only_the_current_slot_whitelist(tmp_path,monkeypatch):
+    from series_chain import text_rule,validate_series
+    args,jobs=triptych(tmp_path,monkeypatch)
+    cfg=json.loads(args.config.read_text())
+    branch=jobs[1]
+    old=text_rule(branch['copy_text'],cfg['logo'])
+    branch['ui_text']=['今日任务']
+    branch['prompt']=branch['prompt'].replace(old,text_rule(branch['copy_text'],cfg['logo'],'',branch['ui_text']))
+    branch['prompt']+='屏幕显示“今日任务”。'
+    validate_series({'jobs':jobs},cfg)
+    branch['prompt']+='屏幕显示“未经确认的提分结果”。'
+    with pytest.raises(ValueError,match='outside'):validate_series({'jobs':jobs},cfg)

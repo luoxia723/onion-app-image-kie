@@ -337,10 +337,10 @@
       <div class="field">
         <label>界面 / 功能参考图</label>
         <label class="switch-row">
-          <span>画面需要展示洋葱 APP 界面/功能截图</span>
+          <span>使用真实 APP 截图</span>
           <input id="uiReferenceRequired" type="checkbox">
         </label>
-        <div class="hint">只有最终画面里有手机、学习机或其它电子屏幕，并且屏幕要显示可识别的洋葱 APP 功能界面时才勾选。不要在 HTML 里上传；保存后请回到 Codex 上传截图。若不展示具体 UI，可不勾选并让 Agent 弱化/模糊屏幕内容。</div>
+        <div class="hint">需要还原实际界面时勾选，保存后在 Codex 对话提供截图。不勾选也可设计清晰的示意界面，无需模糊屏幕。</div>
       </div>
       <div class="field">
         <label for="notes">补充说明</label>
@@ -546,7 +546,7 @@
         ["IP", ip.random ? "随机：每张重新抽取" : ip.label],
         ["模式", "直接生图"],
         ["字体参考", state.fontEnabled ? "启用：每套统一字体" : "不启用"],
-        ["屏幕界面", state.uiReferenceRequired ? "需要：保存后回到 Codex 上传截图" : "不展示可识别 UI"],
+        ["屏幕界面", state.uiReferenceRequired ? "使用真实截图" : "可设计清晰的示意界面"],
         ["图片套数", `${state.sets} 套`],
         ["预计图组数", slots.length ? `${COPY_COUNT} × ${slots.length} × ${state.sets || 0} = ${Number.isFinite(estimatedGroups) ? estimatedGroups : 0} / ${MAX_GROUP_COUNT}` : "-"],
       ];
@@ -651,14 +651,15 @@
         font_prompt_rule: state.fontEnabled ? "每套选择一张字体参考，仅传给首张；同套后续图片通过首张PNG继承，不复制示例文字。" : "不启用字体参考图。",
         cta: allowsCta ? state.cta.trim() : "",
         screen_ui_reference_required: state.uiReferenceRequired,
+        screen_ui_mode: state.uiReferenceRequired ? "reference" : "conceptual",
         ui_reference_required: state.uiReferenceRequired,
-        ui_reference: state.uiReferenceRequired ? "codex_upload_required" : "none",
+        ui_reference: state.uiReferenceRequired ? "codex_upload_required" : "design_concept",
         ui_reference_trigger: state.uiReferenceRequired ? "recognizable_onion_app_screen" : "none",
         ui_reference_upload_status: state.uiReferenceRequired ? "awaiting_codex_upload" : "not_required",
         ui_reference_note: state.uiReferenceRequired
-          ? "只有画面包含可识别的手机/学习机/电子屏幕，并需要展示洋葱 APP 功能界面时才需要截图；不要在 HTML 中上传。保存配置后请回到 Codex 对话上传洋葱 APP 应用内截图。Agent 收到截图后才可进入生图流程。"
-          : "本次不展示可识别的洋葱 APP 屏幕 UI；如画面有设备屏幕，应弱化/模糊屏幕内容，不生成具体界面。",
-        ui_reference_next_action: state.uiReferenceRequired ? "请用户在 Codex 对话上传截图；收到截图前不能进入 prompt、validate-only 或 render。若用户不上传截图，只能改成弱化/模糊屏幕内容。" : "",
+          ? "使用提供的真实界面截图。"
+          : "可设计清晰可读的示意界面，只表达已确认功能，不冒称真实产品截图。",
+        ui_reference_next_action: state.uiReferenceRequired ? "请在 Codex 对话提供截图；也可改用示意界面继续。" : "",
         notes: state.notes.trim()
       };
     }

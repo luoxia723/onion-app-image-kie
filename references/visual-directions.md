@@ -1,8 +1,10 @@
 # 完整画面方案与多样化
 
-新任务默认 `visual_diversity_mode=content_first`、`visual_style_mode=random`。批量按套随机分配主画风，优先不重复：单图每张是一套，双/三图每套共用一种画风。先建立内容创意链，再根据抽到的画风整体设计场景、IP动作、构图、镜头与配色；随机的是主画风，其余视觉维度由Agent协调设计。
+新任务默认 `visual_diversity_mode=content_first`、`visual_style_mode=random`。批量按套随机分配主画风，优先不重复：单图每张是一套，双/三图每套共用一种画风。确认功能事实后，按抽到的画风依次设计世界与场景、故事、构图、光色与材质；随机的是主画风，其余视觉维度由Agent协调设计。
 
 ## 设计一套画面
+
+内部设计层级以[艺术定调](art-direction.md)为准：画风→世界与场景→故事→构图→光色材质。新配置还需在visual_concepts.art_direction中保存这五层决定；最终仍沿用原Prompt结构，将这些决定提炼合并，不重复输出分层分析或已包含的约束。
 
 从[Prompt规则](prompt-rules.md)中的创意链出发，先讲清楚学生处于哪个学习瞬间、卡在哪里、产品做了什么，以及变化如何被看见。有IP时，让IP通过姿势、视线、表情和道具参与这个过程；为角色表演与场景关系保留画面空间。
 
@@ -28,6 +30,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
   "visual_concepts": [
     {
       "name": "清蓝目标路线",
+      "art_direction": {"world": "现代家庭", "scene": "窗边学习桌", "story": "从补学目标到安排每日任务", "composition": "文案与角色动作形成清楚阅读路线", "lighting_materials": "窗光统一人物、木桌与纸面"},
       "style_id": "commercial_anime",
       "prompt": "本周开始数学学习的书桌场景。所选IP与练习本、纸卡处在统一的商业动漫视觉体系中，清楚线稿和柔和光影表现角色。浅蓝乳白环境、深色标题与少量暖黄呼应角色服装。主文案在左侧完整留白，角色在右侧略微前倾，视线与手部动作将阅读引向桌面任务；前景纸面与后景形成自然层次，Logo按规定位置保留。",
       "slot_actions": [
@@ -40,6 +43,7 @@ python scripts/visual_directions.py --assign-styles --config <02_过程/image-co
 }
 ```
 
+- `art_direction`保存从世界到光色的五层定调，按[艺术定调](art-direction.md)执行。screen_ui_mode和screen_text管理清晰示意UI或真实截图。
 - `name` 是方案名称，`prompt` 是完整视觉方案，均不作为额外广告文案。
 - `slot_actions` 按图片顺序写每张的动作和情绪，长度等于所选形式的图片数。对应短句仍由 `copy_refs`、`copy_text` 和文字白名单管理。
 - 可选 `ip_asset_id` 在配置为随机IP时指定本套角色；用户已固定IP或不用IP时不能覆盖。可选 `font_reference_path` 只能选择原版字体库中的文件，并遵守字体开关。未指定时仍按已保存配置为每套选择IP和字体；整体方案需与最终所选素材协调。

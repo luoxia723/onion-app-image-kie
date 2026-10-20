@@ -1015,28 +1015,35 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result["visual_style_mode"] = body.get("visual_style_mode", "random")
     if result["visual_style_mode"] not in {"random", "coordinated"}:
         raise ValueError("visual_style_mode must be random or coordinated")
+    result["art_direction_required"] = bool(body.get("art_direction_required", True))
     result["font_prompt_rule"] = (
         "每套从洋葱专属字体参考中选择一张，仅传给首张；同套后续图片通过首张PNG继承字体，不重新随机或重复传入；不复制示例文字。"
         if result["font_reference_randomized"] else "不启用字体参考图。"
     )
-    screen_ui_required = bool(
+    legacy_screen_reference = bool(
         body.get("screen_ui_reference_required")
         or body.get("screenUiReferenceRequired")
         or body.get("ui_reference_required")
         or body.get("uiReferenceRequired")
     )
-    result["screen_ui_reference_required"] = screen_ui_required
-    result["ui_reference_required"] = screen_ui_required
+    mode = body.get("screen_ui_mode") or ("reference" if legacy_screen_reference else "conceptual")
+    if mode not in {"reference", "conceptual", "none"}:
+        raise ValueError("screen_ui_mode must be reference, conceptual or none")
+    result["screen_ui_mode"] = mode
+    result["screen_ui_reference_required"] = mode == "reference"
+    result["ui_reference_required"] = mode == "reference"
     if result["ui_reference_required"]:
         result["ui_reference"] = "codex_upload_required"
         result["ui_reference_trigger"] = "recognizable_onion_app_screen"
         result["ui_reference_upload_status"] = body.get("ui_reference_upload_status") or "awaiting_codex_upload"
-        result["ui_reference_next_action"] = "保存配置后先提醒用户在 Codex 对话上传截图，建议上传洋葱 APP 界面/功能截图；如果没有截图，只能改成弱化/模糊屏幕内容后继续。收到截图前不能进入 prompt、validate-only 或 render。"
+        result["ui_reference_note"] = "使用真实APP截图，忠实呈现所提供的界面。"
+        result["ui_reference_next_action"] = "请在Codex对话提供截图；如果只需设计示意界面，可改用conceptual模式继续。"
     else:
-        result["ui_reference"] = "none"
+        result["ui_reference"] = "design_concept" if mode == "conceptual" else "none"
         result["ui_reference_trigger"] = "none"
         result["ui_reference_upload_status"] = "not_required"
         result["ui_reference_next_action"] = ""
+        result["ui_reference_note"] = "可设计清晰可读的示意UI，只表达已确认功能；不强制模糊，不冒称真实产品截图。" if mode == "conceptual" else "本次不展示屏幕或UI。"
     return result
 
 

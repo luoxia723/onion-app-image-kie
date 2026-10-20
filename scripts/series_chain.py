@@ -6,8 +6,12 @@ import re
 from logo_reference import normalize_job_references
 
 
-def text_rule(text, logo="洋葱学园", cta=""):
+def text_rule(text, logo="洋葱学园", cta="", ui_text=None):
+    if ui_text is not None and (not isinstance(ui_text, list) or any(not isinstance(value, str) or not value.strip() for value in ui_text)):
+        raise ValueError("ui_text must be a list of non-empty screen labels")
     allowed = [value for value in (text, logo, cta) if value]
+    if ui_text:
+        allowed.extend(value for value in ui_text if value and value not in allowed)
     return "画面文字白名单：" + json.dumps(allowed, ensure_ascii=False)
 
 
@@ -37,9 +41,9 @@ def validate_series(manifest, config):
                     raise ValueError("job must identify its approved copy")
                 text = source.get(f"short{slot}")
                 if text:
-                    if job.get("copy_text") != text or text_rule(text, config.get("logo", ""), config.get("cta", "")) not in job["prompt"]:
+                    if job.get("copy_text") != text or text_rule(text, config.get("logo", ""), config.get("cta", ""), job.get("ui_text")) not in job["prompt"]:
                         raise ValueError("copy_text and text whitelist must match the approved slot")
-                    allowed = [text, config.get("logo", ""), config.get("cta", "")]
+                    allowed = [text, config.get("logo", ""), config.get("cta", ""), *(job.get("ui_text") or [])]
                     for match in re.finditer(r'(?:保留|写出|呈现|显示)[“\"]([^”\"]+)[”\"]', job["prompt"]):
                         prefix = job["prompt"][max(0, match.start() - 4):match.start()]
                         if any(word in prefix for word in ("不", "禁止")):
