@@ -1009,9 +1009,9 @@ def normalize_config_result(body: dict[str, Any], slot_map: dict[str, dict[str, 
     result["font_reference_randomized"] = bool(body.get("font_reference_enabled", body.get("fontEnabled", True)))
     result["font_reference_scope"] = "set"
     result["visual_diversity_enabled"] = bool(body.get("visual_diversity_enabled", True))
-    result["visual_diversity_mode"] = body.get("visual_diversity_mode", "open")
-    if result["visual_diversity_mode"] not in {"open", "preset"}:
-        raise ValueError("visual_diversity_mode must be open or preset")
+    result["visual_diversity_mode"] = body.get("visual_diversity_mode", "content_first")
+    if result["visual_diversity_mode"] not in {"content_first", "open", "preset"}:
+        raise ValueError("visual_diversity_mode must be content_first, open or preset")
     result["font_prompt_rule"] = (
         "每套从洋葱专属字体参考中选择一张，仅传给首张；同套后续图片通过首张PNG继承字体，不重新随机或重复传入；不复制示例文字。"
         if result["font_reference_randomized"] else "不启用字体参考图。"

@@ -17,7 +17,7 @@ description: 当用户已经确认 APP 图片文案并要求生成信息流、�
 - [输入、输出与人工门禁](references/input-output-contract.md)
 - [渠道与版位](references/channel-placement.md)
 - [视觉与Prompt规则](references/prompt-rules.md)
-- 扩展风格、字体或布局时先读[固定项清单](references/visual-invariants.md)和[多样化编排](references/visual-directions.md)，保留IP身份、原版Logo、字体与渠道约束。
+- 设计每套画面时读[完整画面方案](references/visual-directions.md)；先设计场景、IP动作和情绪，再整体安排画风与构图。扩展风格、字体或布局时同时读[固定项清单](references/visual-invariants.md)。
 - 需要主风格描述时先检索[联网整理的主风格库](references/style-library.md)，可用`scripts/visual_directions.py --list-styles --query <关键词> --detail`只取相关条目。库外方向再查第一手资料或许可明确的开源库，自写适配描述并记录来源；不直接套用外部negative_prompt或模型参数。
 - [合规视觉雷区](references/visual-compliance.md)
 - [KIE生图合同](references/provider-contract.md)
@@ -44,7 +44,7 @@ description: 当用户已经确认 APP 图片文案并要求生成信息流、�
 2. 建立“产品事实→目标人群→具体场景→产品动作→可感知变化”的最小视觉链。
 3. 默认启动`scripts/interactive_server.py`，显式把统一任务版本的`02_过程`作为`--output-dir`，打开配置卡供用户保存。用户明确委托Agent填写中间配置时，可由Agent调用同一个`normalize_config_result`校验并代存，不要求用户打开页面；记录本轮委托原文，不冒称用户亲手操作。一次任务只能选择一个具体版位，不能省略确定的配置结果。
 4. 需要可识别APP/UI时等待用户上传真实截图；缺失时停止或改为不可识别的抽象屏幕。
-5. 先按确认文案、场景与IP约束编写本轮开放风格候选`visual_candidates`，候选是Agent的制作编排，不改写用户选定的配置与文案；再按[多样化编排](references/visual-directions.md)运行`scripts/visual_directions.py`生成本轮`visual-plan.json`，再根据配置与[Prompt规则](references/prompt-rules.md)编写`image-render-manifest.json`。将计划路径写入`visual_plan_path`，各job绑定`visual_direction_id`，首张及分支分别写入对应视觉规则；用户已指定风格/布局时先写入配置作为本轮固定项。预计常规裁切达到6%时，先按[白底蓝框适配](references/blue-frame-adaptation.md)准备布局参考，再写框内完整广告、框外纯白的Prompt；低于门槛按常规流程。逐张写清文案、场景、产品动作、构图、参考资产和禁止项。双/三图按[同套首张与分支规则](references/prompt-rules.md#同套双图三图生成)建立真实依赖：图1使用原版素材，图2/3只引用同套图1PNG，表现各自文案对应的不同状态。
+5. 按确认文案先设计完整画面方案，写入`visual_concepts`：具体学习瞬间、IP/主体如何行动、逐张情绪变化，以及统一协调的构图和视觉体系。新任务默认`content_first`，多套可共用合适的画风，通过内容与构图形成区别；风格库按需参考。按[完整画面方案](references/visual-directions.md)运行`scripts/visual_directions.py`保存`visual-plan.json`，再编写`image-render-manifest.json`，绑定计划、逐张动作与素材。预计常规裁切达到6%时按[白底蓝框适配](references/blue-frame-adaptation.md)准备布局参考；低于门槛常规适配。双/三图按[同套首张与分支规则](references/prompt-rules.md#同套双图三图生成)执行：图1使用原版素材，图2/3只引用同套图1PNG，按对应短句推进动作与状态。
 6. 运行`scripts/validate_task.py`和`scripts/direct_batch.py --validate-only`，验证全部job、Prompt、比例、引用顺序和输出路径，不调用付费接口；同时确认本地可导入`requirements.txt`锁定的Pillow，以及蓝框模式需要的OpenCV、NumPy。
 7. 告知预计图组数和图片数；取得当前任务付费确认后，按[直连配置与恢复](references/provider-contract.md)执行清单。先验证所有 job，再顺序生成，参考资产按内容哈希去重。默认单批最多12张，用户明确确认时最多20张；技术失败或提交状态不明时保存状态并停止，内容偏差仅作提示，不中断已授权批次。
 8. 每张候选下载并解码为PNG，记录taskId、本地SHA-256、字节数和原图路径；不伪造供应商哈希或MCP产物ID。蓝框模式由`render.py`调用OpenCV识别实际框线、裁到内侧并拉伸至目标尺寸，另存无损预览，保留原图；找框失败的原图同样进入选择页并标注待复核，不中断其余已授权job。完整保留`image-render-result.json`，技术成功的候选全部进入选择页，文字、Logo、UI、事实和构图检查作为提示。

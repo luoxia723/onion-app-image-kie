@@ -12,6 +12,7 @@ from visual_directions import SKILL_DIR, plan_directions, validate_visual_plan
 
 def config(sets=8):
     return {'request_id': 'visual-test', 'sets': sets, 'visual_diversity_enabled': True,
+            'visual_diversity_mode': 'preset',  # Existing explicit modes remain recoverable.
             'logo': '洋葱学园', 'ip': '雷婷', 'ip_asset_id': 'ip.leiting.junior.standard.001',
             'font_reference_enabled': True,
             'copy_refs': [{'copyDraftId': 'math', 'short1': '这周我想把数学补起来',

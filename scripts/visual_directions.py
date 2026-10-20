@@ -1,4 +1,4 @@
-"""Plan distinct set-level visual directions; no image API calls."""
+"""Freeze complete scene concepts; retain legacy direction plans for recovery."""
 import argparse
 from collections import Counter
 import hashlib
@@ -31,7 +31,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -111,9 +111,85 @@ def varied_layouts(styles, layouts, rng):
     return result
 
 
+def plan_content_concepts(config, seed=None):
+    copies = config.get("copy_refs") or [{} for _ in range(int(config.get("copy_count") or 1))]
+    sets = int(config.get("sets") or 1)
+    if not 1 <= sets <= 50 or not copies or len(copies) * sets > 100:
+        raise ValueError("visual planning exceeds configured group limits")
+    concepts = config.get("visual_concepts")
+    if not isinstance(concepts, list) or len(concepts) != len(copies) * sets:
+        raise ValueError("content_first requires one complete visual_concepts entry per copy/set")
+    placement = config["placements"][0]
+    image_count = int(placement.get("image_count") or {"双图": 2, "三图": 3}.get(config.get("image_form"), 1))
+    assets = json.loads((SKILL_DIR / "assets/asset-manifest.json").read_text())["assets"]
+    ips = {a["asset_id"]: a for a in assets if a["kind"] == "ip"}
+    fixed_ip = config.get("ip_asset_id") or ""
+    random_ip = bool(config.get("ip_random") or fixed_ip == "__random_ip__" or config.get("ip") == "随机")
+    if fixed_ip and not random_ip and fixed_ip not in ips:
+        raise ValueError("unknown selected IP asset")
+    fonts = sorted((SKILL_DIR / "assets/font-references").glob("*.png"))
+    rng = random.Random(str(seed if seed is not None else config.get("request_id", "")))
+    fixed_rules = []
+    fixed = config.get("visual_direction") or {}
+    for kind in ("style", "layout"):
+        if fixed.get(kind + "_prompt"):
+            fixed_rules.append(fixed[kind + "_prompt"])
+        elif fixed.get(kind + "_id"):
+            match = next((v for v in load_catalog()[kind + "s"] if fixed[kind + "_id"] == v["id"] or fixed[kind + "_id"] in v.get("alias_ids", [])), None)
+            if match is None:
+                raise ValueError("unknown visual direction: " + kind)
+            fixed_rules.append(match["prompt"])
+    directions = []
+    for index, concept in enumerate(concepts):
+        if not isinstance(concept, dict) or any(not isinstance(concept.get(k), str) or not concept[k].strip() for k in ("name", "prompt")):
+            raise ValueError("each visual concept needs a name and a complete scene prompt")
+        actions = concept.get("slot_actions")
+        if not isinstance(actions, list) or len(actions) != image_count or any(not isinstance(a, str) or not a.strip() for a in actions):
+            raise ValueError("visual concept slot_actions must cover each image in the saved form")
+        selected_ip = concept.get("ip_asset_id") or (rng.choice(list(ips)) if random_ip else fixed_ip)
+        if selected_ip and (selected_ip not in ips or (not random_ip and selected_ip != fixed_ip)):
+            raise ValueError("concept IP conflicts with the saved IP selection")
+        ip = ips.get(selected_ip)
+        font = ""
+        if config.get("font_reference_enabled", True):
+            if not fonts:
+                raise ValueError("font reference library is empty")
+            font = concept.get("font_reference_path") or str(rng.choice(fonts))
+            if Path(font).resolve() not in {p.resolve() for p in fonts}:
+                raise ValueError("concept font must use an original font reference")
+            font = str(Path(font).resolve())
+        copy_index, set_index = index // sets + 1, index % sets + 1
+        direction_id = f"visual-{index + 1:03d}"
+        slot_rules = {str(i): f"本张动作与情绪[{direction_id}/图{i}]：{action}" for i, action in enumerate(actions, 1)}
+        base_rule = (f"本套完整画面方案[{direction_id}]（方案名不作为画面文案）：{concept['name']}。\n"
+                     f"{concept['prompt']}\n" + slot_rules["1"] + "\n"
+                     + ("用户指定的视觉要求优先：" + "；".join(fixed_rules) + "。" if fixed_rules else "")
+                     + "人物、道具、光线与文字按本套完整方案统一设计，标题可读并为角色动作与场景关系保留空间。"
+                     "所选Logo保持原版图形、标准字、颜色与规定位置；标题遵循所选独立字体参考。")
+        base_rule += ("IP是场景的行动主体，保留原版脸型、发型、体型、服装与关键标识，用姿势、视线和表情表现本张状态。"
+                      if ip else "本套未选IP，按方案中的主体和道具表现确认动作，不新增吉祥物。")
+        directions.append({
+            "direction_id": direction_id, "set_id": f"copy-{copy_index:03d}-placement-001-set-{set_index:02d}",
+            "copy_draft_id": copies[copy_index - 1].get("copyDraftId", f"draft-{copy_index}"),
+            "concept_name": concept["name"], "concept_prompt": concept["prompt"],
+            "style_source_ids": concept.get("style_source_ids", []),
+            "style_description_origin": "task_authored", "style_verification_status": "task_authored",
+            "style_image_validated": False,
+            "slot_prompt_rules": slot_rules, "ip_asset_id": selected_ip,
+            "ip_reference_path": ip["path"] if ip else "", "font_reference_path": font,
+            "subject_mode": "selected_ip" if ip else "approved_action_without_ip",
+            "base_prompt_rule": base_rule,
+            "branch_prompt_rule": f"同套画面继承[{direction_id}]：从本套首张PNG继承角色身份、服装、视觉体系、场景、字体与Logo；按当前短句和本张动作推进状态，调整姿势、视线、表情与必要道具，使每张承担对应的叙事内容。",
+        })
+    return {"schema_version": "onion_visual_plan_v1", "request_id": config.get("request_id"),
+            "config_fingerprint": config_fingerprint(config), "mode": "content_first", "directions": directions}
+
+
 def plan_directions(config, seed=None):
     if len(config.get("placements", [])) != 1:
         raise ValueError("visual planning requires one saved placement")
+    if config.get("visual_diversity_mode", "content_first") == "content_first":
+        return plan_content_concepts(config, seed)
     catalog = load_catalog()
     rng = random.Random(str(seed if seed is not None else config.get("request_id", "")))
     copies = config.get("copy_refs") or [{} for _ in range(int(config.get("copy_count") or 1))]
@@ -235,6 +311,10 @@ def validate_visual_plan(manifest, config):
         key = "base_prompt_rule" if int(job.get("slot") or 1) == 1 else "branch_prompt_rule"
         if job.get("visual_direction_id") != direction["direction_id"] or direction[key] not in job["prompt"]:
             raise ValueError("visual direction must be used in every base and inherited by its branches")
+        if plan.get("mode") == "content_first":
+            action = direction.get("slot_prompt_rules", {}).get(str(int(job.get("slot") or 1)))
+            if not action or action not in job["prompt"]:
+                raise ValueError("each content-first job must use its planned scene action")
         if int(job.get("slot") or 1) == 1:
             from logo_reference import normalize_job_references
             refs = normalize_job_references(job)

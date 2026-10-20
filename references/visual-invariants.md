@@ -36,6 +36,6 @@
 
 ## 编排与效果验证的边界
 
-[多样化编排](visual-directions.md)已提供风格、布局、镜头、场景和配色候选，生成可复现的计划，并检查计划是否绑定到实际Prompt、所选IP和字体；不同套进行组合去重，同套继承首张。已收集描述和来源分别由config/visual-directions.json、config/visual-style-sources.json维护，支持检索与别名；新任务可引用已有描述或由Agent编写visual_candidates开放候选，不限定风格类别总数。
+[完整画面方案](visual-directions.md)由Agent先设计内容、IP动作与整体视觉，再保存可复核的计划；脚本检查计划、逐张动作与实际Prompt、所选IP和字体的绑定。同套继承首张，多套允许共用合适的画风。风格描述及来源仍由config/visual-directions.json、config/visual-style-sources.json维护，供整体设计时按需参考。
 
 当前没有Logo像素保真、前景背景可读性或生成画风一致性的自动图像检测。计划不同不代表成图必然不同，Prompt规则仍需在候选中逐张查看。内容偏差按[候选选择规则](input-output-contract.md)记录，不自动新增付费任务。
