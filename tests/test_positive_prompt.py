@@ -130,3 +130,31 @@ def test_format_is_fingerprinted_without_changing_historical_config():
     assert visual.config_fingerprint(cfg) != visual.config_fingerprint(old)
     assert not positive.enabled(old)
     with pytest.raises(ValueError): positive.enabled({'prompt_format': 'unknown'})
+
+
+@pytest.mark.parametrize('count', [2, 3])
+def test_asset_roles_and_complete_ad_reference_are_explicit(count):
+    cfg = configuration(count); cfg['font_reference_enabled'] = True
+    d = visual.plan_directions(cfg)['directions'][0]
+    refs = [logo_reference.build_logo_reference(cfg),
+            {'label': '参考图2', 'role': '标题字体参考', 'path': d['font_reference_path']}]
+    base = positive.compose(cfg, d, references=refs)
+    assert '参考图1的原版Logo' in base and '参考图2用于标题字形参考' in base
+    assert '完整广告成图' not in base
+    for slot in range(2, count + 1):
+        branch = positive.compose(cfg, d, slot, [{'label': '参考图1', 'path': '/tmp/base.png'}])
+        assert '本套采用透明水彩画风' in branch
+        assert '参考图1为本套已生成的第1张完整广告成图' in branch
+        assert '标题字形参考' not in branch
+
+
+def test_random_style_is_bound_before_writing_even_a_single_image_prompt():
+    cfg = configuration(); cfg.update(visual_style_mode='random', visual_direction={})
+    assignment = visual.assign_styles(cfg)['directions'][0]
+    cfg['visual_concepts'][0]['style_id'] = assignment['style_id']
+    d = visual.plan_directions(cfg)['directions'][0]
+    assert d['style_id'] == assignment['style_id']
+    assert assignment['style_prompt'] in d['base_prompt_rule']
+    other = next(s['id'] for s in visual.load_catalog()['styles'] if s['id'] != assignment['style_id'])
+    cfg['visual_concepts'][0]['style_id'] = other
+    with pytest.raises(ValueError, match='assign-styles'): visual.plan_directions(cfg)

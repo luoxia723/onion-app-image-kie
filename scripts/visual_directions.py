@@ -152,7 +152,7 @@ def plan_content_concepts(config, seed=None):
     style_mode = config.get("visual_style_mode", "random")
     if style_mode not in {"random", "coordinated"}:
         raise ValueError("visual_style_mode must be random or coordinated")
-    random_batch = style_mode == "random" and len(concepts) > 1
+    random_batch = style_mode == "random" and (positive_format(config) or len(concepts) > 1)
     assigned = assign_styles(config, seed)["directions"] if random_batch else []
     placement = config["placements"][0]
     image_count = int(placement.get("image_count") or {"双图": 2, "三图": 3}.get(config.get("image_form"), 1))
@@ -166,6 +166,7 @@ def plan_content_concepts(config, seed=None):
     rng = random.Random(str(seed if seed is not None else config.get("request_id", "")))
     fixed_rules = []
     fixed_style_prompt = ""
+    fixed_style_name = ""
     fixed = config.get("visual_direction") or {}
     for kind in ("style", "layout"):
         if fixed.get(kind + "_prompt"):
@@ -181,6 +182,7 @@ def plan_content_concepts(config, seed=None):
                                match["prompt"] if fixed_ip or random_ip else match.get("no_ip_prompt", match["prompt"]))
             if kind == "style":
                 fixed_style_prompt = selected_prompt
+                fixed_style_name = match["name"]
             else:
                 fixed_rules.append(selected_prompt)
     directions = []
@@ -219,12 +221,20 @@ def plan_content_concepts(config, seed=None):
         direction_id = f"visual-{index + 1:03d}"
         if positive_format(config):
             slot_rules = {str(i): paragraph(action) for i, action in enumerate(actions, 1)}
-            style_text = f"以{style['style_name']}画风呈现，{style['style_prompt']}" if style else fixed_style_prompt
+            style_name = style["style_name"] if style and style["style_id"] != "user_fixed_style" else fixed_style_name
+            style_description = style["style_prompt"] if style else fixed_style_prompt
+            style_text = f"以{style_name}画风呈现，{style_description}" if style_name else style_description
             base_rule = paragraph(style_text, concept["prompt"], slot_rules["1"], *fixed_rules,
                                   "主体、道具与光线形成统一空间，标题位于清晰留白并具有鲜明阅读层级。",
                                   IP_RULE if ip else "", ui_rule)
-            inherited = "画风、场景、主体设定和字体" + ("、Logo及其位置" if config.get("logo_asset_id") or config.get("logo") not in (None, "", "不用") else "")
-            branch_rule = f"以本套已生成的第1张广告成图（参考图1）为基础，保持本套{inherited}，呈现当前文案对应的动作与状态。"
+            inherited = ["画风", "场景", "主体设定"]
+            if font:
+                inherited.append("字体")
+            if config.get("logo_asset_id") or config.get("logo") not in (None, "", "不用"):
+                inherited.append("Logo及其位置")
+            branch_style = f"本套采用{style_name}画风" if style_name else style_text
+            branch_rule = paragraph(branch_style,
+                                    f"参考图1为本套已生成的第1张完整广告成图，以这张成图为基础，保持本套{'、'.join(inherited)}，呈现当前文案对应的动作与状态。")
         else:
             slot_rules = {str(i): f"本张动作与情绪[{direction_id}/图{i}]：{action}" for i, action in enumerate(actions, 1)}
             style_rule = (f"画风定调：{style['style_name']}；{style['style_prompt']}\n" if style else

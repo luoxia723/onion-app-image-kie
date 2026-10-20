@@ -70,7 +70,7 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
             elif asset_id.startswith("ip."):
                 parts.append(f'{label}为本画面角色原型。')
             elif "字体" in role or ref.get("path") == direction.get("font_reference_path"):
-                parts.append(f'标题沿用{label}的字形骨架、笔画粗细、转折、外轮廓与描边层次，配色呼应当前画面，文字完整清晰。')
+                parts.append(f'{label}用于标题字形参考，标题沿用其中的字形骨架、笔画粗细、转折、外轮廓与描边层次，配色呼应当前画面，文字完整清晰。')
             elif direction.get("screen_ui_mode") == "reference" and ("UI" in role or "截图" in role):
                 parts.append(f'屏幕完整呈现{label}提供的真实界面。')
     if frame_label:
