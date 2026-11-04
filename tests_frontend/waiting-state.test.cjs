@@ -9,18 +9,20 @@ function setup(){
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/views.js'),'utf8'),ctx);
  ctx.round=round;vm.runInContext('imgOf=()=>""',ctx);return ctx;
 }
-test('规划等待时显示动画、真实阶段和可离开页面的边界',()=>{
- const ctx=setup(),html=vm.runInContext('viewPick()',ctx);
+test('规划等待直接显示看样台，顶栏收纳真实阶段和可离开页面的边界',()=>{
+ const ctx=setup(),html=vm.runInContext('viewHead()',ctx),pick=vm.runInContext('viewPick()',ctx);
  assert(html.includes('正在规划画面'));
- assert(html.includes('wait-spinner'));
+ assert(html.includes('phase-dot'));
  assert(html.includes('可以切换任务或关闭网页'));
  assert(html.includes('保持本机服务运行'));
+ assert(pick.includes('pick-workbench'));assert(pick.includes('data-slot="one"'));assert(pick.includes('data-slot="two"'));
+ assert(!pick.includes('work-status'));assert(!pick.includes('wait-spinner'));
 });
 test('规划中的占位图与等待图 1 区分显示',()=>{
  const ctx=setup();let html=vm.runInContext('cellHtml(R(),R().slots[0],132)',ctx);
  assert(html.includes('规划中'));
  ctx.round.slots.forEach(s=>s.plan_ready=true);ctx.round.planning_status='done';ctx.round.slots[0].state='generating';
- html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('等待图 1'));
+ html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('等图 1'));assert(html.includes('cell wait'));
 });
 test('全部排队时头部仍显示阶段和完成数量',()=>{
  const ctx=setup(),html=vm.runInContext('viewHead()',ctx);
@@ -29,11 +31,11 @@ test('全部排队时头部仍显示阶段和完成数量',()=>{
 });
 test('停止后仍有已提交图片时不谎称所有任务结束',()=>{
  const ctx=setup();ctx.round.stopped=true;ctx.round.planning_status='stopped';ctx.round.slots[0].state='generating';ctx.round.slots[1].state='stopped';
- const html=vm.runInContext('viewPick()',ctx);assert(html.includes('已提交图片仍在生成'));
+ const html=vm.runInContext('viewHead()',ctx);assert(html.includes('已提交图片仍在生成'));assert(html.includes('已停止后续'));
 });
 test('全部完成时不再显示后台运行提示',()=>{
  const ctx=setup();ctx.round.planning_status='done';ctx.round.slots.forEach(s=>s.state='done');
- const html=vm.runInContext('viewPick()',ctx);assert(!html.includes('可以切换任务或关闭网页'));
+ const html=vm.runInContext('viewHead()',ctx);assert(!html.includes('可以切换任务或关闭网页'));
 });
 test('连接失效时不继续承诺任务正在后台执行',()=>{
  const ctx=setup();ctx.S.connectionLost=true;

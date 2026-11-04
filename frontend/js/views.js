@@ -1,6 +1,6 @@
 let FORM_DEFAULTS={};
 let IMAGE_MODEL_OPTIONS=[['gpt-image-2-5-sunburst-image-to-image','GPT Image 2.5 Sunburst'],['gpt-image-2-image-to-image','GPT Image 2']];
-function imageModelOptions(selected){return IMAGE_MODEL_OPTIONS.map(([id,name])=>`<option value="${id}" ${id===selected?'selected':''}>${name} · 1K</option>`).join('')}
+function imageModelOptions(selected){return IMAGE_MODEL_OPTIONS.map(([id,name])=>`<option value="${id}" ${id===selected?'selected':''}>${id==='gpt-image-2-5-sunburst-image-to-image'?'Sunburst 2.5 · 1K':id==='gpt-image-2-image-to-image'?'GPT Image 2 · 1K':esc(name)}</option>`).join('')}
 
 const $=s=>document.querySelector(s);
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
@@ -49,27 +49,36 @@ function waitLabel(r,s){
 }
 function viewWorkStatus(r){
  const status=workStatus(r);
- if(S.connectionLost)return`<section class="work-status disconnected" role="status"><div><b>暂时无法连接本机服务</b><p>当前显示上次进度。请检查启动服务的窗口，连接恢复后会自动更新。</p></div></section>`;
+ if(S.connectionLost)return`<span class="work-phase disconnected" role="status" title="请检查启动服务的窗口，连接恢复后会自动更新。">暂时无法连接本机服务 · 当前显示上次进度</span>`;
  if(!status.active&&!r.stopped&&!r.paused)return'';
- return`<section class="work-status" id="pcard" aria-label="后台任务状态"><span class="${status.active?'wait-spinner':'work-stopped'}" aria-hidden="true">${status.active?'':'Ⅱ'}</span><div class="work-status-body"><b id="pctx" role="status">${esc(status.title)}</b><div class="work-counts">${esc(status.detail)}</div>${status.active?'<p>可以切换任务或关闭网页，后台会继续。稍后从左侧任务列表返回。</p><small>请保持本机服务运行，不要关闭启动窗口、关机或休眠。</small>':'<p>未提交的图片已停止，已完成的结果会保留。</p>'}</div>${!r.stopped?`<button onclick="pauseQueue(${!r.paused})">${r.paused?'继续队列':'暂停后续'}</button>`:''}<button class="stopb" id="stopbtn" ${r.stopped?'disabled':''} onclick="stopRest()">${r.stopped?'已停止后续':'停止后续提交'}</button></section>`;
+ return`<span class="work-phase" id="pctx" role="status" title="${esc(status.detail)}${status.active?'。可以切换任务或关闭网页；请保持本机服务运行，不要关闭启动窗口、关机或休眠。':''}">${status.active?'<span class="phase-dot" aria-hidden="true"></span>':''}${esc(status.title)}</span>`;
 }
 function tRun(t){const r=t.rounds[t.ri];return !!t.background_running||['queued','running'].includes(r.planning_status)||r.slots.some(s=>s.state==="generating"||(s.state==="queued"&&!blocked(r,s)))}
 function tProg(t){if(tRun(t))return true;if(t.downloaded)return false;const r=t.rounds[t.ri];return r.slots.some(s=>s.state==="done")}
 function tGroup(t){if(t.is_summary)return t.category==='running'?'prog':t.category==='history'?'old':'attention';if(tProg(t))return"prog";const d0=new Date();d0.setHours(0,0,0,0);const s=d0.getTime(),dt=t.date||Date.now(),wd=(d0.getDay()+6)%7;if(dt>=s)return"today";if(dt>=s-864e5)return"yday";if(dt>=s-wd*864e5)return"week";return"old"}
 function tHit(t,q){if(t.is_summary)return[t.name,t.pkg,t.image_model,t.image_form].some(v=>v&&String(v).toLowerCase().includes(q));const p=(t.rounds[t.ri]||{}).params||{};return[tName(t),t.pkg,p.t1,p.t2,p.s1,p.s2,p.s3].some(v=>v&&String(v).toLowerCase().includes(q))}
 const GROUPS=[["prog","正在处理"],["attention","待处理"],["old","历史"]];
-function taskRow(t){if(t.is_summary)return summaryRow(t);const r=t.rounds[t.ri],d=r.slots.find(s=>s.state==="done"),[dc,st]=taskStatus(t),run=tRun(t),m=S.menu===t.id;
- if(S.ren===t.id)return`<li class="trow"><div class="task on ren">${d?`<img src="${imgOf(d)}" alt="">`:'<span class="noimg"></span>'}<input id="renin" aria-label="任务名" value="${esc(S.renV!=null?S.renV:tName(t))}" oninput="S.renV=this.value" onkeydown="if(event.key==='Enter')renOk();if(event.key==='Escape'){event.stopPropagation();renEnd()}" onblur="renOk()"></div></li>`;
- return`<li class="trow ${t.downloaded?"dl":""} ${m?"mopen":""}" oncontextmenu="event.preventDefault();openMenu('${t.id}')"><button class="task ${t.id===S.cur?"on":""}" data-task="${t.id}" onclick="openTask('${t.id}')">${d?`<img src="${imgOf(d)}" alt="">`:'<span class="noimg"></span>'}<div><div class="t1">${esc(tName(t))}</div><div class="t2"><span class="dot ${dc}"></span><span class="tst">${st}</span></div>${r.delivery?.last_version&&st!=='已保存 '+r.delivery.last_version?`<div class="t3">已保存 ${r.delivery.last_version}${r.delivery.has_changes?' · 勾选有变化，需重新保存':''}</div>`:''}</div></button><button class="more" data-more="${t.id}" aria-label="更多操作" aria-haspopup="menu" aria-expanded="${m}" onclick="event.stopPropagation();openMenu('${t.id}')">⋯</button>${m?`<div class="tmenu" role="menu"><button role="menuitem" data-act="ren" onclick="renStart('${t.id}')">重命名</button><button role="menuitem" data-act="dup" onclick="dupFrom('${t.id}')">复制为新任务</button><button role="menuitem" data-act="del" ${run?'disabled aria-disabled="true"':""} onclick="delTask('${t.id}')">删除</button>${run?'<div class="mhint">先停止后续</div>':""}</div>`:""}</li>`}
+function taskRow(t){if(t.is_summary)return summaryRow(t);const r=t.rounds[t.ri],[dc,st]=taskStatus(t),run=tRun(t),m=S.menu===t.id;
+ if(S.ren===t.id)return`<li class="trow"><div class="task on ren"><input id="renin" aria-label="任务名" value="${esc(S.renV!=null?S.renV:tName(t))}" oninput="S.renV=this.value" onkeydown="if(event.key==='Enter')renOk();if(event.key==='Escape'){event.stopPropagation();renEnd()}" onblur="renOk()"></div></li>`;
+ const meta=st+(r.delivery?.last_version&&st!=='已保存 '+r.delivery.last_version?' · 已保存 '+r.delivery.last_version+(r.delivery.has_changes?' · 勾选有变化，需重新保存':''):'');
+ return`<li class="trow ${t.downloaded?"dl":""} ${m?"mopen":""}" oncontextmenu="event.preventDefault();openMenu('${t.id}')"><button class="task ${t.id===S.cur?"on":""}" data-task="${t.id}" onclick="openTask('${t.id}')"><div><div class="t1">${esc(tName(t))}</div><div class="t2" title="${esc(meta)}"><span class="dot ${dc}"></span><span class="tst">${esc(meta)}</span></div></div></button><button class="more" data-more="${t.id}" aria-label="更多操作" aria-haspopup="menu" aria-expanded="${m}" onclick="event.stopPropagation();openMenu('${t.id}')">⋯</button>${m?`<div class="tmenu" role="menu"><button role="menuitem" data-act="ren" onclick="renStart('${t.id}')">重命名</button><button role="menuitem" data-act="dup" onclick="dupFrom('${t.id}')">复制为新任务</button><button role="menuitem" data-act="del" ${run?'disabled aria-disabled="true"':""} onclick="delTask('${t.id}')">删除</button>${run?'<div class="mhint">先停止后续</div>':""}</div>`:""}</li>`}
 function taskList(){const q=(S.q||"").trim().toLowerCase();if(S.searchPending)return '<li class="tnone">正在搜索任务…</li>';if(q){const h=S.summaries||S.tasks.filter(t=>tHit(t,q));return h.length?h.map(taskRow).join(""):'<li class="tnone">没有匹配的任务</li>'}
  const fold=S.fold||{};return GROUPS.map(([g,lab])=>{const ts=(S.summaries||S.tasks).filter(t=>tGroup(t)===g);if(!ts.length)return"";if(g==="prog")return`<li class="gh fixed" data-g="${g}"><span>${lab}</span><span class="gn">${ts.length}</span></li>${ts.map(taskRow).join("")}`;const f=!!fold[g];return`<li><button class="gh" data-g="${g}" aria-expanded="${!f}" onclick="togFold('${g}')"><span><i>${f?"▸":"▾"}</i>${lab}</span><span class="gn">${ts.length}</span></button></li>${f?"":ts.map(taskRow).join("")}`}).join("")}
 function togFold(g){S.fold=Object.assign({},S.fold);S.fold[g]=!S.fold[g];save();render()}
 
-function viewSide(){return`<aside><div class="side-top"><div class="brandrow"><img src="${LOGO.thumb}" alt="洋葱学园">广告图${CFG.simulation?'<span class="mode-tag">模拟模式</span>':""}</div><button class="primary" id="newbtn" onclick="newTask()">＋ 新建任务</button><div class="tsearch"><input id="tq" type="search" placeholder="搜索" aria-label="搜索任务" value="${esc(S.q||"")}" oninput="searchTasks(this.value)"></div></div>
+function viewSide(){return`<aside><div class="side-top"><div class="brandrow"><img src="${LOGO.thumb}" alt="洋葱学园"><span>广告图工作台</span>${CFG.simulation?'<span class="mode-tag">模拟模式</span>':""}</div><button id="newbtn" onclick="newTask()">＋ 新建任务</button><div class="tsearch"><input id="tq" type="search" placeholder="搜索" aria-label="搜索任务" value="${esc(S.q||"")}" oninput="searchTasks(this.value)"></div></div>
 <div class="sidebar-scroll"><ul id="draft-list" class="drafts" aria-label="草稿">${typeof draftListHtml==='function'?draftListHtml():''}</ul><ul class="tasks" aria-label="任务">${taskList()||((S.drafts||[]).length?'':'<li class="empty-list">还没有任务</li>')}</ul></div>${S.undo?`<div class="undo" id="undo" role="status"><span>已删除 ·</span><button id="undobtn" onclick="undoDel()">撤销</button></div>`:""}
 <div class="side-bot"><div id="queue-overview" class="queue-overview">${typeof queueText==='function'?esc(queueText()):''}</div><button class="ghost" id="cfgbtn" onclick="openCfg()">⚙ 设置</button></div></aside>`}
 function stepsHtml(){const current=S.view==='form'?0:1;return`<div class="steps" role="tablist">${[['form','配置生成'],['pick','挑选保存']].map(([key,label],i)=>`<button class="step ${i===current?'on':i<current?'done':''}" ${key==='pick'&&!R()?'disabled':''} onclick="go('${key}')"><i>${i<current?'✓':i+1}</i>${label}</button>`).join('')}</div>`}
 function viewHead(){const t=T(),pr=P(),nm=t?t.pkg:"新任务",tt=t?t.pkg+" · "+(pr.t1||pr.s1||""):"新任务";
+ if(S.view==='form')return `<header class="head pick-head config-head" id="head"><div class="pick-heading"><h1 id="title" tabindex="-1">${esc(t?tName(t):'新任务')}</h1></div><span class="config-draft-state" id="draft-status" role="status">${esc(S.navigationPending?'正在打开，请稍候…':S.draftStatus||'草稿自动保存')}</span></header>`;
+
+ if(S.view==='pick'&&t){
+  const round=R(),status=workStatus(round);
+  const queueActions=status.active||round.paused?`${!round.stopped?`<button onclick="pauseQueue(${!round.paused})">${round.paused?'继续队列':'暂停后续'}</button>`:''}<button id="stopbtn" ${round.stopped?'disabled':''} onclick="stopRest()">${round.stopped?'已停止后续':'停止后续提交'}</button>`:'';
+  const rounds=t.rounds.length>1?`<label>修改记录<select id="roundSel" onchange="setRound(+this.value)">${t.rounds.map((entry,index)=>`<option value="${index}" ${index===t.ri?'selected':''}>${esc(roundLabel(entry,index,t.rounds.length))}</option>`).reverse().join('')}</select></label>`:'';
+  return`<header class="head pick-head" id="head"><div class="pick-heading"><h1 id="title" tabindex="-1">${esc(tName(t))}</h1><span class="pick-progress" id="progtx">已出 <strong>${status.done} / ${status.total}</strong> 张</span>${viewWorkStatus(round)}</div><div class="pick-head-actions"><button id="redo" onclick="editRedo()">修改配置</button><button id="dup" onclick="dupTask()">复制为新任务</button><details class="pick-more" ${S.pickMore?'open':''} ontoggle="S.pickMore=this.open"><summary aria-label="任务更多操作">⋯</summary><div>${queueActions}${t.pkgs.length?'<button onclick="go(\'dl\')">交付记录</button>':''}${rounds}<span>${esc((IMAGE_MODEL_OPTIONS.find(model=>model[0]===(round.image_model||IMAGE_MODEL_OPTIONS[0][0]))||IMAGE_MODEL_OPTIONS[0])[1])} · 1K</span></div></details></div>${S.navigationPending?'<span class="pick-opening" role="status">正在打开，请稍候…</span>':''}</header>`;
+ }
  const acts=S.view==="pick"&&t?`<div class="row"><button id="redo" onclick="editRedo()">修改配置 / 补充生成</button><button id="dup" onclick="dupTask()">复制为新任务</button>${t.pkgs.length?`<button id="historybtn" onclick="go('dl')">交付记录</button>`:''}</div>`:"";
  const rr=R(),rbar=S.view!=="form"&&t&&rr?(()=>{const status=workStatus(rr);return`<div class="hbar"><div class="prog" id="prog">${status.active?'<span class="wait-spinner small" aria-hidden="true"></span>':''}<div class="pbar" role="progressbar" aria-label="图片完成进度" aria-valuemin="0" aria-valuemax="${status.total}" aria-valuenow="${status.done}"><i style="width:${Math.round(status.done/Math.max(1,status.total)*100)}%"></i></div><span id="progtx">${status.active||rr.stopped?esc(status.title)+' · ':''}${status.done} / ${status.total} 张完成</span></div><span class="muted">${esc((IMAGE_MODEL_OPTIONS.find(x=>x[0]===(rr.image_model||IMAGE_MODEL_OPTIONS[0][0]))||IMAGE_MODEL_OPTIONS[0])[1])} · 1K</span>${t.rounds.length>1?`<label class="rsel"><span class="sr">修改记录</span><select id="roundSel" onchange="setRound(+this.value)">${t.rounds.map((x,i)=>`<option value="${i}" ${i===t.ri?"selected":""}>${esc(roundLabel(x,i,t.rounds.length))}</option>`).reverse().join("")}</select></label>`:''}</div>`})():'';
  return`<div class="head" id="head"><div class="crumb">任务 / <b id="crumbName">${esc(nm)}</b></div><div class="titlerow"><h1 id="title" tabindex="-1">${esc(tt)}</h1><div id="headActs">${acts}</div></div>${stepsHtml()}${S.navigationPending?'<div class="draft-state" id="navigation-status" role="status">正在打开，请稍候…</div>':''}${S.view==='form'?'<div class="draft-state"><span id="draft-status" role="status">'+esc(S.draftStatus||'草稿自动保存')+'</span><button class="lnk" onclick="persistDraft()">保存草稿</button></div>':''}${rbar}</div>`}
@@ -77,99 +86,137 @@ function setsBad(pr){const v=String(pr.sets).trim();return!/^\d+$/.test(v)||+v<S
 
 const IMAGE_FORMS = {
   '单图': {count:1, fields:[['t1','主标题'],['t2','副标题']]},
-  '双图': {count:2, fields:[['s1','短句 1'],['s2','短句 2']]},
-  '三图': {count:3, fields:[['s1','短句 1'],['s2','短句 2'],['s3','短句 3']]},
+  '双图': {count:2, fields:[['s1','句 1'],['s2','句 2']]},
+  '三图': {count:3, fields:[['s1','句 1'],['s2','句 2'],['s3','句 3']]},
 };
 function imageFormOf(pr){
   if(Object.hasOwn(pr,'image_form'))return IMAGE_FORMS[pr.image_form]?pr.image_form:'';
   const forms=[...new Set((pr.pids||[]).map(plOf).filter(Boolean).map(p=>p.image_form||Object.keys(IMAGE_FORMS).find(f=>IMAGE_FORMS[f].count===p.image_count)))];
   return forms.length===1?forms[0]:'';
 }
-function defParams(form='单图'){return{image_form:form,pids:[],t1:'',t2:'',s1:'',s2:'',s3:'',cta:DEF_CTA,sets:3,ip:'random',style:'random',font:'random',noLogo:false,references:[],...(FORM_DEFAULTS[form]||{})}}
+function channelOptions(){return [...new Set([...PLACEMENTS.map(p=>p.category),'学习机'])]}
+function channelForms(channel){return Object.keys(IMAGE_FORMS).filter(form=>PLACEMENTS.some(p=>p.category===channel&&p.image_count===IMAGE_FORMS[form].count))}
+function formPlacements(pr){return PLACEMENTS.filter(p=>p.category===pr.channel&&p.image_count===IMAGE_FORMS[imageFormOf(pr)]?.count)}
+function defParams(form='单图'){return{channel:'',image_form:form,pids:[],t1:'',t2:'',s1:'',s2:'',s3:'',cta:DEF_CTA,cta_enabled:true,cta_overrides:{},sets:3,ip:'random',style:'random',font:'random',noLogo:false,references:[],...(FORM_DEFAULTS[form]||{})}}
 function loadDraft(params){
   const form=imageFormOf(params)||'单图';
   S.draft={...defParams(form),pids:[],product_facts:S.product?.text||'',facts_version:S.product?.revision||0,...structuredClone(params)};
   S.draft.image_form=imageFormOf(params)||(params.image_form!==undefined||params.pids?.length?'':form);
+  if(!Object.hasOwn(params,'channel')){const channels=[...new Set(S.draft.pids.map(plOf).filter(Boolean).map(p=>p.category))];S.draft.channel=channels.length===1?channels[0]:''}
+  S.visualOpen=visualCustomized(S.draft);S.referenceMode=!!S.draft.references.length;
   S.formDrafts={};
   S.formError=null;
 }
 function setImageForm(form){
-  if(S.submitting||S.navigationPending||!IMAGE_FORMS[form]||form===imageFormOf(S.draft))return;
+  if(S.submitting||S.navigationPending||!channelForms(S.draft.channel).includes(form)||form===imageFormOf(S.draft))return;
   S.formDrafts=S.formDrafts||{};
   const previous=imageFormOf(S.draft);
   if(previous)S.formDrafts[previous]=structuredClone(S.draft);
   const shared={};
-  for(const k of ['cta','sets','ip','style','font','noLogo','references','feature_note','image_model','direction','product_facts','facts_version'])if(S.draft[k]!==undefined)shared[k]=structuredClone(S.draft[k]);
+  for(const k of ['channel','cta','cta_enabled','sets','ip','style','font','noLogo','references','feature_note','image_model','direction','product_facts','facts_version'])if(S.draft[k]!==undefined)shared[k]=structuredClone(S.draft[k]);
   S.draft={...(S.formDrafts[form]?structuredClone(S.formDrafts[form]):defParams(form)),...shared};
-  if(formRequiresLogo(S.draft))S.draft.noLogo=false;
+  filterFormPlacements(S.draft);
   S.tried=false;S.formError=null;save();render();
+}
+function filterFormPlacements(pr){
+  const ids=formPlacements(pr).map(p=>p.id);
+  pr.pids=pr.pids.filter(id=>ids.includes(id));
+  for(const key of ['cta_overrides','variants_by_placement'])if(pr[key])for(const id of Object.keys(pr[key]))if(!pr.pids.includes(id))delete pr[key][id];
+}
+function setChannel(channel){
+  if(S.submitting||S.navigationPending)return;
+  const forms=channelForms(channel),form=imageFormOf(S.draft);
+  S.draft.channel=channel;
+  if(forms.length&&!forms.includes(form))setImageForm(forms[0]);
+  for(const pr of [S.draft,...Object.values(S.formDrafts||{})]){pr.channel=channel;filterFormPlacements(pr)}
+  S.tried=false;save();render();
+}
+function setCtaOverride(id,mode,text){
+  if(S.submitting||S.navigationPending||!S.draft.pids.includes(id))return;
+  S.draft.cta_overrides=S.draft.cta_overrides||{};
+  S.draft.cta_overrides[id]={mode,text:text??S.draft.cta_overrides[id]?.text??S.draft.cta??''};
+  save();if(text===undefined)render();else updSum();
 }
 function formIssue(pr){
   const form=imageFormOf(pr);
+  if(!pr.channel)return{field:'channel',message:'请选择渠道'};
   if(!form)return{field:'image-form',message:'请选择图片形式'};
-  if(!pr.pids.length)return{field:'chans',message:'请选择渠道版位'};
-  if(pr.pids.some(id=>!plOf(id)||plOf(id).image_count!==IMAGE_FORMS[form].count))return{field:'chans',message:'所选版位与文案形式不一致，请重新选择'};
+  if(!pr.pids.length)return{field:'chans',message:'请选择版位'};
+  if(pr.pids.some(id=>!formPlacements(pr).some(p=>p.id===id)))return{field:'chans',message:'所选版位与当前渠道、形式不一致，请重新选择'};
   for(const [key,label] of IMAGE_FORMS[form].fields)if(!(pr[key]||'').trim())return{field:'f-'+key,message:'请填写'+label};
   if(setsBad(pr))return{field:'f-sets',message:'套数请填写 1–20 的整数'};
-  if((pr.references||[]).some(r=>!(r.note||'').trim()))return{field:'reference-options',message:'请说明每张参考图中需要保留的内容'};
   if((pr.cta||'').length>12)return{field:'f-cta',message:'按钮文字最多 12 字'};
+  for(const [id,value] of Object.entries(pr.cta_overrides||{}))if(value.mode==='custom'&&(!value.text.trim()||value.text.length>12))return{field:'cta-'+id,message:'版位按钮文字请填写 1–12 字'};
+  const refs=pr.references||[];
+  if(refs.some(r=>(r.note||'').length>200))return{field:'reference-options',message:'参考图说明最多 200 字'};
+  if(new Set(refs.map(r=>r.purpose)).size!==refs.length)return{field:'reference-options',message:'每种用途最多上传 1 张参考图'};
   return null;
 }
 function formErr(pr){const e=formIssue(pr);return e?e.field==='f-sets'?'sets':e.field==='chans'?'pids':'copy':''}
-function formRequiresLogo(pr){return(pr.pids||[]).some(id=>{
-  const p=plOf(id);return p&&(p.logo_policy==='required'||p.platform==='喜马拉雅'&&p.target_width===720&&[1280,1559].includes(p.target_height));
-})}
-function ipChoiceLabel(pr){return pr.ip==='none'?'不用 IP':IPS.find(a=>a.id===pr.ip)?.label||'随机 IP'}
-function ipChoices(pr){
-  const groups=[{name:'标准形象',items:[]},{name:'学段与 Q 版',items:[]},{name:'老师角色',items:[]}];
-  for(const a of IPS){const group=a.variant==='standard'||a.id.includes('.standard.')?0:a.stage==='teacher'||a.id.includes('.teacher.')?2:1;groups[group].items.push(a)}
-  const button=(id,label,thumb='')=>`<button class="ip ${pr.ip===id?'on':''}" data-ip="${id}" aria-label="${esc(label)}" title="${esc(label)}" aria-pressed="${pr.ip===id}" onclick="setF('ip','${id}',1)"><div style="${thumb?`background-image:url(${thumb})`:''}">${thumb?'':esc(label)}</div>${thumb?`<span class="ip-name">${esc(label).replace('-', '<br>')}</span>`:''}</button>`;
-  return`<div class="ip-catalog" id="ips" role="group" aria-labelledby="ip-label"><div class="ips ip-modes">${button('random','随机 IP')}${button('none','不用 IP')}</div>${groups.filter(g=>g.items.length).map(g=>`<div class="ip-group"><div class="ip-group-label">${g.name}<span>${g.items.length} 份</span></div><div class="ips">${g.items.map(a=>button(a.id,a.label,a.thumb)).join('')}</div></div>`).join('')}</div>`;
-}
-function fontChoiceLabel(pr){return !pr.font||pr.font==='random'?'随机字体参考':pr.font==='none'?'不用字体参考':(typeof FONTS!=='undefined'?FONTS:[]).find(a=>a.id===pr.font)?.label||'已停用的字体参考'}
-function viewFontOptions(pr){
-  const fonts=typeof FONTS!=='undefined'?FONTS:[],selected=fonts.find(a=>a.id===pr.font);
-  return`<div class="field"><label for="f-font">标题字体</label><div><select id="f-font" onchange="setF('font',this.value,1)">${[['random','随机字体参考'],['none','不用字体参考'],...fonts.map(a=>[a.id,a.label]),...(!selected&&pr.font&&!['none','random'].includes(pr.font)?[[pr.font,'已停用，请重新选择']]:[])].map(([id,label])=>`<option value="${esc(id)}" ${(pr.font||'random')===id?'selected':''}>${esc(label)}</option>`).join('')}</select>${selected?`<img class="font-preview" src="${selected.thumb}" alt="${esc(selected.label)}">`:''}<p class="field-help">${pr.font==='none'?'标题字形由模型根据画面设计。':'沿用样张字形，不使用样张里的旧文案。'}</p></div></div>`;
-}
-function optionsSummary(pr){return`<dt>角色 IP</dt><dd>${esc(ipChoiceLabel(pr))}</dd><dt>画风</dt><dd>${esc(pr.style&&pr.style!=='random'?pr.style:'随机画风')}</dd><dt>标题字体</dt><dd>${esc(fontChoiceLabel(pr))}</dd><dt>产品资料</dt><dd>已引用 v${esc(pr.facts_version??0)}</dd><dt>品牌 Logo</dt><dd>${pr.noLogo?'不用 Logo':'使用 Logo'}${formRequiresLogo(pr)?'（版位要求）':''}</dd><dt>自选参考图</dt><dd>${(pr.references||[]).length} 张</dd><dt>补充要求</dt><dd>${(pr.feature_note||'').trim()?'已填写':'未填写'}</dd>`}
+function visualCustomized(pr){return !!((pr.references||[]).length||pr.ip!=='random'||pr.style!=='random'||pr.noLogo||pr.font&&pr.font!=='random'||pr.feature_note)}
+const REFERENCE_PURPOSES={style:'参考风格',composition:'参考排版',ui:'产品界面'};
+function viewReferenceOptions(pr){return `<div class="reference-slots" id="reference-options" tabindex="-1">${Object.entries(REFERENCE_PURPOSES).map(([purpose,label])=>{
+  const i=(pr.references||[]).findIndex(r=>r.purpose===purpose),r=pr.references?.[i];
+  return `<section class="reference-slot ${r?'uploaded':''}" data-purpose="${purpose}"><div class="slot-heading"><h4>${label}</h4>${r?`<button ${S.uploadingPurpose?'disabled':''} onclick="removeReference(${i})" aria-label="移除${label}">移除</button>`:''}</div>${r?`<img class="reference-thumb" src="${esc(r.thumbnail_url||r.preview||'')}" alt="${esc(r.name)}"><label class="slot-note">补充说明（选填）<textarea id="ref-note-${purpose}" maxlength="200" rows="2" oninput="setReferenceNote(${i},this.value)">${esc(r.note||'')}</textarea></label>`:`<button class="reference-upload" ${S.uploadingPurpose?'disabled':''} onclick="uploadReference('${purpose}')">${S.uploadingPurpose===purpose?'正在上传…':'＋ 上传图片'}</button>`}</section>`;
+}).join('')}</div>`}
 function viewVisualOptions(pr){
-  const required=formRequiresLogo(pr);
-  return`<section class="card visual-options" id="visual-options" aria-labelledby="visual-options-title"><h3 id="visual-options-title">画面与素材</h3>
-    <div class="field"><span class="lab" id="ip-label">角色 IP</span><div>${ipChoices(pr)}<p class="field-help">随机 IP 从标准形象中每套分配角色；其他学段、Q 版或老师请直接指定。不用 IP 时不引用品牌角色素材，画面仍可有原创人物。</p></div></div>
-    <div class="field"><label for="styleq">画风</label><div class="combo" id="combo"><input id="styleq" role="combobox" aria-expanded="${!!S.styleOpen}" aria-controls="stylelist" autocomplete="off" value="${esc(S.styleOpen?(S.styleQ||''):(pr.style==='random'?'随机画风':pr.style))}" placeholder="搜索或选择画风" onfocus="styleOpen()" onclick="styleOpen()" oninput="styleFilter(this.value)" onkeydown="styleKey(event)"><span class="caret" aria-hidden="true">▾</span>${S.styleOpen?`<ul class="clist" id="stylelist" role="listbox">${styleOpts().map((s,i)=>`<li role="option" data-style="${esc(s)}" aria-selected="${pr.style===s}" class="${i===(S.styleHi||0)?'hi':''}" onmousedown="event.preventDefault();pickStyle(${esc(JSON.stringify(s))})">${s==='random'?'随机画风':esc(s)}</li>`).join('')}</ul>`:''}</div></div>
-    ${viewFontOptions(pr)}
-    <div class="field" style="margin:0"><span class="lab">品牌 Logo</span><div><div class="chips"><button class="chip ${!pr.noLogo?'on':''}" id="withlogo" aria-pressed="${!pr.noLogo}" onclick="setF('noLogo',false,1)">使用 Logo</button><button class="chip ${pr.noLogo?'on':''}" id="nologo" aria-pressed="${!!pr.noLogo}" ${required?'disabled':''} onclick="setF('noLogo',true,1)">不用 Logo</button></div>${required?'<p class="field-help">所选版位要求保留 Logo。</p>':''}</div></div>
-  </section>`;
-}
-const REFERENCE_PURPOSES={style:'画风参考',composition:'构图参考',ui:'真实 UI 截图',legacy:'画风 / 构图（旧配置）'};
-function referencePurposeSelect(r,i){return`<select aria-label="参考图用途" onchange="setReferencePurpose(${i},this.value)">${Object.entries(REFERENCE_PURPOSES).filter(([id])=>id!=='legacy'||!r.purpose||r.purpose==='legacy').map(([id,label])=>`<option value="${id}" ${(r.purpose||'legacy')===id?'selected':''}>${label}</option>`).join('')}</select>`}
-function viewReferenceOptions(pr){return`<section class="card" id="reference-options" aria-labelledby="reference-options-title"><h3 id="reference-options-title">参考图与补充要求</h3>
-  <div class="field"><span class="lab">参考图</span><div><button onclick="uploadReference()">＋ 上传参考图 / 界面截图</button><div class="upload-list">${(pr.references||[]).map((r,i)=>`<div class="upload-item"><span>${esc(r.name)}</span>${referencePurposeSelect(r,i)}<button class="lnk" onclick="removeReference(${i})" aria-label="移除参考图">×</button><textarea aria-label="参考图说明" maxlength="200" rows="2" oninput="setReferenceNote(${i},this.value)">${esc(r.note||'')}</textarea></div>`).join('')}</div><p class="field-help">画风与构图参考分别沿用对应视觉特征；真实 UI 截图用于产品屏幕，保留原有界面内容。</p>${S.tried&&formIssue(pr)?.field==='reference-options'?`<div class="errtx">${esc(formIssue(pr).message)}</div>`:''}</div></div>
-  <div class="field"><label for="f-feature">补充要求</label><textarea id="f-feature" maxlength="200" placeholder="填写希望沿用的构图、场景或其他要求" oninput="setF('feature_note',this.value)">${esc(pr.feature_note||'')}</textarea></div>
-  <div class="field" style="margin:0"><span class="lab">产品资料</span><div><div class="row"><span class="ro">已引用 v${esc(pr.facts_version??0)}</span><button onclick="openCfg()">维护资料</button><button onclick="useLatestProduct()">引用最新资料</button></div><details class="product-preview"><summary>查看已引用资料</summary><pre>${esc(pr.product_facts||'未提供产品资料，仅依据已确认文案。')}</pre></details></div></div>
-  </section>`}
-function viewForm(){
-  const pr=S.draft,form=imageFormOf(pr),definition=IMAGE_FORMS[form],grp={};
-  PLACEMENTS.filter(p=>definition&&p.image_count===definition.count).forEach(p=>{(grp[p.category]=grp[p.category]||[]).push(p)});
-  const issue=S.tried?formIssue(pr):null;
-  const fi=(key,label)=>`<div class="field"><label for="f-${key}">${label}</label><div><input id="f-${key}" data-k="${key}" required aria-required="true" aria-invalid="${!!(issue?.field==='f-'+key)}" value="${esc(pr[key]||'')}" class="${issue?.field==='f-'+key?'bad':''}" oninput="setF('${key}',this.value)">${issue?.field==='f-'+key?`<div class="errtx">${esc(issue.message)}</div>`:''}</div></div>`;
-  return `<div class="form"><fieldset class="form-fields" ${S.submitting||S.navigationPending?'disabled':''}>
-    <div class="card compose-card">    <div class="form-kind"><h3 id="image-form-label">图片形式</h3><div class="form-options" role="radiogroup" aria-labelledby="image-form-label" id="image-form">${Object.keys(IMAGE_FORMS).map(f=>`<label class="form-option ${f===form?'on':''}"><input type="radio" name="image_form" value="${f}" ${f===form?'checked':''} onchange="setImageForm(this.value)"><span>${f}</span></label>`).join('')}</div>${issue?.field==='image-form'?`<div class="errtx">${esc(issue.message)}</div>`:''}</div>
-    ${definition?`<div class="copy-card"><div class="copy-heading"><h3>文案</h3><span>${form}</span></div>${definition.fields.map(([k,label])=>fi(k,label)).join('')}<div class="field" style="margin:0"><label for="f-cta">按钮文字</label><input id="f-cta" maxlength="12" value="${esc(pr.cta||'')}" style="max-width:240px" oninput="setF('cta',this.value)"></div></div>`:''}
-    </div>
-    ${viewVisualOptions(pr)}
-    <div class="card"><h3>渠道版位</h3><div id="chans">${Object.entries(grp).map(([g,list])=>`<div class="grp">${g}</div><div class="chips placement-options">${list.map(p=>`<button class="chip ${pr.pids.includes(p.id)?'on':''}" data-pid="${p.id}" aria-pressed="${pr.pids.includes(p.id)}" onclick="togP('${p.id}')">${esc(pname(p))}<small>${psz(p)}${p.image_count>1?' ×'+p.image_count:''}</small></button>`).join('')}</div>`).join('')}</div>${issue?.field==='chans'?`<div class="errtx">${esc(issue.message)}</div>`:''}</div>
-    <div class="card"><div class="field" style="margin:0"><label for="f-sets" class="sets-label">每版位套数</label><div><input id="f-sets" type="number" min="${SETS_MIN}" max="${SETS_MAX}" value="${pr.variants_by_placement&&new Set(Object.values(pr.variants_by_placement)).size>1?'':esc(pr.sets)}" placeholder="分别设置" style="width:120px" class="${setsBad(pr)?'bad':''}" oninput="setSets(this.value)">${issue?.field==='f-sets'?`<div class="errtx">${esc(issue.message)}</div>`:''}</div></div></div>
+  const open=S.visualOpen??visualCustomized(pr),reference=!!(pr.references||[]).some(r=>r.purpose==='style'),fonts=typeof FONTS!=='undefined'?FONTS:[];
+  const groups=[['标准形象',IPS.filter(a=>a.variant==='standard'||a.id.includes('.standard.'))],['学段与 Q 版',IPS.filter(a=>a.variant!=='standard'&&!a.id.includes('.standard.')&&a.stage!=='teacher'&&!a.id.includes('.teacher.'))],['老师角色',IPS.filter(a=>a.stage==='teacher'||a.id.includes('.teacher.'))]];
+  return `<section class="card visual-options" id="visual-options" aria-labelledby="visual-options-title"><div class="section-heading"><h3 id="visual-options-title">画面设定</h3><span class="scene-summary">${visualCustomized(pr)?'已定制':'全部随机'}</span><button aria-expanded="${open}" onclick="S.visualOpen=${!open};render()">${open?'收起':'定制'}</button></div>${open?`
+    <div class="scene-mode"><div class="config-segments" role="group" aria-label="画面参考"><button class="${!S.referenceMode?'active':''}" aria-pressed="${!S.referenceMode}" ${S.uploadingPurpose?'disabled':''} onclick="setReferenceMode(false)">随机</button><button class="${S.referenceMode?'active':''}" aria-pressed="${!!S.referenceMode}" ${S.uploadingPurpose?'disabled':''} onclick="setReferenceMode(true)">按参考图</button></div></div>
     ${viewReferenceOptions(pr)}
-    <div class="card"><div class="field" style="margin:0"><label for="f-direction">方向名</label><div><input id="f-direction" maxlength="30" value="${esc(pr.direction||'')}" oninput="setF('direction',this.value)"><p class="field-help">用于任务和文件命名，不会作为画面文字。</p></div></div></div>
-    </fieldset><div class="card sum" id="sum"><h3>本次生成</h3><div class="field" style="display:block"><label for="image-model" style="display:block;margin-bottom:8px">图片模型</label><select id="image-model" style="width:100%" ${S.submitting||S.navigationPending?'disabled':''} onchange="setF('image_model',this.value)">${imageModelOptions(pr.image_model|| (typeof CFG!=='undefined'&&CFG.imageModel)||IMAGE_MODEL_OPTIONS[0][0])}</select></div><dl><dt>版位</dt><dd id="sum-p">${pr.pids.length} 个</dd><dt>每版位</dt><dd id="sum-n">${pr.variants_by_placement&&new Set(Object.values(pr.variants_by_placement)).size>1?'分别设置':esc(pr.sets)+' 套'}</dd></dl><dl id="sum-config" class="sum-config">${optionsSummary(pr)}</dl>${S.submitting?'<p class="field-help" role="status">正在提交本次配置，请稍候。创建任务后即可离开页面。</p>':''}<div class="gorow"><button class="primary" id="go" ${setsBad(pr)||S.submitting||S.navigationPending?'disabled':''} onclick="startGen()">${S.submitting?'正在提交…':'开始生成'}</button><span class="tot" id="tot">${typeof CFG!=='undefined'&&!CFG.simulation?'真实生图 · ':''}共 ${totalOf(pr)} 张</span></div></div></div>`;
+    <div class="custom-controls"><label>IP<select id="ips" onchange="setF('ip',this.value,1)"><option value="random" ${pr.ip==='random'?'selected':''}>随机 IP</option><option value="none" ${pr.ip==='none'?'selected':''}>不用 IP</option>${groups.map(([label,items])=>`<optgroup label="${label}">${items.map(a=>`<option data-ip="${a.id}" value="${a.id}" ${pr.ip===a.id?'selected':''}>${esc(a.label)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <label>画风${reference?'<span class="style-locked" role="status">🔒 按参考图</span>':`<select id="styleq" onchange="setF('style',this.value,1)">${['random',...STYLES.map(s=>s.name)].map(name=>`<option value="${esc(name)}" ${pr.style===name?'selected':''}>${name==='random'?'随机画风':esc(name)}</option>`).join('')}</select>`}</label>
+    <label>Logo<select id="nologo" onchange="setF('noLogo',this.value==='none',1)"><option value="use" ${!pr.noLogo?'selected':''}>使用 Logo</option><option value="none" ${pr.noLogo?'selected':''}>不用 Logo</option></select></label>
+    <label>标题字体<select id="f-font" onchange="setF('font',this.value,1)">${[['random','随机字体参考'],['none','不用字体参考'],...fonts.map(a=>[a.id,a.label])].map(([id,label])=>`<option value="${id}" ${(pr.font||'random')===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
+    <label class="scene-note" for="f-feature">补充要求（选填）<textarea id="f-feature" maxlength="200" rows="2" oninput="setF('feature_note',this.value)">${esc(pr.feature_note||'')}</textarea></label>
+    <details class="product-preview"><summary>产品资料 · 已引用 v${esc(pr.facts_version??0)}</summary><div class="row"><button onclick="openCfg()">维护资料</button><button onclick="useLatestProduct()">引用最新资料</button></div><pre>${esc(pr.product_facts||'未提供产品资料，仅依据已确认文案。')}</pre></details>
+    ${S.tried&&formIssue(pr)?.field==='reference-options'?`<div class="errtx">${esc(formIssue(pr).message)}</div>`:''}`:''}</section>`;
+}
+function placementCtaText(pr,id){
+  const value=pr.cta_overrides?.[id]||{mode:'inherit'};
+  return value.mode==='custom'?value.text:value.mode==='none'||pr.cta_enabled===false?'':pr.cta||'';
+}
+function placementCta(pr,p){
+  const value=pr.cta_overrides?.[p.id]||{mode:'inherit'},selected=pr.pids.includes(p.id),label=pname(p)+'按钮文字',text=placementCtaText(pr,p.id);
+  return `<div class="placement-cta mode-${value.mode} ${text?'':'no-button'}">${value.mode==='custom'?`<span class="cta-custom-dot" aria-hidden="true">•</span><input id="cta-${p.id}" aria-label="${esc(label)}" maxlength="12" value="${esc(value.text||'')}" ${!selected?'disabled':''} oninput="setCtaOverride('${p.id}','custom',this.value)">`:`<span class="placement-cta-label" data-cta-label="${p.id}">${esc(text||'无按钮')}</span>`}<select aria-label="${esc(label)}模式" ${!selected?'disabled':''} onchange="setCtaOverride('${p.id}',this.value)">${[['inherit','跟随统一'],['custom','自定义'],['none','无按钮']].map(([mode,label])=>`<option value="${mode}" ${mode===value.mode?'selected':''}>${mode===value.mode?'✓ ':''}${label}</option>`).join('')}</select></div>`;
+}
+function summaryFormula(pr){
+  if(!pr.channel)return '';
+  const mixed=pr.variants_by_placement&&new Set(pr.pids.map(id=>pr.variants_by_placement[id]??+pr.sets)).size>1;
+  return mixed?`${pr.pids.length} 版位 × 分别设置套数`:`${pr.pids.length} 版位 × ${esc(pr.sets)} 套${IMAGE_FORMS[imageFormOf(pr)]?.count>1?' × '+IMAGE_FORMS[imageFormOf(pr)].count+' 张':''}`;
+}
+function viewForm(){
+  const pr=S.draft,form=imageFormOf(pr),definition=IMAGE_FORMS[form],placements=formPlacements(pr),grp={},forms=channelForms(pr.channel),blocked=S.submitting||S.navigationPending,unavailable=!forms.length;
+  placements.forEach(p=>{(grp[p.platform]=grp[p.platform]||[]).push(p)});
+  const issue=S.tried?formIssue(pr):null;
+  const fi=(key,label)=>`<label class="copy-field" for="f-${key}"><span>${label}</span><input id="f-${key}" data-k="${key}" required aria-required="true" aria-invalid="${issue?.field==='f-'+key}" value="${esc(pr[key]||'')}" class="${issue?.field==='f-'+key?'bad':''}" oninput="setF('${key}',this.value)">${issue?.field==='f-'+key?`<span class="errtx">${esc(issue.message)}</span>`:''}</label>`;
+  return `<div class="form config-form"><fieldset class="form-fields config-main" ${blocked?'disabled':''}>
+    <section class="card compose-card"><div class="channel-row"><h3 id="channel-label">渠道</h3><div id="channel" class="config-segments" role="radiogroup" aria-labelledby="channel-label" tabindex="-1">${channelOptions().map(channel=>`<button role="radio" aria-checked="${pr.channel===channel}" class="${pr.channel===channel?'active':''}" onclick="setChannel('${channel}')">${esc(channel)}</button>`).join('')}</div>${issue?.field==='channel'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div>
+    <fieldset class="channel-dependent" ${unavailable?'disabled':''}>
+    ${forms.length>1?`<div class="format-row"><h3 id="image-form-label">形式</h3><div class="config-segments" role="radiogroup" aria-labelledby="image-form-label" id="image-form">${forms.map(f=>`<button role="radio" aria-checked="${f===form}" class="${f===form?'active':''}" onclick="setImageForm('${f}')">${f}</button>`).join('')}</div></div>`:''}
+    <div class="config-copy"><div class="copy-lines">${(definition?.fields||[]).map(([k,label])=>fi(k,label)).join('')}</div><div class="default-cta"><label for="f-cta">默认按钮文字</label><input id="f-cta" maxlength="12" value="${esc(pr.cta||'')}" oninput="setF('cta',this.value)"><label class="inline-check"><input id="cta-enabled" type="checkbox" ${pr.cta_enabled!==false?'checked':''} onchange="setF('cta_enabled',this.checked)">默认加按钮</label>${issue?.field==='f-cta'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div></div>
+    </fieldset></section>
+    <fieldset class="channel-dependent" ${unavailable?'disabled':''}>
+    <section class="card placements-card"><div class="section-heading"><h3>版位</h3>${pr.channel?`<span class="placement-count">${esc(pr.channel)} · ${form}（已选 ${pr.pids.length}/${placements.length}）</span>`:''}</div><div id="chans" tabindex="-1" class="platform-groups">${Object.entries(grp).sort(([,a],[,b])=>(a.length>2)-(b.length>2)).map(([platform,list])=>`<section class="platform-group ${list.length>2?'span-two':''}"><h4>${esc(platform)}</h4><div class="platform-items ${list.length>2?'two-columns':''}">${list.map(p=>`<div class="placement-row ${pr.pids.includes(p.id)?'checked':''}" data-pid="${p.id}"><label class="placement-check"><input type="checkbox" aria-label="${esc(pname(p))} ${psz(p)}" ${pr.pids.includes(p.id)?'checked':''} onchange="togP('${p.id}')"><span>${esc(p.name.replace(/\s*\d+×\d+/,''))}</span></label><span class="placement-size">${psz(p)}${p.logo_policy==='required'?`<span class="logo-lock ${pr.noLogo?'force-highlight':''}">🔒 Logo</span>`:''}</span>${placementCta(pr,p)}</div>`).join('')}</div></section>`).join('')}</div>${issue?.field==='chans'?`<div class="errtx">${esc(issue.message)}</div>`:''}${issue?.field.startsWith('cta-')?`<div class="errtx">${esc(issue.message)}</div>`:''}</section>
+    ${viewVisualOptions(pr)}</fieldset>${pr.channel&&!forms.length?'<div class="channel-empty" role="status">该渠道暂无版位</div>':''}
+    </fieldset><fieldset class="card sum config-summary channel-dependent" id="sum" ${blocked||unavailable?'disabled':''}><label for="f-sets">每版位套数</label><div class="sets-stepper"><button aria-label="减少套数" onclick="stepSets(-1)">−</button><input id="f-sets" type="number" min="${SETS_MIN}" max="${SETS_MAX}" value="${pr.variants_by_placement&&new Set(Object.values(pr.variants_by_placement)).size>1?'':esc(pr.sets)}" placeholder="分别设置" class="${setsBad(pr)?'bad':''}" oninput="setSets(this.value)"><button aria-label="增加套数" onclick="stepSets(1)">＋</button></div>${issue?.field==='f-sets'?`<span class="errtx">${esc(issue.message)}</span>`:''}
+    <label for="image-model">图片模型</label><select id="image-model" onchange="setF('image_model',this.value)">${imageModelOptions(pr.image_model||(typeof CFG!=='undefined'&&CFG.imageModel)||IMAGE_MODEL_OPTIONS[0][0])}</select>
+    <div class="total-action"><div class="tot" id="tot" aria-live="polite">共 ${pr.channel?totalOf(pr):0} 张</div><p id="sum-formula">${summaryFormula(pr)}</p><button class="primary" id="go" ${setsBad(pr)||blocked||unavailable||!pr.pids.length||S.uploadingPurpose?'disabled':''} onclick="startGen()">${S.submitting?'正在提交…':'开始生成'}</button>${S.submitting?'<span class="field-help" role="status">正在提交配置，请稍候</span>':''}</div></fieldset></div>`;
 }
 function need(k){return (IMAGE_FORMS[imageFormOf(S.draft)]?.fields||[]).some(([f])=>f===k)}
 
-function cellHtml(r,s,rowh){const p=plOf(s.pid),w=Math.round(rowh*p.target_width/p.target_height),st=isFail(r,s)?"failed":s.state;
- if(st==="done")return`<div class="cell done" style="width:${w}px" data-slot="${s.id}" data-st="done" role="button" tabindex="0" aria-label="套 ${s.set} · ${esc(pname(p))}${p.image_count>1?" 图 "+s.idx:""},查看大图" onclick="openPv('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPv('${s.id}')}"><img alt="" src="${imgOf(s)}">${["frame_review","frame_failed"].includes(s.reason_code)?`<span class="frame-note">${s.reason_code==='frame_failed'?'待适配':'已适配'}</span>`:""}</div>`;
- if(st==="failed"){const m=failMsg(r,s),retry=imageRetry(r,s),planning=s.reason_code==='planning_failed';return`<div class="cell fail" style="width:${Math.max(w,150)}px" data-slot="${s.id}" data-st="failed"><div class="box"><span class="sr">失败</span><p tabindex="0" title="${esc(m)}" aria-label="失败:${esc(m)}" onclick="openPv('${s.id}')">${esc(m)}</p><button data-redo="${s.id}" ${retry.disabled?'disabled':''} onclick="${planning?'retryPlanning()':retry.blocked?"openPv('"+retry.head?.id+"')":(retry.query?'resumeImage':'redo')+"('"+s.id+"')"}">${planning?'重试规划':retry.label}</button></div></div>`}
- const cls={queued:"wait",waiting_first:"wait",generating:"gen",stopped:"stop"}[st],label=waitLabel(r,s);return`<div class="cell ${cls}" style="width:${w}px" data-slot="${s.id}" data-st="${st}" role="img" aria-label="${esc(label)}"><div class="box">${st==='queued'?'<span class="wait-dots" aria-hidden="true"><i></i><i></i><i></i></span>':''}<span class="vlab">${esc(label)}</span>${st==="generating"?`<span class="muted" data-t0="${s.t0}">0:00</span>`:""}</div></div>`}
+function cellHtml(r,s){
+ const p=plOf(s.pid),frame=s.reason_code==='frame_failed'||s.state==='done'&&s.delivery_eligible===false;
+ const failed=isFail(r,s)||s.state==='stopped',waiting=s.state==='waiting_first'||s.state==='queued'&&s.idx>1&&r.slots.find(slot=>slot.id===s.first_id)?.state!=='done';
+ const label=frame?'需去框':failed?'生成失败':s.state==='done'?'':waiting?'等图 1':r.paused?'已暂停后续':'生成中';
+ let content='',actions='';
+ if(s.state==='done')content=`<img alt="${esc(pname(p))} 第 ${s.set} 套 图 ${s.idx}" src="${imgOf(s)}">${frame?'<span class="frame-note">需去框</span>':''}`;
+ else content=`<span class="vlab">${label}</span>`;
+ if(frame)actions=`<div class="sample-actions"><button ${S.localProcessing?'disabled':''} onclick="reprocessFrame('${s.id}')">重新去框</button><button ${S.localProcessing?'disabled':''} onclick="fitImage('${s.id}')">整图适配</button></div>`;
+ else if(failed){const retry=imageRetry(r,s),planning=s.reason_code==='planning_failed';actions=`<div class="sample-actions"><button data-redo="${s.id}" ${retry.disabled?'disabled':''} onclick="${planning?'retryPlanning()':retry.blocked?"openPv('"+retry.head?.id+"')":retry.query?"resumeImage('"+s.id+"')":"repairSet('"+s.pid+"',"+s.set+")"}">${planning?'重试规划':retry.blocked?'查看图 1':retry.query?'恢复查询':'补齐'}</button></div>`}
+ return`<div class="sample-unit"><div class="cell ${frame?'frame-pending':failed?'fail':s.state==='done'?'done':waiting?'wait':'gen'}" style="aspect-ratio:${p.target_width}/${p.target_height};--image-ratio:${p.target_width/p.target_height}" data-slot="${s.id}" data-st="${s.state}" title="${esc(failed?failMsg(r,s):s.state==='done'?'已完成':waitLabel(r,s))}" ${s.state==='done'?`role="button" tabindex="0" aria-label="套 ${s.set} · ${esc(pname(p))} 图 ${s.idx}，查看大图" onclick="openPv('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPv('${s.id}')}"`:`role="img" aria-label="${label}"`}>${content}</div>${actions}<div class="sample-caption">${p.image_count>1?'图 '+s.idx+' · ':''}${psz(p)}</div></div>`;
+}
 function imageRetry(r,s){
  const head=r.slots.find(x=>x.id===s.first_id),query=!!s.query_required||['unknown','timeout'].includes(s.reason_code),blockedFirst=blocked(r,s)||s.state==='blocked_first_failed';
  const group=s.idx===1?r.slots.filter(x=>x.pid===s.pid&&x.set===s.set):[s];
@@ -205,37 +252,32 @@ function viewCfg(){return`<div class="mask" id="m-settings" onclick="if(event.ta
  <div class="foot"><button onclick="closeCfg()">取消</button><button class="primary" id="cfgsave" onclick="saveCfg()">保存</button></div></div></div>`}
 
 function softRender(){if(!S.pv&&!S.cfgOpen&&!S.maintenanceOpen)return render();const a=document.querySelector("#app>.app");if(!a)return render();const m=$("main"),y=m?m.scrollTop:0,ae=document.activeElement,inApp=a.contains(ae),fref=inApp?trapRef(ae):null;
- const body=S.view==="form"?viewForm():S.view==="pick"?viewPick():viewDl();const d=document.createElement("div");d.innerHTML=`<div class="app">${viewSide()}<main id="main">${viewHead()}<div class="body" id="body">${body}</div>${S.view!=='form'?viewSelectionFooter():''}</main></div>`;const tl=$(".sidebar-scroll")||$(".tasks"),ty=tl?tl.scrollTop:0;a.replaceWith(d.firstElementChild);const tl2=$(".sidebar-scroll")||$(".tasks");if(tl2)tl2.scrollTop=ty;const m2=$("main");if(m2){m2.scrollTop=y;setHH()}if(fref){const e=document.querySelector(fref);if(e)e.focus({preventScroll:true})}updTimers();syncSelectionControls()}
+ const stage=$('.sample-stage'),stageTop=stage?.scrollTop||0,setsLeft=$('#sets')?.scrollLeft||0,directoryTop=$('.dir-list')?.scrollTop||0;
+ const body=S.view==="form"?viewForm():S.view==="pick"?viewPick():viewDl();const d=document.createElement("div");d.innerHTML=`<div class="app ${S.view==='pick'?'pick-mode':''}">${viewSide()}<main id="main">${viewHead()}<div class="body" id="body">${body}</div>${S.view!=='form'?viewSelectionFooter():''}</main></div>`;const tl=$(".sidebar-scroll")||$(".tasks"),ty=tl?tl.scrollTop:0;a.replaceWith(d.firstElementChild);const tl2=$(".sidebar-scroll")||$(".tasks");if(tl2)tl2.scrollTop=ty;const m2=$("main");if(m2){m2.scrollTop=y;setHH()}if(fref){const e=document.querySelector(fref);if(e)e.focus({preventScroll:true})}updTimers();syncSelectionControls();
+ const updatedStage=$('.sample-stage');if(updatedStage){updatedStage.scrollTop=stageTop;$('#sets').scrollLeft=setsLeft;$('.dir-list').scrollTop=directoryTop}
+}
 function setHH(){const m2=$("main"),h=$("#head"),tb=document.querySelector(".toolbar");if(!m2||!h)return;m2.style.setProperty("--hh",h.offsetHeight+"px");m2.style.setProperty("--sp",(h.offsetHeight+(tb&&S.view==="pick"?tb.offsetHeight+8:0)+8)+"px")}
 function render(){const ae=document.activeElement,fk=ae&&ae.id,fref=ae&&ae!==document.body?trapRef(ae):null,ss=ae&&(ae.selectionStart||(ae.value&&ae.matches&&ae.matches('input[type=search],#styleq')?ae.value.length:ae.selectionStart)),m=$("main"),y=m?m.scrollTop:0;
+ const stage=$('.sample-stage'),stageTop=stage?.scrollTop||0,setsLeft=$('#sets')?.scrollLeft||0,directoryTop=$('.dir-list')?.scrollTop||0;
  const body=S.view==="form"?viewForm():S.view==="pick"?viewPick():viewDl();
  const tl=$(".sidebar-scroll")||$(".tasks"),ty=tl?tl.scrollTop:0;window._rnd=true;
-$("#app").innerHTML=`<div class="app">${viewSide()}<main id="main">${viewHead()}<div class="body" id="body">${body}</div>${S.view!=='form'?viewSelectionFooter():''}</main></div>${S.pv?viewPv():""}${S.cfgOpen?viewCfg():""}${S.maintenanceOpen?viewMaintenance():""}`;
+$("#app").innerHTML=`<div class="app ${S.view==='pick'?'pick-mode':''}">${viewSide()}<main id="main">${viewHead()}<div class="body" id="body">${body}</div>${S.view!=='form'?viewSelectionFooter():''}</main></div>${S.pv?viewPv():""}${S.cfgOpen?viewCfg():""}${S.maintenanceOpen?viewMaintenance():""}`;
  window._rnd=false;const tl2=$(".sidebar-scroll")||$(".tasks");if(tl2)tl2.scrollTop=ty;
  const m2=$("main");if(m2){m2.scrollTop=y;setHH()}
+ const updatedStage=$('.sample-stage');if(updatedStage){updatedStage.scrollTop=stageTop;$('#sets').scrollLeft=setsLeft;$('.dir-list').scrollTop=directoryTop}
  if(!fk&&fref){const e=document.querySelector(fref);if(e&&!(S.pv||S.cfgOpen))e.focus({preventScroll:true})}if(fk){const e=document.getElementById(fk);if(e&&!e.closest(".mask")||e&&(S.pv||S.cfgOpen)){e.focus({preventScroll:true});try{if(ss!=null&&e.setSelectionRange)e.setSelectionRange(ss,ss)}catch(_){}}}updTimers();syncSelectionControls()}
 
-function styleOpts(){const q=(S.styleQ||"").trim();return["random",...STYLES.map(s=>s.name)].filter(s=>!q||(s==="random"?"随机":s).includes(q))}
-function styleOpen(){if(S.styleOpen||window._skipOpen)return;S.styleOpen=true;S.styleQ="";S.styleHi=0;render();const i=$("#styleq");i.focus();i.select()}
-function styleFilter(v){S.styleQ=v;S.styleHi=0;render()}
-function pickStyle(s){if(S.submitting||S.navigationPending)return;S.draft.style=s;S.styleOpen=false;S.styleQ="";save();window._skipOpen=true;render();window._skipOpen=false}
-function styleKey(e){if(!S.styleOpen&&e.key==="ArrowDown"){e.preventDefault();return styleOpen()}const o=styleOpts();if(e.key==="ArrowDown"){e.preventDefault();S.styleHi=Math.min(o.length-1,(S.styleHi||0)+1);render()}else if(e.key==="ArrowUp"){e.preventDefault();S.styleHi=Math.max(0,(S.styleHi||0)-1);render()}else if(e.key==="Enter"){e.preventDefault();if(o[S.styleHi||0])pickStyle(o[S.styleHi||0])}else if(e.key==="Escape"){e.stopPropagation();S.styleOpen=false;window._skipOpen=true;render();window._skipOpen=false}}
-document.addEventListener("mousedown",e=>{if(S.styleOpen&&!e.target.closest("#combo")){S.styleOpen=false;window._skipOpen=true;render();window._skipOpen=false}});
-/* ===== 动作 ===== */
-
-
-
-
-
-function togP(id){if(S.submitting||S.navigationPending)return;const p=plOf(id),form=IMAGE_FORMS[imageFormOf(S.draft)];if(!p||!form||p.image_count!==form.count)return;const a=S.draft.pids;S.draft.pids=a.includes(id)?a.filter(x=>x!==id):[...a,id];if(S.draft.variants_by_placement){for(const k of Object.keys(S.draft.variants_by_placement))if(!S.draft.pids.includes(k))delete S.draft.variants_by_placement[k]}const required=formRequiresLogo(S.draft)&&S.draft.noLogo;if(required)S.draft.noLogo=false;save();render();if(required)toast('所选版位要求保留 Logo，已启用')}
+/* ===== 配置动作 ===== */
+function togP(id){if(S.submitting||S.navigationPending||!formPlacements(S.draft).some(p=>p.id===id))return;const a=S.draft.pids;S.draft.pids=a.includes(id)?a.filter(x=>x!==id):[...a,id];filterFormPlacements(S.draft);save();render()}
 function setF(k,v,re){if(S.submitting||S.navigationPending)return;S.draft[k]=v;save();if(re)render();else updSum()}
 function setSets(v){if(S.submitting||S.navigationPending)return;delete S.draft.variants_by_placement;S.draft.sets=v;save();updSum()}
-function updSum(){const pr=S.draft;const e=$("#tot");if(e)e.textContent=(typeof CFG!=='undefined'&&!CFG.simulation?'真实生图 · ':'')+"共 "+totalOf(pr)+" 张";const i=$("#f-sets");if(i)i.classList.toggle("bad",setsBad(pr));const sp=$("#sum-p");if(sp)sp.textContent=pr.pids.length+" 个";const sn=$("#sum-n");if(sn)sn.textContent=pr.variants_by_placement&&new Set(Object.values(pr.variants_by_placement)).size>1?'分别设置':pr.sets+" 套";const c=$("#sum-config");if(c)c.innerHTML=optionsSummary(pr);const g=$("#go");if(g)g.disabled=setsBad(pr)}
+function stepSets(delta){setSets(Math.max(SETS_MIN,Math.min(SETS_MAX,(+S.draft.sets||SETS_MIN)+delta)));render()}
+function updSum(){const pr=S.draft;const e=$("#tot");if(e)e.textContent="共 "+(pr.channel?totalOf(pr):0)+" 张";const i=$("#f-sets");if(i){i.classList.toggle("bad",setsBad(pr));if(document.activeElement!==i)i.value=pr.sets}document.querySelectorAll('[data-cta-label]').forEach(label=>{const text=placementCtaText(pr,label.dataset.ctaLabel);label.textContent=text||'无按钮';label.parentElement.classList.toggle('no-button',!text)});const formula=$("#sum-formula");if(formula)formula.innerHTML=summaryFormula(pr);const g=$("#go");if(g)g.disabled=setsBad(pr)||!pr.channel||!pr.pids.length||!!S.submitting||!!S.navigationPending||!!S.uploadingPurpose}
 
 function setTab(c){S.tab=c;S.miss=false;save();render()}
 async function setRound(i){const epoch=beginNavigation();if(epoch===null)return;try{await persistPromptDraft();if(epoch!==viewEpoch)return;const t=await request('/tasks/'+S.cur+'?view=1&round='+i);if(epoch!==viewEpoch)return;installTask(t);T().ri=i;save(false);render()}finally{finishNavigation(epoch)}}
 
-function trapRef(e){if(!e||e===document.body)return null;return e.id?"#"+e.id:e.dataset&&e.dataset.slot?`[data-slot="${e.dataset.slot}"]`:e.closest&&e.closest("[data-slot]")?`[data-slot="${e.closest("[data-slot]").dataset.slot}"]`:null}
+function trapRef(e){if(!e||e===document.body)return null;return e.id?"#"+e.id:e.dataset?.sel?`[data-sel="${e.dataset.sel}"]`:e.dataset?.pickPlacement?`[data-pick-placement="${e.dataset.pickPlacement}"]`:e.dataset&&e.dataset.slot?`[data-slot="${e.dataset.slot}"]`:e.closest&&e.closest("[data-slot]")?`[data-slot="${e.closest("[data-slot]").dataset.slot}"]`:null}
 
 
 function curPvSlot(){return S.pvDetails?.id===S.pv?S.pvDetails:null}
@@ -261,11 +303,17 @@ function setsOf(r){
 }
 function selectedSet(r,g){return !!r.sel[g.id]}
 function attentionSet(r,g){return g.sl.some(s=>isFail(r,s)||s.state==='stopped'||s.reason_code==='frame_failed')}
+function readySet(g){return g.sl.length===plOf(g.pid).image_count&&g.sl.every(s=>s.state==='done'&&s.delivery_eligible!==false&&s.reason_code!=='frame_failed')}
+function pickPlacement(r){
+ const key=S.cur+':'+r.id;
+ if(S.pickRound!==key||!r.params.pids.includes(S.pickPid)){S.pickRound=key;S.pickPid=r.params.pids[0]}
+ return S.pickPid;
+}
 function groupMatchesFilter(r,g,pf){
   return pf==='yes'?selectedSet(r,g):pf==='no'?!selectedSet(r,g):pf==='bad'?attentionSet(r,g):true;
 }
 function selectionScope(r){
-  return setsOf(r).filter(g=>(S.tab==='all'||plOf(g.pid).platform===S.tab)&&groupMatchesFilter(r,g,S.pf)&&g.sl.some(s=>s.state==='done'));
+  return setsOf(r).filter(g=>g.pid===pickPlacement(r)&&groupMatchesFilter(r,g,S.pf)&&(readySet(g)||selectedSet(r,g)));
 }
 function bulkSelectionState(r){
   const scope=selectionScope(r),selected=scope.filter(g=>selectedSet(r,g)).length;
@@ -275,39 +323,33 @@ function syncSelectionControls(){const e=document.querySelector('#select-visible
 function pickCardClick(event,n,pid){
   if(event.target.closest('button,input,label,textarea,a,.cell')||S.selectionBusy)return;
   const r=R(),group=setsOf(r).find(g=>g.pid===pid&&g.n===n);
-  if(group?.sl.some(s=>s.state==='done'))toggleSel(n,false,pid);
+  if(group&&(readySet(group)||selectedSet(r,group)))toggleSel(n,false,pid);
 }
 function viewPick(){
   const r=R();if(!r)return'';
-  const groups=setsOf(r),channels=chans(r),rowh=S.tab==='all'?132:220;
-  const inChannel=g=>S.tab==='all'||plOf(g.pid).platform===S.tab;
-  const channelGroups=groups.filter(inChannel);
-  const filters={all:g=>true,yes:g=>selectedSet(r,g),no:g=>!selectedSet(r,g),bad:g=>attentionSet(r,g)};
-  const labels=[['all','全部'],['yes','已选'],['no','未选'],['bad','需检查']];
-  const tabs=`<div class="tabs" role="tablist" aria-label="渠道"><button class="tab ${S.tab==='all'?'on':''}" onclick="setTab('all')">所有渠道</button>${channels.map(c=>{const gs=groups.filter(g=>plOf(g.pid).platform===c),done=gs.filter(g=>g.sl.every(s=>s.state==='done')).length,bad=gs.some(g=>g.sl.some(s=>isFail(r,s)));return`<button class="tab ${S.tab===c?'on':''}" onclick="setTab(${esc(JSON.stringify(c))})">${esc(c)} ${done}/${gs.length}${bad?'<span class="rd" aria-label="有失败"></span>':''}</button>`}).join('')}</div>`;
-  const filter=`<div class="fseg" role="group" aria-label="筛选">${labels.map(([k,label])=>`<button class="${S.pf===k?'on':''}" aria-pressed="${S.pf===k}" onclick="S.pf='${k}';render()">${label} <span class="num">${channelGroups.filter(filters[k]).length}</span></button>`).join('')}</div>`;
-  const missing=missK(r),missingHtml=missing?`<div class="miss neutral" id="miss"><button id="missbtn" aria-expanded="${!!S.miss}" onclick="S.miss=!S.miss;render()">${missing} 个版位尚未采纳 ▾</button>${S.miss?`<div class="menu">${(r.pending_placements||[]).map(p=>`<div>${esc(p.name)}<span>本次可不纳入图包</span></div>`).join('')}</div>`:''}</div>`:'';
-  const progress=viewWorkStatus(r);
-  const cardWidth=Math.max(320,...groups.map(g=>{const p=plOf(g.pid);return Math.ceil(rowh*p.target_width/p.target_height*p.image_count+6*(p.image_count-1)+34)}));
+  const groups=setsOf(r),pid=pickPlacement(r),p=plOf(pid),visible=groups.filter(g=>g.pid===pid).sort((first,second)=>first.n-second.n);
+  const directory=r.params.pids.map(id=>{
+    const placement=plOf(id),sets=groups.filter(g=>g.pid===id),slots=sets.flatMap(g=>g.sl),done=slots.filter(s=>s.state==='done').length;
+    const selected=sets.filter(g=>selectedSet(r,g)).length,problems=sets.filter(g=>attentionSet(r,g)||g.sl.some(s=>s.delivery_eligible===false)).length;
+    const running=slots.some(s=>['queued','generating','waiting_first'].includes(s.state));
+    const progress=running?`<span class="dir-gen-progress">${done}/${slots.length}<span class="mini-progress-track" role="progressbar" aria-label="${esc(pname(placement))}生成进度" aria-valuemin="0" aria-valuemax="${slots.length}" aria-valuenow="${done}"><i style="width:${done/Math.max(1,slots.length)*100}%"></i></span></span>`:'';
+    return`<button class="dir-item ${id===pid?'active':''}" data-pick-placement="${id}" aria-current="${id===pid?'true':'false'}" onclick="setPickPlacement('${id}')"><span class="dir-item-name">${esc(pname(placement))}</span><span class="dir-item-size">${psz(placement)}</span><span class="dir-status-cols"><span>${problems?`<span class="dir-problem-text">${problems} 问题</span>`:progress}</span><span>${selected?`<span class="badge-selected">✓ ${selected}</span>`:!running&&!problems?`<span class="badge-unselected-ready">0/${sets.length} 待选</span>`:''}</span></span></button>`;
+  }).join('');
   const bulk=bulkSelectionState(r);
-  const selectionBar=`<div class="selection-bar"><label class="select-all"><input id="select-visible" type="checkbox" aria-label="全选当前列表" aria-checked="${bulk.mixed?'mixed':bulk.all?'true':'false'}" ${bulk.all?'checked':''} ${!bulk.scope.length||S.selectionBusy?'disabled':''} onchange="selectVisible(this.checked)"><span>全选当前列表</span></label><button class="ghost" id="clear-visible" ${!bulk.selected||S.selectionBusy?'disabled':''} onclick="clearVisibleSelection()">取消选择</button><span class="selection-count">已选 ${groups.filter(g=>selectedSet(r,g)).length} 套</span></div>`;
-  const visible=channelGroups.filter(filters[S.pf]||filters.all);
+  const selectionBar=`<div class="selection-bar"><label class="select-all"><input id="select-visible" type="checkbox" aria-label="全选当前版位" aria-checked="${bulk.mixed?'mixed':bulk.all?'true':'false'}" ${bulk.all?'checked':''} ${!bulk.scope.length||S.selectionBusy?'disabled':''} onchange="selectVisible(this.checked)"><span>全选当前版位</span></label><button class="ghost" id="clear-visible" ${!bulk.selected||S.selectionBusy?'disabled':''} onclick="clearVisibleSelection()">取消选择</button></div>`;
   const legacy=r.planning_source==='simulation'?`<div class="planning-notice"><span>历史模拟结果，尚未使用新的画面规划</span><button onclick="dupTask()">复制并重新规划</button></div>`:'';
   const planError=r.planning_status==='failed'?`<div class="planning-error" role="alert"><span>${esc(r.planning_error||'画面规划未完成')}</span><button onclick="retryPlanning()">重试规划</button></div>`:'';
-  const sections=r.params.pids.filter(pid=>visible.some(g=>g.pid===pid)).map(pid=>{
-    const p=plOf(pid),gs=visible.filter(g=>g.pid===pid).sort((a,b)=>a.n-b.n),all=groups.filter(g=>g.pid===pid);
-    return`<section class="placement-section"><div class="placement-head"><div><b>${esc(pname(p))}</b><span>${psz(p)} · ${all.filter(g=>g.sl.every(s=>s.state==='done')).length}/${all.length}套已生成</span></div><button ${['queued','running'].includes(r.planning_status)||all.length>=20?'disabled':''} onclick="addVariant('${pid}')">＋ 再出一套</button></div><div class="suite-grid" style="--card-width:${cardWidth}px">${gs.map(g=>{
-      const on=selectedSet(r,g),ip=ipOfSet(r.params,g.n),ready=g.sl.some(s=>s.state==='done'),broken=g.sl.some(s=>['failed','blocked_first_failed','stopped'].includes(s.state)||!s.delivery_eligible&&s.delivery_eligible!==undefined)&&!g.sl.some(s=>s.state==='generating');
-      return`<section class="set ${on?'chosen':''}" data-set="${g.n}" data-placement="${g.pid}" aria-label="${esc(pname(p))} · 套 ${g.n}" onclick="pickCardClick(event,${g.n},'${g.pid}')"><div class="sethead"><div><b>第 ${g.n} 套</b><span class="meta">${ip?esc(ip.label):''}</span></div><label class="set-check" title="${on?'取消选择':'选择这一套'}"><input type="checkbox" data-sel="${g.id}" aria-label="选择 ${esc(pname(p))} 套 ${g.n}" ${on?'checked':''} ${!ready||S.selectionBusy?'disabled':''} onchange="toggleSel(${g.n},false,'${g.pid}')"></label></div><div class="wall" style="--rowh:${rowh}px"><div class="pg"><div class="imgs">${g.sl.map(s=>cellHtml(r,s,rowh)).join('')}</div><div class="cap">${psz(p)} · ${g.sl.length}张${g.sl.some(s=>s.state==='done'&&s.delivery_eligible===false)?`<button class="lnk" onclick="openPv('${g.sl.find(s=>s.delivery_eligible===false).id}')">处理适配</button>`:broken?`<button class="lnk" onclick="repairSet('${pid}',${g.n})">补齐这套</button>`:''}</div></div></div>${g.sl.some(s=>s.reason_code==='frame_failed')?'<div class="set-notice">尚未适配到目标尺寸。查看大图后可重新去框或整图适配。</div>':g.sl.some(s=>s.reason_code==='frame_review')?'<div class="set-notice">尺寸已适配，可查看成品与原图对比。</div>':''}</section>`;
-    }).join('')}</div></section>`;
+  const cards=visible.map(g=>{
+    const on=selectedSet(r,g),ready=readySet(g),problem=attentionSet(r,g)||g.sl.some(s=>s.delivery_eligible===false);
+    return`<section class="set ${on?'chosen':''} ${problem?'has-problem':''}" data-set="${g.n}" data-placement="${g.pid}" aria-label="${esc(pname(p))} · 套 ${g.n}" onclick="pickCardClick(event,${g.n},'${g.pid}')"><div class="sethead"><b>第 ${g.n} 套</b><label class="set-check" title="${on?'取消选择':'选择这一套'}"><input type="checkbox" data-sel="${g.id}" aria-label="选择 ${esc(pname(p))} 套 ${g.n}" ${on?'checked':''} ${!ready&&!on||S.selectionBusy?'disabled':''} onchange="toggleSel(${g.n},false,'${g.pid}')"><span aria-hidden="true">✓</span></label></div><div class="sample-row" style="--images:${p.image_count}">${[...g.sl].sort((first,second)=>first.idx-second.idx).map(s=>cellHtml(r,s)).join('')}</div></section>`;
   }).join('');
-  return`${legacy}${planError}${progress}<div class="toolbar">${tabs}<div class="tright">${filter}${missingHtml}</div></div>${selectionBar}<div id="sets">${sections||'<div class="tnone">没有符合筛选条件的套图</div>'}</div>`;
+  return`<div class="pick-workbench"><nav class="placement-dir" aria-label="本轮版位目录"><label class="dir-top-switch"><input id="auto-next" type="checkbox" ${S.autoNext!==false?'checked':''} onchange="setAutoNext(this.checked)"><span>勾完自动跳到下一版位</span></label><div class="dir-list">${directory}</div></nav><section class="sample-stage"><div class="placement-head"><h2>${esc(pname(p))} <span>${psz(p)}</span></h2><button ${['queued','running'].includes(r.planning_status)||visible.length>=20?'disabled':''} onclick="addVariant('${pid}')">＋ 再出一套</button></div>${legacy}${planError}${selectionBar}<div class="suite-grid" id="sets" style="--columns:${Math.min(p.image_count>1?2:3,visible.length)||1}">${cards||'<div class="tnone">暂无套图</div>'}</div></section></div>`;
 }
 function viewSelectionFooter(){
   const r=R();if(!r)return'';const d=r.delivery||{};
-  const partial=d.incomplete_sets>0&&d.ready_sets>0;
-  const saveButton=partial?`<button id="save-ready" class="primary" ${S.exportBusy?'disabled':''} onclick="dlAll(true)">${S.exportBusy?'正在保存…':'只保存合格的 '+d.ready_sets+' 套'}</button>`:`<button id="save-selected" class="primary" ${!d.can_export||S.exportBusy?'disabled':''} onclick="dlAll()">${S.exportBusy?'正在保存…':d.matching_version?'再次保存 '+d.matching_version:d.next_version?'保存 '+d.next_version:d.selected_sets?'暂无可保存套图':'请选择图片'}</button>`;
-  return`<div class="selection-footer"><div><b>已选 ${d.selected_sets||0} 套</b><span>合格 ${d.ready_sets||0} 套 · 覆盖 ${d.covered_placements||0}/${d.total_placements||r.params.pids.length} 个版位</span>${partial?`<small>另 ${d.incomplete_sets} 套待处理，不纳入本次图包</small>`:''}${d.last_version?`<small>已保存 ${d.last_version}${d.has_changes?' · 勾选有变化，需重新保存':''}</small>`:''}</div><div class="row">${d.incomplete_sets?`<button onclick="locateIncomplete()">处理 ${d.incomplete_sets} 套</button>`:''}${d.last_version?'<button onclick="openFolder()">打开文件夹</button>':''}${saveButton}</div></div>`;
+  const partial=d.incomplete_sets>0;
+  const saveButton=`<button id="${partial?'save-ready':'save-selected'}" class="primary" ${!d.ready_sets||!(d.can_export_ready||d.can_export)||S.exportBusy?'disabled':''} onclick="dlAll(${partial})">${S.exportBusy?'正在保存…':'保存已合格的 '+(d.ready_sets||0)+' 套'}</button>`;
+  return`<footer class="selection-footer"><div><span class="save-facts">已选 <b>${d.selected_sets||0}</b> 套 · ${d.covered_placements||0}/${d.total_placements||r.params.pids.length} 个版位</span>${partial?`<button class="lnk" onclick="locateIncomplete()" title="另 ${d.incomplete_sets} 套待处理，不纳入本次图包">${d.incomplete_sets} 套待处理</button>`:''}${d.last_version?`<button class="lnk" onclick="openFolder()">已保存 ${esc(d.last_version)}${d.has_changes?' · 勾选有变化，需重新保存':''} · 打开文件夹</button>`:''}</div>${saveButton}</footer>`;
 }
 
 function viewDl(){
@@ -316,4 +358,4 @@ function viewDl(){
 }
 
 function roundLabel(r,i,count){const name=(IMAGE_MODEL_OPTIONS.find(x=>x[0]===(r.image_model||IMAGE_MODEL_OPTIONS[0][0]))||IMAGE_MODEL_OPTIONS[0])[1];return '第 '+(i+1)+' 次修改'+(i===count-1?' · 当前':'')+' · '+name+' · '+(r.params.image_form||'')+(r.created_at?' · '+new Date(r.created_at*1000).toLocaleString('zh-CN'):'')}
-function summaryRow(t){const menu=S.menu===t.id;return `<li class="trow ${menu?'mopen':''}">${S.ren===t.id?`<input id="renin" aria-label="任务名" value="${esc(S.renV??t.name)}" oninput="S.renV=this.value" onkeydown="if(event.key==='Enter')renOk();if(event.key==='Escape')renEnd()" onblur="renOk()">`:`<button class="task ${S.cur===t.id?'on':''}" data-task="${t.id}" onclick="openTask('${t.id}')">${t.thumbnail_url?`<img src="${t.thumbnail_url}" alt="">`:'<span class="noimg"></span>'}<div><div class="t1">${esc(t.name)}</div><div class="t2">${esc(t.status)} · ${t.done}/${t.total}</div><div class="t3">${esc(t.image_form||'')}${t.archived?' · 已归档':''}</div></div></button>`}<button class="more" aria-label="更多操作" onclick="openMenu('${t.id}')">⋯</button>${menu?`<div class="tmenu"><button onclick="renStart('${t.id}')">重命名</button><button onclick="dupFrom('${t.id}')">复制为新任务</button><button ${t.active?'disabled':''} onclick="archiveTask('${t.id}',${!t.archived})">${t.archived?'取消归档':'归档'}</button><button ${t.active?'disabled':''} onclick="delTask('${t.id}')">删除任务及候选</button></div>`:''}</li>`}
+function summaryRow(t){const menu=S.menu===t.id,meta=[t.status,t.image_form,t.done+'/'+t.total,t.archived?'已归档':''].filter(Boolean).join(' · ');return `<li class="trow ${menu?'mopen':''}">${S.ren===t.id?`<input id="renin" aria-label="任务名" value="${esc(S.renV??t.name)}" oninput="S.renV=this.value" onkeydown="if(event.key==='Enter')renOk();if(event.key==='Escape')renEnd()" onblur="renOk()">`:`<button class="task ${S.cur===t.id?'on':''}" data-task="${t.id}" onclick="openTask('${t.id}')"><div><div class="t1">${esc(t.name)}</div><div class="t2" title="${esc(meta)}">${esc(meta)}</div></div></button>`}<button class="more" aria-label="更多操作" onclick="openMenu('${t.id}')">⋯</button>${menu?`<div class="tmenu"><button onclick="renStart('${t.id}')">重命名</button><button onclick="dupFrom('${t.id}')">复制为新任务</button><button ${t.active?'disabled':''} onclick="archiveTask('${t.id}',${!t.archived})">${t.archived?'取消归档':'归档'}</button><button ${t.active?'disabled':''} onclick="delTask('${t.id}')">删除任务及候选</button></div>`:''}</li>`}

@@ -7,6 +7,7 @@ let CFG={kie:false,path:'',base:DEF_BASE,up:DEF_UP,simulation:true},CONN={};
 let S={tasks:[],cur:null,view:'form',draft:defParams(),tab:'all',pf:'all',pv:null,miss:false,cfgOpen:false,tried:false,drafts:[],draftId:null,draftSequence:0,draftRevision:0};
 let lastRefreshAt=0;
 let storage={used_bytes:0},busy=false,loading=false,pollTimer,searchTimer,viewEpoch=0,refreshFailures=0;
+let pickAdvanceTimer;
 
 async function request(path,method='GET',body){
   const response=await fetch('/api'+path,{method,headers:method==='GET'?{}:{'Content-Type':'application/json','X-Onion-Request':'1'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -77,10 +78,10 @@ async function refresh(){if(loading)return;loading=true;lastRefreshAt=Date.now()
   if(epoch!==viewEpoch)return;if(!r.unchanged){installTask(r);syncPreviewState();detailChanged=true}
  }
  if(!detailChanged&&!wasDisconnected&&previous===JSON.stringify([S.summaries,S.queue])){updTimers();return}
- if(!S.ren&&!S.styleOpen){if(S.view==='form'){const list=$('.tasks');if(list&&!S.menu)list.innerHTML=taskList()||'<li class="empty-list">还没有任务</li>';const q=$('#queue-overview');if(q)q.textContent=queueText()}else softRender()}
+ if(!S.ren){if(S.view==='form'){const list=$('.tasks');if(list&&!S.menu)list.innerHTML=taskList()||'<li class="empty-list">还没有任务</li>';const q=$('#queue-overview');if(q)q.textContent=queueText()}else softRender()}
 }catch(e){refreshFailures++;if(refreshFailures>=2){S.connectionLost=true;softRender()}if(!S.summaries?.length)report(e)}finally{loading=false;if(query!==(S.q||''))refresh()}}
 function searchTasks(q){S.q=q;S.searchPending=true;S.draftSearching=true;S.draftLimit=20;updateDraftList();clearTimeout(searchTimer);searchTimer=setTimeout(()=>{refresh();refreshDraftList().catch(report)},180)}
-function beginNavigation(){if(S.submitting){toast('正在提交配置，请稍候');return null}const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
+function beginNavigation(){if(S.submitting){toast('正在提交配置，请稍候');return null}clearTimeout(pickAdvanceTimer);S.pickMore=false;const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
 function finishNavigation(epoch){if(epoch===viewEpoch){S.navigationPending=false;render()}}
 async function newTask(){return newDraft()}
 async function openTask(id){
@@ -96,7 +97,7 @@ async function go(v){
   await persistDraft();S.view=v;S.draftId=null;S.miss=false;save(false);render();$('#main').scrollTop=0;
 }
 function editRedo(){return editTaskDraft()}
-async function startGen(){if(busy||S.navigationPending)return;
+async function startGen(){if(busy||S.navigationPending||S.uploadingPurpose)return;
   if(!CFG.planningKey){toast('请先配置画面规划 API');return openCfg()}
   if(!CFG.simulation&&!CFG.kie)return openCfg();
   S.tried=true;const issue=formIssue(S.draft);if(issue){render();const field=document.getElementById(issue.field);if(field){field.scrollIntoView({block:'center'});field.focus()}return}
@@ -114,21 +115,41 @@ async function startGen(){if(busy||S.navigationPending)return;
 }
 async function action(name,data={}){const t=await request('/tasks/'+S.cur+'/'+name,'POST',{round:T().ri,...data});installTask(t);softRender();return t}
 async function changeSelection(name,data){
-  if(S.selectionBusy){softRender();return}
+  if(S.selectionBusy){softRender();return false}
   S.selectionBusy=true;softRender();
-  try{await action(name,data)}catch(e){report(e)}finally{S.selectionBusy=false;softRender()}
+  try{await action(name,data);return true}catch(e){report(e);return false}finally{S.selectionBusy=false;softRender()}
 }
 async function toggleSel(n,inPv,pid){
   pid=pid||curPvSlot()?.pid||R().params.pids[0];
-  const adopted=!R().sel[selectionKey(pid,n)];
-  await changeSelection('adopt',{set:n,placement_id:pid,adopted});
+  const adopted=!R().sel[selectionKey(pid,n)],roundId=R().id,task=S.cur;
+  clearTimeout(pickAdvanceTimer);
+  const changed=await changeSelection('adopt',{set:n,placement_id:pid,adopted});
+  if(changed&&adopted&&!inPv&&!S.pv&&S.cur===task&&R()?.id===roundId)schedulePickAdvance(pid);
   if(S.pv){const b=$('#pvsel');if(b)b.textContent=adopted?'已选':'选中这一套'}
 }
+function setPickPlacement(pid){clearTimeout(pickAdvanceTimer);S.pickPid=pid;S.pf='all';render();$('.sample-stage')?.scrollTo({top:0});$('#sets')?.scrollTo({left:0});document.querySelector(`[data-pick-placement="${pid}"]`)?.scrollIntoView({block:'nearest'})}
+function setAutoNext(enabled){S.autoNext=enabled;localStorage.setItem('onion.pick.autoNext',String(enabled));if(!enabled)clearTimeout(pickAdvanceTimer)}
+function schedulePickAdvance(pid){
+  clearTimeout(pickAdvanceTimer);
+  const round=R(),roundId=round.id,task=S.cur,epoch=viewEpoch;
+  if(S.autoNext===false||S.view!=='pick'||S.navigationPending||pickPlacement(round)!==pid)return;
+  const groups=setsOf(round);
+  if(!groups.some(group=>group.pid===pid&&selectedSet(round,group)&&readySet(group)))return;
+  pickAdvanceTimer=setTimeout(()=>{
+    if(S.autoNext===false||S.view!=='pick'||S.navigationPending||S.cur!==task||R()?.id!==roundId||viewEpoch!==epoch||S.pv||pickPlacement(R())!==pid)return;
+    const current=R(),sets=setsOf(current),order=current.params.pids,index=order.indexOf(pid);
+    if(!sets.some(group=>group.pid===pid&&selectedSet(current,group)&&readySet(group)))return;
+    const next=[...order.slice(index+1),...order.slice(0,index)].find(id=>!sets.some(group=>group.pid===id&&selectedSet(current,group)&&readySet(group))&&sets.some(group=>group.pid===id&&readySet(group)&&!selectedSet(current,group)));
+    if(next)setPickPlacement(next);
+  },400);
+}
 async function selectVisible(adopted){
+  const roundId=R().id,task=S.cur,pid=pickPlacement(R());clearTimeout(pickAdvanceTimer);
   const sets=selectionScope(R()).map(g=>({placement_id:g.pid,set:g.n}));
-  if(sets.length)await changeSelection('adopt-bulk',{sets,adopted});
+  if(sets.length&&await changeSelection('adopt-bulk',{sets,adopted})&&adopted&&S.cur===task&&R()?.id===roundId)schedulePickAdvance(pid);
 }
 async function clearVisibleSelection(){
+  clearTimeout(pickAdvanceTimer);
   const r=R(),sets=selectionScope(r).filter(g=>selectedSet(r,g)).map(g=>({placement_id:g.pid,set:g.n}));
   if(sets.length)await changeSelection('adopt-bulk',{sets,adopted:false});
 }
@@ -171,29 +192,51 @@ async function dlAll(readyOnly=false){
 }
 function redl(v){const p=T().pkgs.find(p=>p.v===v);if(p)downloadLink('/api/tasks/'+S.cur+'/packages/'+p.id)}
 async function openFolder(){await request('/tasks/'+S.cur+'/open-folder','POST',{})}
-async function uploadReference(){
-  if(S.submitting)return toast('正在提交配置，请稍候');
-  if((S.draft.references||[]).length>=3)return toast('参考图最多 3 张');
+async function uploadReference(purpose){
+  if(S.submitting||S.navigationPending||S.uploadingPurpose)return;
+  if(S.draft.references.some(r=>r.purpose===purpose))return toast('每种用途最多上传 1 张参考图');
   const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';
-  input.onchange=async()=>{const f=input.files[0];if(!f)return;if(f.size>10*1024*1024)return toast('参考图不能超过 10MB');
-    S.uploadFile=f;S.uploadName=f.name;showUploadDialog();};input.click();
+  input.onchange=async()=>{const f=input.files[0];if(f)await addReference(f,purpose)};input.click();
 }
-function showUploadDialog(){const m=document.createElement('div');m.className='mask';m.id='upload-dialog';m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-label="参考图用途"><h2>参考图用途</h2><label for="upload-purpose">用途</label><select id="upload-purpose"><option value="style">画风参考</option><option value="composition">构图参考</option><option value="ui">真实 UI 截图</option></select><label for="upload-note">需要保留的内容</label><textarea id="upload-note" maxlength="200" rows="3" style="margin-top:12px"></textarea><div class="foot"><button id="upload-cancel">取消</button><button class="primary" id="upload-save">添加参考图</button></div></div>`;
- document.body.append(m);$('#upload-note').focus();$('#upload-cancel').onclick=()=>{m.remove();S.uploadFile=null};$('#upload-save').onclick=async()=>{const note=$('#upload-note').value,purpose=$('#upload-purpose').value;const f=S.uploadFile;if(!f)return;$('#upload-save').disabled=true;try{const bytes=new Uint8Array(await f.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));const r=await request('/uploads','POST',{name:f.name,note,purpose,data:btoa(binary)});S.draft.references=S.draft.references||[];if(!S.draft.references.some(x=>x.id===r.id))S.draft.references.push(r);m.remove();S.uploadFile=null;save();render()}catch(e){report(e);$('#upload-save').disabled=false}};
- m.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();m.remove()}if(e.key==='Tab'){const fs=[...m.querySelectorAll('select,textarea,button')];const i=fs.indexOf(document.activeElement);if(e.shiftKey&&i===0){e.preventDefault();fs.at(-1).focus()}else if(!e.shiftKey&&i===fs.length-1){e.preventDefault();fs[0].focus()}}});
+async function referencePreview(file){
+  const bitmap=await createImageBitmap(file),canvas=document.createElement('canvas'),scale=Math.min(1,120/bitmap.width,90/bitmap.height);
+  canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+  return canvas.toDataURL('image/jpeg',0.55);
 }
-function removeReference(i){if(S.submitting)return;S.draft.references.splice(i,1);save();render()}
-function setReferencePurpose(i,value){if(S.submitting||!REFERENCE_PURPOSES[value])return;S.draft.references[i].purpose=value;save();render()}
-function setReferenceNote(i,value){if(S.submitting)return;S.draft.references[i].note=value;save();updSum()}
+async function addReference(file,purpose){
+  if(S.submitting||S.navigationPending||S.uploadingPurpose)return;
+  if(S.draft.references.some(r=>r.purpose===purpose))return toast('每种用途最多上传 1 张参考图');
+  if(file.size>10*1024*1024)return toast('参考图不能超过 10MB');
+  const draft=S.draftId;
+  S.uploadingPurpose=purpose;render();
+  try{
+    const preview=await referencePreview(file),bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+    for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+    const r=await request('/uploads','POST',{name:file.name,note:'',purpose,data:btoa(binary)});
+    if(draft!==S.draftId)return;
+    if(S.draft.references.some(x=>x.id===r.id))return toast('这张图片已在其他上传位使用');
+    S.draft.references.push({...r,preview});S.referenceMode=true;S.visualOpen=true;save();
+  }catch(e){report(e)}finally{S.uploadingPurpose=null;render()}
+}
+function setReferenceMode(reference){
+  if(S.submitting||S.navigationPending||S.uploadingPurpose)return;
+  S.referenceMode=reference;
+  if(!reference)S.draft.references=[];
+  save();render();
+}
+function removeReference(i){if(S.submitting||S.navigationPending)return;S.draft.references.splice(i,1);S.referenceMode=!!S.draft.references.length;save();render()}
+function setReferenceNote(i,value){if(S.submitting||S.navigationPending)return;S.draft.references[i].note=value;save();updSum()}
 document.addEventListener('click',e=>{if(S.menu&&!e.target.closest('.tmenu,.more')){S.menu=null;render()}});
 window.addEventListener('resize',()=>setHH());
 async function useLatestProduct(){if(S.submitting)return;const draft=S.draftId;const p=await request('/product');if(draft!==S.draftId||S.submitting||S.navigationPending)return;S.product=p;S.draft.product_facts=p.text;S.draft.facts_version=p.revision;save();render()}
 async function retryPlanning(){await action('retry-planning');render()}
 async function repairSet(pid,n){await action('repair-set',{placement_id:pid,set:n});render()}
 async function addVariant(pid){await action('add-variant',{placement_id:pid});render()}
-function locateIncomplete(){const key=R()?.delivery?.incomplete_keys?.[0];S.tab='all';S.pf='all';render();if(key){const e=[...document.querySelectorAll('[data-sel]')].find(e=>e.dataset.sel===key);e?.closest('.set')?.scrollIntoView({block:'center'})}}
+function locateIncomplete(){const key=R()?.delivery?.incomplete_keys?.[0];if(key){setPickPlacement(key.split('::')[0]);document.querySelector(`[data-sel="${key}"]`)?.closest('.set')?.scrollIntoView({block:'center',inline:'center'})}}
 async function boot(){
  try{
+  S.autoNext=localStorage.getItem('onion.pick.autoNext')!=='false';
   const [b,s,d]=await Promise.all([request('/bootstrap'),request('/settings'),request('/drafts?summary=1')]);
   PLACEMENTS=b.placements;ASSETS=b.assets;IPS=ASSETS.ips;LOGO=ASSETS.logos.find(a=>/standard/.test(a.id))||ASSETS.logos[0];FONTS=ASSETS.fonts;STYLES=ASSETS.styles;FORM_DEFAULTS=b.form_defaults||{};S.planner=b.planner;S.product=b.product;S.drafts=d.drafts;applySettings(s);
   const hash=new URLSearchParams(location.hash.slice(1));S.cur=hash.get('task');S.view=['form','pick','dl'].includes(hash.get('view'))?hash.get('view'):'form';
