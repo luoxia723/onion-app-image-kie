@@ -123,7 +123,8 @@ def test_settings_redaction_and_validation(engine,tmp_path):
     for invalid in (0,21):
         with pytest.raises(UserError):engine.create({**params(),'sets':invalid},'invalid-'+str(invalid))
     p=next(p for p in PLACEMENTS if p['platform']=='喜马拉雅' and p['logo_policy']=='required')
-    with pytest.raises(UserError):engine.create({**params(),'pids':[p['id']],'noLogo':True},'invalid-logo')
+    task=engine.create({**params(),'pids':[p['id']],'noLogo':True},'required-logo')
+    assert engine.task(task['id'])['rounds'][0]['configs'][0]['config']['logo']=='洋葱学园'
 
 def test_restart_does_not_resubmit_unknown(engine):
     e=engine;p=params();t=e.create(p,'recovery-batch');e.mutate(t['id'],'stop',{})
@@ -183,7 +184,7 @@ def test_duplicate_keeps_uploaded_reference_usable(engine):
     upload.parent.mkdir(exist_ok=True)
     Image.new('RGB',(32,32),'white').save(upload)
     p=params(False,1)
-    p['references']=[{'id':'test-reference','path':str(upload),'note':'参考留白与画面配色','name':upload.name}]
+    p['references']=[{'id':'test-reference','path':str(upload),'note':'参考留白与画面配色','name':upload.name,'purpose':'style'}]
     tid=e.create(p,'with-reference')['id']
     wait_done(e,tid)
     copied=e.mutate(tid,'duplicate',{})['params']

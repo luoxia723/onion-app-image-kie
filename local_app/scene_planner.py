@@ -63,8 +63,8 @@ def plan_input(r):
             'placement':cfg['placements'][0], 'approved_copy':cfg['copy_refs'][0],
             'style':meta['style'],'ip':meta.get('ip_name') or '普通原创初中生',
             'feature_note':r['params'].get('feature_note',''),
-            'reference_notes':[x['note'] for x in r['params'].get('references',[])],
-            'references':[{'name':x.get('name','参考图'),'purpose':x.get('purpose','legacy'),'note':x['note']} for x in r['params'].get('references',[])],
+            'reference_notes':[x.get('note','') for x in r['params'].get('references',[])],
+            'references':[{'name':x.get('name','参考图'),'purpose':x.get('purpose','legacy'),'note':x.get('note','')} for x in r['params'].get('references',[])],
             'screen_ui_mode':cfg.get('screen_ui_mode','conceptual'),
             'font_reference_enabled':cfg.get('font_reference_enabled',True),
             'existing_other_schemes':[{'name':x['concept']['name'],'scene':x['concept']['art_direction']['scene']} for x in r['configs'] if x['pid']==entry['pid'] and x['set']!=entry['set'] and x.get('concept')],
@@ -92,6 +92,7 @@ def planning_instructions(rules, scoped=False):
               '指定IP时只设计该角色的动作和少量时代配饰，不能编造其性别、年龄、五官或核心服装，外观沿用本轮原版参考。'
               'screen_text只可使用确认资料中明确给出的界面原文；没有则返回空数组。'
               'references的purpose表示用户确认用途：style仅参考画风，composition仅参考构图，ui提供真实产品界面。'
+              '分配的style.id为reference时，本轮所有套按参考风格图及用户说明统一画风，沿用其配色、笔触、材质和光影，不另选画风，也不使用下拉指定的画风；style_id统一沿用reference。'
               'legacy表示历史画风与构图综合参考。screen_ui_mode为reference时，设计能呈现真实截图的屏幕位置与朝向，界面细节由上传原图提供，不凭空描述未提供的界面内容，也不把界面文字改作广告标题。'
               '无字体参考时，标题字形可根据当前画风设计；有字体参考时沿用其字形体系。'
               '所有画面描述、人物动作、接触支撑和镜头机位使用中文，写入prompt或slot_actions；不输出最终生图Prompt。'

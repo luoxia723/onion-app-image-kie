@@ -39,7 +39,7 @@ def bootstrap():
     return dict(placements=PLACEMENTS, assets=assets)
 
 
-def validate(pr, output):
+def validate(pr, output, *, existing_references=()):
     if not isinstance(pr, dict): raise UserError('请填写任务参数')
     if not isinstance(pr.get('product_facts',''),str) or len(pr.get('product_facts',''))>20000: raise UserError('产品资料限 20000 字，请填写已确认的信息')
     ids = pr.get('pids', [])
@@ -53,6 +53,8 @@ def validate(pr, output):
     if not isinstance(counts,dict) or any(pid not in ids or type(n) is not int or not 1<=n<=20 for pid,n in counts.items()):
         raise UserError('各版位套数请填写 1–20 的整数')
     ps = [BY_ID[i] for i in ids]
+    if 'channel' in pr and any(p['category']!=pr['channel'] for p in ps):
+        raise UserError('所选版位不属于当前渠道，请重新选择')
     forms={p['image_form'] for p in ps}
     if len(forms)!=1:
         raise UserError('同一份文案只能选择同一种图片形式的渠道版位')
@@ -67,10 +69,16 @@ def validate(pr, output):
     for key,label in fields:
         if not pr.get(key,'').strip(): raise UserError('请填写'+label)
     if len(pr.get('cta', '')) > 12: raise UserError('按钮文字最多 12 字')
+    if type(pr.get('cta_enabled',True)) is not bool: raise UserError('请选择是否添加统一按钮')
+    overrides=pr.get('cta_overrides',{})
+    if not isinstance(overrides,dict) or any(pid not in ids for pid in overrides): raise UserError('按钮设置只能用于所选版位')
+    for override in overrides.values():
+        if not isinstance(override,dict) or override.get('mode') not in ('inherit','custom','none'): raise UserError('请选择有效的按钮模式')
+        if override['mode']=='custom':
+            if not isinstance(override.get('text'),str) or not override['text'].strip(): raise UserError('请填写版位按钮文字')
+            if len(override['text'])>12: raise UserError('按钮文字最多 12 字')
     if len(pr.get('feature_note', '')) > 200: raise UserError('补充要求最多 200 字')
     if any(len(pr.get(k, '')) > 1000 for k,_ in fields): raise UserError('单条文案最多 1000 字')
-    if pr.get('noLogo') and any(p.get('logo_policy') == 'required' or (p['platform']=='喜马拉雅' and p['target_width']==720 and p['target_height'] in (1280,1559)) for p in ps):
-        raise UserError('所选喜马拉雅版位必须带 Logo，请取消「不用 Logo」')
     if pr.get('ip', 'random') not in ['random','none','full_random'] + [a['asset_id'] for a in ASSETS if a['kind']=='ip']:
         raise UserError('指定 IP 无效，请重新选择')
     if pr.get('style', 'random') not in ['random'] + [s['name'] for s in STYLES]: raise UserError('指定画风无效，请重新选择')
@@ -80,14 +88,16 @@ def validate(pr, output):
     if not isinstance(refs, list) or len(refs) > 3: raise UserError('参考图最多 3 张')
     for ref in refs:
         if isinstance(ref,dict) and (not isinstance(ref.get('purpose','legacy'),str) or ref.get('purpose','legacy') not in REFERENCE_PURPOSES):raise UserError('请选择参考图用途：画风、构图或真实 UI 截图')
-        if not isinstance(ref,dict) or not isinstance(ref.get('note'),str) or not 1<=len(ref['note'].strip())<=200:
-            raise UserError('请填写参考图的风格或构图用途，限 1–200 字')
-        if re.fullmatch(r'(参考图|图片|截图)[A-Za-z0-9一二三 ]*',ref['note'].strip()):
-            raise UserError('请说明参考图的具体风格或构图用途')
+        if not isinstance(ref,dict) or not isinstance(ref.get('note',''),str) or len(ref.get('note',''))>200:
+            raise UserError('参考图说明最多 200 字')
+        if ref.get('purpose','legacy')=='legacy' and not any(old.get('id')==ref.get('id') and old.get('purpose','legacy')=='legacy' for old in existing_references):
+            raise UserError('请选择参考图用途：画风、构图或真实 UI 截图')
+    purposes=[ref.get('purpose','legacy') for ref in refs if ref.get('purpose','legacy')!='legacy']
+    if len(purposes)!=len(set(purposes)): raise UserError('每种用途最多上传 1 张参考图')
     if len({ref.get('id') for ref in refs})!=len(refs): raise UserError('参考图重复，请移除重复图片')
     if pr.get('font')=='none' and pr.get('ip') in ('none','full_random') and pr.get('noLogo') and not refs:
         model=normalize_model(pr.get('image_model',MODEL))
-        if any(not geometry_report(p['target_width'],p['target_height'],model=model)['needs_safe_area'] for p in ps):
+        if any(p.get('logo_policy')!='required' and not geometry_report(p['target_width'],p['target_height'],model=model)['needs_safe_area'] for p in ps):
             raise UserError('当前模型需要参考图，请至少保留 Logo、IP、字体参考中的一项，或上传参考图')
     direction = safe_direction(pr['direction']) if pr.get('direction') else safe_filename((pr.get('s1') if form!='单图' else pr.get('t1'))[:16])
     if len(str(output / '工作区/产物/2026-10-29/APP图片' / ('APP_'+direction+'_APP图片_235959') / 'v001' / '喜马拉雅' / ('APP_'+direction+'_APP图片_方案020_图03_v001.jpg'))) > 259:
@@ -114,11 +124,13 @@ def safe_filename(value):
 
 def copy_signature(pr):
     import hashlib
-    keys=['image_form','t1','t2','s1','s2','s3','cta','feature_note','ip','style','font','noLogo','facts_version','product_facts','image_model']
+    keys=['channel','image_form','t1','t2','s1','s2','s3','cta','feature_note','ip','style','font','noLogo','facts_version','product_facts','image_model']
     value={k:pr.get(k) or '' for k in keys}
     value['image_model']=pr.get('image_model',MODEL)
     value['ip']=pr.get('ip') or 'random';value['style']=pr.get('style') or 'random';value['noLogo']=bool(pr.get('noLogo'))
     value['font']=pr.get('font') or 'random'
+    value['cta_enabled']=pr.get('cta_enabled',True)
+    value['cta_overrides']=pr.get('cta_overrides',{})
     value['references']=[{'id':x.get('id'),'note':x.get('note'),'purpose':x.get('purpose','legacy')} for x in pr.get('references',[])]
     return hashlib.sha256(json.dumps(value,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
@@ -138,33 +150,45 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
     pairs=pairs or requested_pairs(pr)
     metadata=copy.deepcopy(assignments or {})
     count=max(n for _,n in pairs)
-    style_cfg={'request_id':rid,'sets':count,'copy_refs':[{}],'prompt_format':positive_prompt.FORMAT,
-               'ip_random':pr.get('ip','random')=='random','ip_asset_id':pr.get('ip') if pr.get('ip') not in ('random','none','full_random') else ''}
-    if pr.get('style','random')!='random':
-        style_cfg['visual_direction']={'style_id':next(s['id'] for s in STYLES if s['name']==pr['style'])}
-    styles=visual_directions.assign_styles(style_cfg)['directions']
+    reference=next((x for x in pr.get('references',[]) if x.get('purpose')=='style'),None)
+    reference_style=None
+    if reference is not None:
+        note=reference.get('note','').strip()
+        reference_style={'id':'reference','name':'参考风格图','prompt':'沿用参考风格图的配色、笔触、材质和光影'+('；'+note if note else '')}
+    else:
+        style_cfg={'request_id':rid,'sets':count,'copy_refs':[{}],'prompt_format':positive_prompt.FORMAT,
+                   'ip_random':pr.get('ip','random')=='random','ip_asset_id':pr.get('ip') if pr.get('ip') not in ('random','none','full_random') else ''}
+        if pr.get('style','random')!='random':
+            style_cfg['visual_direction']={'style_id':next(s['id'] for s in STYLES if s['name']==pr['style'])}
+        styles=visual_directions.assign_styles(style_cfg)['directions']
     ips=[a for a in ASSETS if a['kind']=='ip' and '.standard.' in a['asset_id']]
     fonts=[a for a in ASSETS if a['kind']=='font' and a.get('enabled',True)]
     for n in range(1,count+1):
         if str(n) in metadata: continue
         rng=random.Random(rid+':'+str(n))
         ip=rng.choice(ips) if pr.get('ip','random')=='random' else next((a for a in ASSETS if a['asset_id']==pr.get('ip')),None)
-        style=next(s for s in STYLES if s['id']==styles[n-1]['style_id'])
+        style=reference_style or next(s for s in STYLES if s['id']==styles[n-1]['style_id'])
         font=None if pr.get('font')=='none' else (rng.choice(fonts) if pr.get('font','random')=='random' else next(a for a in ASSETS if a['kind']=='font' and a['asset_id']==pr['font']))
         metadata[str(n)]={'ip_id':ip['asset_id'] if ip else '', 'ip_name':(ip.get('asset_name_zh') or ip['display_name']) if ip else '',
             'style_id':style['id'],'style':{'id':style['id'],'name':style['name'],'description':style.get('visual_prompt',style['prompt'])},
             'font_path':str((ROOT/font['path']).resolve()) if font else '',
-            'style_source':'random' if pr.get('style','random')=='random' else 'specified'}
+            'style_source':'reference' if reference_style else 'random' if pr.get('style','random')=='random' else 'specified'}
     slots=[];configs=[]
     for pid,n in pairs:
         p=copy.deepcopy((placements_override or BY_ID)[pid]);meta=metadata[str(n)]
+        cta=pr.get('cta','') if pr.get('cta_enabled',True) else ''
+        override=pr.get('cta_overrides',{}).get(pid,{'mode':'inherit'})
+        if override['mode']!='inherit':cta=override['text'] if override['mode']=='custom' else ''
+        logo='不用' if pr.get('noLogo') and p.get('logo_policy')!='required' else '洋葱学园'
         cfg=dict(request_id=task_id+'-'+pid+'-'+str(n),placements=[p],sets=1,
             image_model=image_model,prompt_format=positive_prompt.FORMAT,prompt_layout="poster_sections_v1",visual_contract_version=positive_prompt.VISUAL_CONTRACT_VERSION,
             copy_refs=[dict(copyDraftId='approved',mainTitle=pr.get('t1',''),subtitle=pr.get('t2',''),**{'short'+str(i):pr.get('s'+str(i),'') for i in range(1,4)})],
-            cta=pr.get('cta',''),cta_render_mode='button',logo='不用' if pr.get('noLogo') else '洋葱学园',
+            cta=cta,cta_render_mode='button',logo=logo,
             ip_asset_id=meta['ip_id'],font_reference_enabled=bool(meta['font_path']),screen_ui_mode='reference' if any(x.get('purpose')=='ui' for x in pr.get('references',[])) else 'conceptual',
             visual_style_mode='coordinated',visual_direction={'style_id':meta['style_id']},
             art_direction_required=True,learner_story_required=True,visual_concepts=[])
+        if meta['style_source']=='reference':
+            cfg['visual_direction']['style_prompt']=meta['style']['description']
         if p['image_count'] > 1:
             cfg['prompt_context_version']='per_image_v1'
         ci=len(configs);configs.append({'pid':pid,'set':n,'config':cfg})
@@ -174,10 +198,10 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
             sid=head if idx==1 else uuid.uuid4().hex
             if idx==1:
                 refs=[]
-                if not pr.get('noLogo'): refs.append(logo_reference.build_logo_reference(cfg))
+                if cfg['logo']!='不用': refs.append(logo_reference.build_logo_reference(cfg))
                 if meta['ip_id']: refs.append({'asset_id':meta['ip_id'],'path':next(a['path'] for a in ASSETS if a['asset_id']==meta['ip_id']),'role':'角色 IP'})
                 if meta['font_path']:refs.append({'path':meta['font_path'],'role':'标题字体参考'})
-                refs.extend({'path':x['path'],'purpose':x.get('purpose','legacy'),'role':REFERENCE_PURPOSES[x.get('purpose','legacy')]+'：'+x['note']} for x in pr.get('references',[]))
+                refs.extend({'path':x['path'],'purpose':x.get('purpose','legacy'),'role':REFERENCE_PURPOSES[x.get('purpose','legacy')]+('：'+x['note'] if x.get('note','').strip() else '')} for x in pr.get('references',[]))
                 for j,ref in enumerate(refs,1): ref['label']='参考图'+str(j)
                 if geometry_report(p['target_width'],p['target_height'],model=image_model)['needs_safe_area']:
                     frame=blue_frame.prepare_layout(p['target_width'],p['target_height'],cache/(sid+'-frame'),label='参考图'+str(len(refs)+1),model=image_model)
@@ -222,7 +246,7 @@ def compile_plans(r,result,*,apply=True):
         prompts=[]
         extra=r['params'].get('feature_note','')
         first=next(s for s in group if s['idx']==1)
-        notes=[ref['label']+'用于'+REFERENCE_PURPOSES.get(x.get('purpose','legacy'),'画风参考')+'，'+x['note'] for ref,x in zip([a for a in first['refs'] if a.get('purpose') in REFERENCE_PURPOSES or a.get('role','').startswith('风格/构图')],r['params'].get('references',[]))]
+        notes=[ref['label']+'用于'+REFERENCE_PURPOSES.get(x.get('purpose','legacy'),'画风参考')+('，'+x['note'] if x.get('note','').strip() else '') for ref,x in zip([a for a in first['refs'] if a.get('purpose') in REFERENCE_PURPOSES or a.get('role','').startswith('风格/构图')],r['params'].get('references',[]))]
         scoped=cfg.get('prompt_context_version')=='per_image_v1'
         direction['base_prompt_rule']=positive_prompt.paragraph(direction['base_prompt_rule'],'' if scoped else extra,*notes)
         direction['branch_prompt_rule']=positive_prompt.paragraph(direction['branch_prompt_rule'],'' if scoped else extra)

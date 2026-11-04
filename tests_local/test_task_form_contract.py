@@ -57,7 +57,7 @@ def test_user_material_choices_reach_planner_and_actual_first_image_refs(tmp_pat
     pr=params('单图')
     pr.update(ip=ip['asset_id'] if ip_choice=='specified' else ip_choice,
               style=STYLES[0]['name'],noLogo=no_logo,feature_note='标题与人物不要互相遮挡',
-              references=[dict(id='user-ref',path=str(tmp_path/'reference.png'),note='参考空间构图',name='reference.png')])
+              references=[dict(id='user-ref',path=str(tmp_path/'reference.png'),note='参考空间构图',name='reference.png',purpose='composition')])
     validate(pr,tmp_path)
     r=make_round(pr,'material-choices',tmp_path,2,True,defer_planning=True)
     data=plan_input(r)['jobs'][0];meta=r['set_metadata']['1']
@@ -94,3 +94,104 @@ def test_all_available_ip_variants_can_be_selected_without_losing_identity(tmp_p
         assert len(refs)==1 and refs[0]['asset_id']==ip['asset_id']
         assert refs[0]['path']==ip['path']
         assert r['configs'][0]['config']['ip_asset_id']==ip['asset_id']
+
+
+@pytest.mark.parametrize('channel',sorted({p['category'] for p in PLACEMENTS}))
+def test_channel_accepts_only_its_placements(channel,tmp_path):
+    pr=params('单图');pr.update(channel=channel,pids=[p['id'] for p in PLACEMENTS if p['category']==channel and p['image_form']=='单图'])
+    validate(pr,tmp_path)
+    pr['pids'].append(next(p['id'] for p in PLACEMENTS if p['category']!=channel and p['image_form']=='单图'))
+    with pytest.raises(UserError,match='^所选版位不属于当前渠道，请重新选择$'):validate(pr,tmp_path)
+
+
+def test_channel_uses_catalog_categories_and_remains_optional(tmp_path,monkeypatch):
+    from local_app.planning import BY_ID
+    pr=params('单图');pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图']
+    validate(pr,tmp_path)
+    pr['channel']='未配置渠道'
+    with pytest.raises(UserError,match='所选版位不属于当前渠道'):validate(pr,tmp_path)
+    placement=BY_ID[pr['pids'][0]];monkeypatch.setitem(placement,'category','学习机')
+    pr.update(channel='学习机',pids=[placement['id']])
+    validate(pr,tmp_path)
+
+
+@pytest.mark.parametrize('enabled',[None,0,1,'false'])
+def test_cta_enabled_must_be_boolean(enabled,tmp_path):
+    with pytest.raises(UserError,match='统一按钮'):validate({**params('单图'),'cta_enabled':enabled},tmp_path)
+
+
+@pytest.mark.parametrize('override',[
+    None,[],{'unselected':{'mode':'none'}},
+    {'selected':None},{'selected':{}},{'selected':{'mode':'invalid'}},
+    {'selected':{'mode':'custom'}},{'selected':{'mode':'custom','text':''}},
+    {'selected':{'mode':'custom','text':'  '}},{'selected':{'mode':'custom','text':123}},
+    {'selected':{'mode':'custom','text':'字'*13}},
+])
+def test_invalid_cta_overrides_are_rejected(override,tmp_path):
+    pr=params('单图')
+    if isinstance(override,dict):override={pr['pids'][0] if key=='selected' else key:value for key,value in override.items()}
+    pr['cta_overrides']=override
+    with pytest.raises(UserError,match='按钮'):validate(pr,tmp_path)
+
+
+@pytest.mark.parametrize('form',['单图','双图','三图'])
+@pytest.mark.parametrize('enabled,unified',[(True,'统一按钮'),(False,'统一按钮'),(True,'')])
+@pytest.mark.parametrize('mode',['inherit','custom','none','default'])
+def test_effective_cta_is_resolved_per_placement_and_uses_existing_prompt_path(tmp_path,form,enabled,unified,mode):
+    from local_app.planning import make_round,compile_plans
+    from tests_local.fakes import FixturePlanner
+    pr=params(form);pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']==form][:2]
+    first,second=pr['pids']
+    overrides={second:{'mode':'custom','text':'字'*12}}
+    if mode!='default':overrides[first]={'mode':mode,'text':'单独按钮'}
+    pr.update(cta=unified,cta_enabled=enabled,cta_overrides=overrides)
+    validate(pr,tmp_path)
+    r=make_round(pr,'per-placement-cta',tmp_path,1,True,defer_planning=True)
+    compile_plans(r,FixturePlanner().plan(r,lambda result:None))
+    expected={first:'单独按钮' if mode=='custom' else (unified if enabled and mode!='none' else ''),second:'字'*12}
+    assert {entry['pid']:entry['config']['cta'] for entry in r['configs']}==expected
+    for slot in r['slots']:
+        text=expected[slot['pid']]
+        assert ('CTA按钮' in slot['prompt'])==bool(text)
+        if text:assert '按钮文字逐字为“'+text+'”' in slot['prompt']
+
+
+def test_legacy_cta_defaults_and_new_fields_are_fingerprinted(tmp_path):
+    from local_app.planning import copy_signature,make_round
+    pr=params('单图');signature=copy_signature(pr)
+    assert copy_signature({**pr,'cta_enabled':True,'cta_overrides':{}})==signature
+    assert copy_signature({**pr,'cta_enabled':False})!=signature
+    assert copy_signature({**pr,'cta_overrides':{pr['pids'][0]:{'mode':'custom','text':'试试学习'}}})!=signature
+    r=make_round(pr,'legacy-cta',tmp_path,1,True,defer_planning=True)
+    assert r['configs'][0]['config']['cta']==pr['cta']
+
+
+@pytest.mark.parametrize('note',[None,'','参考图A','字'*200])
+def test_reference_notes_are_optional_and_reach_compilation(note,tmp_path):
+    from local_app.planning import make_round,compile_plans
+    from local_app.scene_planner import plan_input
+    from tests_local.fakes import FixturePlanner
+    pr=params('单图');ref=dict(id='ref',purpose='style',path=str(tmp_path/'ref.png'))
+    if note is not None:ref['note']=note
+    pr['references']=[ref]
+    validate(pr,tmp_path)
+    r=make_round(pr,'optional-note',tmp_path,1,True,defer_planning=True)
+    assert plan_input(r)['jobs'][0]['reference_notes']==[note or '']
+    compile_plans(r,FixturePlanner().plan(r,lambda result:None))
+
+
+@pytest.mark.parametrize('purpose',['style','composition','ui'])
+def test_reference_purposes_have_one_slot_each(purpose,tmp_path):
+    pr=params('单图');pr['references']=[{'id':name,'purpose':name,'note':''} for name in ('style','composition','ui')]
+    validate(pr,tmp_path)
+    pr['references']=[{'id':'first','purpose':purpose},{'id':'second','purpose':purpose}]
+    with pytest.raises(UserError,match='每种用途最多上传 1 张'):validate(pr,tmp_path)
+
+
+@pytest.mark.parametrize('reference',[
+    {'purpose':'style','note':'字'*201},{'purpose':'style','note':None},
+    {'purpose':'legacy'},{},{'purpose':'unknown'},
+])
+def test_new_references_reject_invalid_notes_and_legacy_purposes(reference,tmp_path):
+    pr=params('单图');pr['references']=[{'id':'ref',**reference}]
+    with pytest.raises(UserError,match='参考图'):validate(pr,tmp_path)

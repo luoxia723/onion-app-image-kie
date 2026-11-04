@@ -144,9 +144,9 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/api/uploads' and method=='POST':
             note=str(body.get('note','')).strip()
             from .planning import REFERENCE_PURPOSES
-            purpose=body.get('purpose','legacy')
-            if not isinstance(purpose,str) or purpose not in REFERENCE_PURPOSES:raise UserError('请选择参考图用途')
-            if not 1<=len(note)<=200 or re.fullmatch(r'(参考图|图片|截图)[A-Za-z0-9一二三 ]*',note): raise UserError('请用 1–200 字说明参考图中需要保留的内容')
+            purpose=body.get('purpose')
+            if not isinstance(purpose,str) or purpose not in REFERENCE_PURPOSES or purpose=='legacy':raise UserError('请选择参考图用途')
+            if len(note)>200: raise UserError('参考图说明最多 200 字')
             try:
                 data=base64.b64decode(body.get('data',''),validate=True)
                 if not 0<len(data)<=10*1024*1024: raise ValueError()

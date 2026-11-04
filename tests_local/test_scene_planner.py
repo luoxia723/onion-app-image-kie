@@ -76,6 +76,23 @@ def test_api_freezes_original_skill_and_reuses_validated_cache(api,tmp_path,monk
     assert len(calls)==2 # A different model must not reuse old model's cache.
 
 
+def test_api_instructs_reference_style_and_preserves_style_id(api,tmp_path,monkeypatch):
+    r=round_for_test(tmp_path)
+    pr=copy.deepcopy(r['params'])
+    pr['references']=[dict(id='style-ref',path=str(tmp_path/'style.png'),purpose='style',note='沿用粉彩质感')]
+    r=make_round(pr,'reference-style-planner',tmp_path/'reference',1,True,defer_planning=True)
+    result=FixturePlanner().plan(r,lambda x:None);result.pop('_provenance')
+    def request(payload,config,stopped):
+        system=payload['messages'][0]['content']
+        assert '分配的style.id为reference时' in system and '本轮所有套按参考风格图及用户说明统一画风' in system
+        assert '不另选画风，也不使用下拉指定的画风' in system
+        job=json.loads(payload['messages'][1]['content'].split('\n',1)[1])['jobs'][0]
+        assert job['style']['id']=='reference' and '沿用粉彩质感' in job['style']['description']
+        return completion(json.dumps(result,ensure_ascii=False))
+    monkeypatch.setattr(api,'_request',request)
+    api.plan(r,lambda x:compile_plans(r,x,apply=False))
+
+
 def test_api_repairs_schema_and_contract_failures_only(api,tmp_path,monkeypatch):
     r=round_for_test(tmp_path)
     good=FixturePlanner().plan(r,lambda x:None);good.pop('_provenance')

@@ -191,6 +191,8 @@ def plan_content_concepts(config, seed=None):
         if not isinstance(concept, dict) or any(not isinstance(concept.get(k), str) or not concept[k].strip() for k in ("name", "prompt")):
             raise ValueError("each visual concept needs a name and a complete scene prompt")
         style = assigned[index] if random_batch else None
+        if style is None and fixed.get("style_id") == "reference" and fixed.get("style_prompt"):
+            style = {"style_id": "reference", "style_name": "参考风格图", "style_prompt": fixed["style_prompt"], "style_source_ids": []}
         if style is None and concept.get("style_id"):
             single_style_config = config if fixed.get("style_id") or fixed.get("style_prompt") else {
                 **config, "visual_direction": {**fixed, "style_id": concept["style_id"]}}

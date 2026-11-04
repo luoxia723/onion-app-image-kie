@@ -172,7 +172,8 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                 pr=json.loads(json.dumps(pr))
                 pr=self.freeze_product(pr,self.document('draft:'+draft_id).get('draft') if draft_id else None)
                 pr.setdefault('image_model',self.settings.image_model)
-            direction=validate(pr,self.settings.output)
+            existing_references=[ref for rr in self.task(tid)['rounds'] for ref in rr['params'].get('references',[])] if tid else []
+            direction=validate(pr,self.settings.output,existing_references=existing_references)
             pr=normalize_form(pr)
             if self.settings.real and not self.settings.key: raise UserError('请先在设置中填写 KIE Key')
             if tid:
@@ -248,7 +249,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
 
     def remember_form(self,pr):
         saved=self.document('form_defaults')
-        saved[pr['image_form']]={k:pr[k] for k in ('pids','sets','ip','style','font','noLogo','cta') if k in pr}
+        saved[pr['image_form']]={k:pr[k] for k in ('channel','pids','sets','ip','style','font','noLogo','cta','cta_enabled','cta_overrides') if k in pr}
         self.put_document('form_defaults',saved)
 
     def extend(self,t,r,pr,idem,*,draft_id=None,pairs=None):

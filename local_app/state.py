@@ -103,7 +103,7 @@ class StateMixin:
         draft=data.get('draft');forms=data.get('form_drafts',{})
         if not isinstance(draft,dict) or not isinstance(forms,dict) or len(json.dumps(data,ensure_ascii=False))>100000:
             raise UserError('草稿内容不正确或过长')
-        allowed={'image_form','pids','t1','t2','s1','s2','s3','cta','sets','ip','style','font','noLogo','references','feature_note','direction',
+        allowed={'channel','image_form','pids','t1','t2','s1','s2','s3','cta','cta_enabled','cta_overrides','sets','ip','style','font','noLogo','references','feature_note','direction',
                  'product_facts','facts_version','variants_by_placement','image_model'}
         def clean(value): return {k:v for k,v in value.items() if k in allowed}
         with self.lock:
