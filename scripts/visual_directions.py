@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import random
+from font_library import font_references
 from art_direction import IP_RULE, NO_IP_RULE, art_direction_layers, concise_ip_note, screen_rule, learner_story
 from positive_prompt import enabled as positive_format, paragraph, validate_paragraph
 
@@ -33,7 +34,7 @@ def config_fingerprint(config):
               "logo_reference_path", "cta", "ip", "ip_asset_id",
               "ip_random", "font_reference_enabled", "visual_direction")
     payload = {key: config.get(key) for key in fields}
-    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format", "cta_render_mode", "visual_contract_version"):
+    for key in ("visual_candidates", "visual_diversity_mode", "visual_concepts", "visual_style_mode", "art_direction_required", "learner_story_required", "screen_ui_mode", "prompt_format", "cta_render_mode", "visual_contract_version", "prompt_context_version", "prompt_layout", "image_model"):
         if config.get(key) is not None:
             payload[key] = config[key]
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -137,7 +138,7 @@ def assign_styles(config, seed=None):
                             "style_id": style["id"], "style_name": style["name"],
                             "style_prompt": (style.get("visual_prompt", style["prompt"]) if positive_format(config) else
                                              style["prompt"] if has_ip else style.get("no_ip_prompt", style["prompt"])),
-                            "ip_adaptation": style.get("ip_adaptation", "") if has_ip and not positive_format(config) else "",
+                            "ip_adaptation": style.get("ip_adaptation", "") if has_ip and (not positive_format(config) or config.get("prompt_context_version") == "per_image_v1") else "",
                             "style_source_ids": style.get("source_ids", [])} for i, style in enumerate(selected)]}
 
 
@@ -162,7 +163,7 @@ def plan_content_concepts(config, seed=None):
     random_ip = bool(config.get("ip_random") or fixed_ip == "__random_ip__" or config.get("ip") == "随机")
     if fixed_ip and not random_ip and fixed_ip not in ips:
         raise ValueError("unknown selected IP asset")
-    fonts = sorted((SKILL_DIR / "assets/font-references").glob("*.png"))
+    fonts = font_references()
     rng = random.Random(str(seed if seed is not None else config.get("request_id", "")))
     fixed_rules = []
     fixed_style_prompt = ""
@@ -212,10 +213,10 @@ def plan_content_concepts(config, seed=None):
         ip = ips.get(selected_ip)
         font = ""
         if config.get("font_reference_enabled", True):
-            if not fonts:
+            if not fonts and not concept.get("font_reference_path"):
                 raise ValueError("font reference library is empty")
             font = concept.get("font_reference_path") or str(rng.choice(fonts))
-            if Path(font).resolve() not in {p.resolve() for p in fonts}:
+            if Path(font).resolve() not in {p.resolve() for p in font_references(include_disabled=True)}:
                 raise ValueError("concept font must use an original font reference")
             font = str(Path(font).resolve())
         copy_index, set_index = index // sets + 1, index % sets + 1
@@ -225,10 +226,14 @@ def plan_content_concepts(config, seed=None):
             style_name = style["style_name"] if style and style["style_id"] != "user_fixed_style" else fixed_style_name
             style_description = style["style_prompt"] if style else fixed_style_prompt
             style_text = f"以{style_name}画风呈现，{style_description}" if style_name else style_description
+            scoped = config.get('prompt_context_version') == 'per_image_v1'
+            if scoped and (not isinstance(concept.get('common_visual'), str) or not concept['common_visual'].strip()):
+                raise ValueError('scoped visual concept requires common_visual')
+            adaptation = concise_ip_note(style.get('ip_adaptation', '')) if scoped and ip and style else ''
             base_rule = paragraph(style_text, f"画面中的学习者为{story['protagonist']}。" if story else "",
-                                  story["pain_point"] if story else "",
-                                  concept["prompt"], slot_rules["1"], *fixed_rules,
-                                  IP_RULE if ip else "", ui_rule)
+                                  '' if scoped else story["pain_point"] if story else "",
+                                  concept['common_visual'] if scoped else concept['prompt'], slot_rules["1"], *fixed_rules,
+                                  IP_RULE if ip else "", adaptation, '' if scoped else ui_rule)
             inherited = ["画风", "场景", "人物外形与服饰" if story else "主体设定"]
             if font:
                 inherited.append("字体")
@@ -325,7 +330,7 @@ def plan_directions(config, seed=None):
             raise ValueError("unknown selected IP asset")
     elif not random_ip:
         ips = []
-    fonts = sorted((SKILL_DIR / "assets/font-references").glob("*.png"))
+    fonts = font_references()
     placement = config["placements"][0]
     width, height = int(placement["target_width"]), int(placement["target_height"])
     small = min(width, height) <= 400
@@ -401,9 +406,13 @@ def validate_visual_plan(manifest, config):
         raise ValueError("visual plan must cover exactly the manifest sets")
     for job in manifest["jobs"]:
         if positive_format(config):
-            validate_paragraph(job["prompt"])
+            if config.get("prompt_layout") == "poster_sections_v1":
+                from poster_prompt import validate_text
+                validate_text(job["prompt"])
+            else:
+                validate_paragraph(job["prompt"])
         direction = directions[job["set_id"]]
-        if config.get("visual_contract_version"):
+        if config.get("visual_contract_version") and config.get('prompt_context_version') != 'per_image_v1':
             product_action = (direction.get("learner_story") or {}).get("product_action", "").rstrip("。")
             if product_action and product_action not in job["prompt"]:
                 raise ValueError("confirmed product action must reach the final prompt")

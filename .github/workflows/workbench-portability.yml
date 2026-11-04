@@ -1,0 +1,29 @@
+name: Workbench portability
+on:
+  workflow_dispatch:
+  push:
+    paths: ['bootstrap.py', 'run.py', 'requirements.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tests_local/**', 'tests/**', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+  pull_request:
+    paths: ['bootstrap.py', 'run.py', 'requirements.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tests_local/**', 'tests/**', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+permissions:
+  contents: read
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        python: ['3.10', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python bootstrap.py --install-only
+      - name: Install test runner in isolated environment
+        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pip','install','pytest'])"
+      - name: Offline portability and image processing checks
+        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pytest','tests_local/test_portable_startup.py','tests/test_blue_frame.py','tests_local/test_kie_transport.py','-q'])"

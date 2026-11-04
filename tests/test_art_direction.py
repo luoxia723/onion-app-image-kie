@@ -1,5 +1,4 @@
 """Art direction remains hierarchical while subject and screen choices open up."""
-import copy
 import json
 from pathlib import Path
 import sys
@@ -7,10 +6,7 @@ import sys
 import pytest
 
 sys.path.insert(0,str(Path(__file__).parents[1]/'scripts'))
-import interactive_server
 import visual_directions as visual
-from series_chain import text_rule
-from validate_task import validate
 
 
 def art_config():
@@ -58,30 +54,6 @@ def test_new_tasks_require_every_art_direction_layer(missing):
     with pytest.raises(ValueError,match='art_direction'):visual.plan_directions(cfg)
 
 
-def test_new_saved_configs_allow_conceptual_ui_by_default_and_keep_real_ui_explicit():
-    body={'delivery_name':'艺术定调','placement_ids':['oppo-rich-horizontal-big-1280x720']}
-    slots=interactive_server.slots_by_id()
-    conceptual=interactive_server.normalize_config_result(body,slots)
-    assert conceptual['art_direction_required']
-    assert conceptual['screen_ui_mode']=='conceptual' and not conceptual['ui_reference_required']
-    assert conceptual['ui_reference_next_action']==''
-    real=interactive_server.normalize_config_result({**body,'ui_reference_required':True},slots)
-    assert real['screen_ui_mode']=='reference' and real['ui_reference_required']
-    explicit=interactive_server.normalize_config_result({**body,'ui_reference_required':True,'screen_ui_mode':'conceptual'},slots)
-    assert not explicit['ui_reference_required']
-
-
-def test_ui_screenshot_validation_is_only_for_real_reference_mode():
-    task={'schema_version':'onion_app_image_task_v1','task_id':'test','copy_source':'copy.md','approved_copy_ids':['one'],
-          'config_status':'saved','placements':[{}],'asset_references':[],'ui_required':True,'ui_references':[],
-          'candidate_count':1,'paid_generation_approved':False,'publishing_allowed':False,'screen_ui_mode':'conceptual'}
-    assert validate(task)==[]
-    task['screen_ui_mode']='reference'
-    assert 'ui_reference_required' in validate(task)
-    task['ui_references']=['real-screenshot.png']
-    assert validate(task)==[]
-
-
 def test_no_ip_style_assignments_do_not_inherit_identity_constraints():
     cfg=art_config();cfg.update(sets=39,visual_direction={})
     cfg['copy_refs'].append({**cfg['copy_refs'][0],'copyDraftId':'math-2'})
@@ -101,18 +73,6 @@ def test_ip_can_take_small_period_details_without_changing_identity():
     assert d['art_direction']['world']=='中世纪幻想藏书室'
     style=visual.assign_styles(cfg)['directions'][0]
     assert '扣件' in style['ip_adaptation']
-
-
-def test_screen_text_is_bound_to_the_visual_plan_and_literal_whitelist(tmp_path):
-    cfg=art_config();plan=visual.plan_directions(cfg);d=plan['directions'][0]
-    path=tmp_path/'visual-plan.json';path.write_text(json.dumps(plan))
-    job={'set_id':d['set_id'],'slot':1,'visual_direction_id':d['direction_id'],
-         'prompt':d['base_prompt_rule'],'references':[],'ui_text':d['screen_text']}
-    manifest={'visual_plan_path':str(path),'jobs':[job]}
-    visual.validate_visual_plan(manifest,cfg)
-    assert json.loads(text_rule('主文案','洋葱学园','',job['ui_text']).split('：',1)[1])==['主文案','洋葱学园','今日任务','学习进度']
-    broken=copy.deepcopy(manifest);broken['jobs'][0]['ui_text']=['未经确认的成绩']
-    with pytest.raises(ValueError,match='ui_text'):visual.validate_visual_plan(broken,cfg)
 
 
 def test_screen_none_does_not_accept_screen_labels():

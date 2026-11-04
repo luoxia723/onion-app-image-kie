@@ -14,3 +14,8 @@ __pycache__/
 *.render-input.json
 *.lock/
 .DS_Store
+
+.onion-local/
+.cache/
+
+.venv-backup-*/

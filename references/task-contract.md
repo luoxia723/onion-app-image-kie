@@ -1,27 +1,7 @@
-# APP 图片生成任务合同
+# 工作台任务合同
 
-```json
-{
-  "schema_version": "onion_app_image_task_v1",
-  "task_id": "与request_id相同",
-  "copy_source": "APP_拍题精学_APP图片投放文案_v001.md",
-  "approved_copy_ids": ["文案 1"],
-  "config_status": "saved",
-  "placements": [{"channel": "信息流", "placement": "...", "form": "单图"}],
-  "asset_references": [],
-  "screen_ui_mode": "conceptual",
-  "ui_required": false,
-  "ui_references": [],
-  "candidate_count": 3,
-  "paid_generation_approved": false,
-  "publishing_allowed": false
-}
-```
+任务管理、队列和持久化由local_app负责。批次包含制作轮次；轮次冻结文案、模型、素材及规划，每张图片记录实际提示词、参考顺序、首图依赖、供应商任务号、原图及成品路径和历史版本。
 
-`placements`为兼容现有下游继续保留数组结构，但一个任务版本必须且只能包含1项。配置页和保存端都不得接受多版位。
+多窗口共享本机服务。重复提交使用同一操作标识恢复原结果；多任务共享全局并发额度。暂停不创建新版本，恢复查询不更换请求。归档、清理和删除分别处理。
 
-配置卡、Prompt生成和`validate-only`阶段允许`paid_generation_approved=false`。正式执行前本字段必须为真，同时调用命令必须显式带`--approved-in-current-task`；历史任务合同不能替代当前授权。本合同永远不允许投放发布。
-
-屏幕模式为conceptual时可设计清晰示意UI，无需真实截图；reference表示要求还原真实界面，必须有ui_references；none不展示屏幕。旧任务未保存模式时，保留其原有ui_required含义。
-
-新任务的image-config-result.json同时保存execution_policy（默认3路并发、240秒等待、最多一次超时重开）、estimated_candidate_count、estimated_credits与max_estimated_credits。实际授权应涵盖候选数量和含重开的预算上限；旧合同不因本地默认策略变化获得新提交额度。
+已存在的任务ID、回执、目录、图片版本和交付包继续有效。sqlite与本地候选文件构成历史恢复依据，不需要旧配置卡、候选选择页或命令行批量入口。详见[整体方案](workbench-optimization-plan.md)和[工作台行为](workbench-behavior.md)。

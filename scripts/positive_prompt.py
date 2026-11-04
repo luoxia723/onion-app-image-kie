@@ -36,6 +36,7 @@ def branch_title_rule(text):
 
 
 def is_font_reference(ref):
+    if ref.get('purpose') in ('style','composition','ui','legacy'):return False
     return "字体" in str(ref.get("role") or "") or "font-references" in str(ref.get("path") or "")
 
 
@@ -99,6 +100,9 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
     """
     if not enabled(config):
         raise ValueError("compose requires the new prompt_format")
+    if config.get("prompt_layout") == "poster_sections_v1":
+        from poster_prompt import compose as compose_poster
+        return compose_poster(config,direction,slot,references,frame_label)
     from logo_reference import logo_position, logo_prompt_rule
     from blue_frame import prompt_rule
     from cta_rules import prompt_rule as cta_rule
@@ -115,7 +119,7 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
     if slot > 1:
         parts.append(direction["slot_prompt_rules"][str(slot)])
     product_action = (direction.get("learner_story") or {}).get("product_action", "").rstrip("。")
-    if product_action and product_action not in "".join(parts):
+    if config.get('prompt_context_version') != 'per_image_v1' and product_action and product_action not in "".join(parts):
         parts.append(product_action)
     if texts[0]:
         parts.append(f'主标题文字逐字呈现为“{texts[0]}”，作为画面的第一文字层级，按本张构图完整排布。' if slot == 1 else branch_title_rule(texts[0]))
@@ -133,6 +137,8 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
                 parts.append(f'{label}为本画面角色原型。')
             elif is_font_reference(ref) or ref.get("path") == direction.get("font_reference_path"):
                 parts.append(font_rule(label))
+                if config.get('prompt_context_version') == 'per_image_v1':
+                    parts.append(f'{label}的字形只映射到本张主标题；样张中的旧字句及附带贴纸、吉祥物和装饰不作为画面内容，品牌区仅按Logo参考独立呈现。')
             elif direction.get("screen_ui_mode") == "reference" and ("UI" in role or "截图" in role):
                 parts.append(f'屏幕完整呈现{label}提供的真实界面。')
     elif config.get("font_reference_enabled", True):

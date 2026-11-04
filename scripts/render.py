@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import base64
 import hashlib
 import io
@@ -193,17 +192,21 @@ def build_create_request(
     aspect_ratio: str,
     resolution: str,
     input_urls: list[str] | None = None,
+    model: str = MODEL,
 ) -> urllib.request.Request:
     normalize_resolution(resolution)
-    if aspect_ratio not in ASPECT_RATIOS:
-        raise ValueError("unsupported Sunburst 1K aspect_ratio")
+    from kie_model import normalize_model, aspect_ratios, GPT_IMAGE_2
+    model=normalize_model(model)
+    if aspect_ratio not in aspect_ratios(model):
+        raise ValueError("unsupported model 1K aspect_ratio")
     if not input_urls:
         raise ValueError("Sunburst image-to-image requires at least one reference image; no model fallback is allowed")
     task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": RESOLUTION, "background": "opaque", "input_urls": input_urls}
+    if model==GPT_IMAGE_2: task_input.pop("background")
     return json_request(
         f"{api_base.rstrip('/')}/api/v1/jobs/createTask",
         api_key,
-        {"model": MODEL, "input": task_input},
+        {"model": model, "input": task_input},
     )
 
 
@@ -417,14 +420,16 @@ def poll_task(
     state: dict[str, Any],
     retries: int,
     timeout_seconds: int,
+    *, request_fn=None,
 ) -> tuple[str, dict[str, Any]]:
+    request=request_fn or request_json
     started = state.get("submitted_at", time.time())
     while True:
         remaining = started + timeout_seconds - time.time()
         confirming = remaining <= 0
         # A final bounded status query distinguishes a slow task from a lost connection.
         query_budget = 10 if confirming else min(30, remaining)
-        body = request_json(
+        body = request(
             build_status_request(api_base, api_key, task_id),
             1 if confirming else retries,
             operation=f"poll KIE task {task_id}",
@@ -468,8 +473,12 @@ def poll_task(
         time.sleep(min(poll_delay(elapsed), max(0.0, timeout_seconds - elapsed)))
 
 
-def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths, fingerprint, state_path, state, aspect_ratio, resolution):
+def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths, fingerprint, state_path, state, aspect_ratio, resolution, *, request_fn=None, upload_fn=None):
     """Resume one active task, replacing only a confirmed timeout within its saved cap."""
+    request=request_fn or request_json
+    upload=upload_fn or upload_references
+    from kie_model import normalize_model
+    model=normalize_model(getattr(args,"image_model",MODEL))
     limit = getattr(args, "max_timeout_restarts", 0)
     if type(limit) is not int or limit not in (0, 1):
         raise ValueError("max_timeout_restarts must be 0 or 1")
@@ -480,15 +489,15 @@ def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths,
                 raise KieError("submission or restart is not authorized; retain the task state", 3)
             cache_path = getattr(args, "upload_cache", None)
             cache = json.loads(Path(cache_path).read_text()) if cache_path and Path(cache_path).is_file() else None
-            urls = (upload_references(upload_base, api_key, reference_paths, args.retries, cache=cache)
-                    if cache is not None else upload_references(upload_base, api_key, reference_paths, args.retries))
-            state = {"provider": "kie", "fingerprint": fingerprint, "model": MODEL,
+            urls = (upload(upload_base, api_key, reference_paths, args.retries, cache=cache)
+                    if cache is not None else upload(upload_base, api_key, reference_paths, args.retries))
+            state = {"provider": "kie", "fingerprint": fingerprint, "model": model,
                      "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "submitting",
                      "submitted_at": time.time(), "attempt_history": state.get("attempt_history", []),
                      "timeout_restarts": state.get("timeout_restarts", 0)}
             atomic_write_json(state_path, state)
             try:
-                created = request_json(build_create_request(api_base, api_key, prompt, aspect_ratio, resolution, urls),
+                created = request(build_create_request(api_base, api_key, prompt, aspect_ratio, resolution, urls, **({"model":model} if model!=MODEL else {})),
                                        1, operation="create KIE image task", retry_network=False,
                                        request_timeout=min(30, max(1, args.poll_timeout)))
                 task_id = str((created.get("data") or {}).get("taskId") or "")
@@ -503,7 +512,7 @@ def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths,
         if state.get("result_url"):
             return state["result_url"], state
         try:
-            url, _ = poll_task(api_base, api_key, task_id, state_path, state, args.retries, max(1, args.poll_timeout))
+            url, _ = poll_task(api_base, api_key, task_id, state_path, state, args.retries, max(1, args.poll_timeout), **({"request_fn":request_fn} if request_fn else {}))
             return url, state
         except GenerationTimeout:
             count = state.get("timeout_restarts", 0)
@@ -511,11 +520,14 @@ def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths,
                 raise
             previous = {key: value for key, value in state.items() if key != "attempt_history"}
             previous.update(abandoned_at=time.time(), cancellation_confirmed=False)
-            state = {"provider": "kie", "fingerprint": fingerprint, "model": MODEL,
+            state = {"provider": "kie", "fingerprint": fingerprint, "model": model,
                      "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "restart_ready",
                      "attempt_history": [*state.get("attempt_history", []), previous], "timeout_restarts": count + 1}
             atomic_write_json(state_path, state)
             log("WARN", f"Task {task_id} timed out; starting its one authorized replacement. The old task may still complete and be billed.")
+
+
+class ResultLinkExpired(KieError):pass
 
 
 def download_image(url: str, output_path: str | Path) -> Path:
@@ -533,7 +545,10 @@ def download_image(url: str, output_path: str | Path) -> Path:
         )
         with urllib.request.urlopen(request, timeout=300) as resp:
             image_bytes = resp.read()
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403,404,410):raise ResultLinkExpired("结果链接已过期，需要重新查询") from None
+        raise KieError("图片下载失败，请恢复查询",3) from None
+    except (urllib.error.URLError, TimeoutError) as exc:
         raise KieError(f"download KIE result failed: {exc}", 3)
     if not image_bytes:
         raise KieError("download KIE result returned an empty file", 3)
@@ -553,237 +568,3 @@ def download_image(url: str, output_path: str | Path) -> Path:
         temp.unlink(missing_ok=True)
         raise KieError(f"downloaded KIE result is not a valid image: {exc}", 3)
     return output
-
-
-def load_input(args: argparse.Namespace) -> dict[str, Any]:
-    payload: dict[str, Any] = {}
-    if args.input_json:
-        payload = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
-    if args.prompt:
-        payload["prompt"] = args.prompt
-    if args.aspect_ratio:
-        payload["aspect_ratio"] = args.aspect_ratio
-    if args.size:
-        payload["size"] = args.size
-    if args.resolution:
-        payload["resolution"] = args.resolution
-    if args.quality:
-        payload["quality"] = args.quality
-    references = list(payload.get("reference_images") or [])
-    references.extend(args.reference or [])
-    payload["reference_images"] = references
-    return payload
-
-
-def output_geometry(path: Path, target_size: str) -> dict[str, Any]:
-    from PIL import Image
-    with Image.open(path) as image:
-        width, height = image.size
-    result: dict[str, Any] = {"actual_width": width, "actual_height": height, "review_findings": []}
-    if target_size:
-        target_width, target_height = map(int, target_size.split("x"))
-        crop_report = cover_crop_report(width, height, target_width, target_height)
-        scale = max(target_width / width, target_height / height)
-        result.update({"actual_crop_percent": crop_report["crop_percent"], "delivery_scale": round(scale, 3)})
-        if crop_report["needs_safe_area"]:
-            result["review_findings"].append(f"比例差距较大：交付预计裁切 {crop_report['crop_percent']:.1f}%，请确认生成后的构图、文字和 Logo 完整。")
-        if scale >= 1.25:
-            result["review_findings"].append(f"1K 原图交付时需放大约 {scale:.2f} 倍，请检查小字与边缘清晰度。")
-    return result
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-json", help="JSON with prompt/reference_images/aspect_ratio or size/resolution")
-    parser.add_argument("--prompt", help="Complete prompt text")
-    parser.add_argument("--aspect-ratio", choices=sorted(ASPECT_RATIOS))
-    parser.add_argument("--size", help="Target render size, e.g. 1568x672; mapped to the nearest KIE ratio")
-    parser.add_argument("--resolution", choices=sorted(RESOLUTION_CHOICES), default=None)
-    parser.add_argument("--quality", choices=sorted(LEGACY_QUALITY_CHOICES), default=None, help=argparse.SUPPRESS)
-    parser.add_argument("--reference", action="append", default=[], help="Local reference image path; repeatable")
-    parser.add_argument("--output", required=True, help="Output PNG path")
-    parser.add_argument("--api-base", default=None, help=f"KIE task API base, default {DEFAULT_API_BASE}")
-    parser.add_argument("--upload-base", default=None, help=f"KIE upload API base, default {DEFAULT_UPLOAD_BASE}")
-    parser.add_argument("--retries", type=int, default=3)
-    parser.add_argument("--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT)
-    parser.add_argument("--max-timeout-restarts", type=int, choices=(0, 1), default=0)
-    parser.add_argument("--upload-cache", help=argparse.SUPPRESS)
-    parser.add_argument("--validate-only", action="store_true", help="Validate without calling KIE")
-    parser.add_argument(
-        "--approved-in-current-task",
-        action="store_true",
-        help="Required for a paid KIE task; current-task approval cannot come from a saved file",
-    )
-    return parser.parse_args()
-
-
-@contextmanager
-def output_lock(output):
-    lock = Path(str(output) + ".lock")
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        lock.mkdir()
-    except FileExistsError:
-        raise KieError(f"output locked by another or interrupted run: {lock}", 3)
-    try:
-        (lock / "owner.json").write_text(json.dumps({"pid": os.getpid()}))
-        yield
-    finally:
-        (lock / "owner.json").unlink(missing_ok=True)
-        lock.rmdir()
-
-
-def run(args) -> int:
-    autoload_dotenv()
-    try:
-        payload = load_input(args)
-        prompt = str(payload.get("prompt") or "").strip()
-        if not prompt:
-            raise ValueError("prompt is required")
-        resolution = normalize_resolution(payload.get("resolution"))
-        legacy_quality = validate_legacy_quality(payload.get("quality"))
-        if legacy_quality:
-            log("WARN", f"quality={legacy_quality} is deprecated and ignored; KIE resolution={resolution} is used")
-        requested_ratio = str(payload.get("aspect_ratio") or "").strip()
-        size_label, aspect_ratio = generation_geometry(str(payload.get("size") or "").strip(), requested_ratio)
-        frame_layout_path = payload.get("frame_layout_path")
-        if size_label and geometry_report(*map(int, size_label.split("x")))["needs_safe_area"] and not frame_layout_path:
-            raise ValueError("预计裁切达到6%：缺少 frame_layout_path，先准备白底蓝框布局。")
-
-        skill_dir = SCRIPT_DIR.parent
-        project_root = find_project_root(SCRIPT_DIR)
-        reference_items = normalize_reference_items(list(payload.get("reference_images", [])))
-        if not reference_items:
-            raise ValueError("Sunburst image-to-image requires at least one original Logo, IP, font or UI reference image")
-        validate_reference_labels(prompt, reference_items)
-        validate_asset_reference_bindings(reference_items)
-        validate_logo_prompt_rule(prompt, reference_items)
-        reference_paths = [
-            resolve_reference_path(item["path"], project_root=project_root, skill_dir=skill_dir)
-            for item in reference_items
-        ]
-        missing = [str(path) for path in reference_paths if not path.is_file()]
-        if missing:
-            raise ValueError("reference image not found: " + ", ".join(missing))
-        oversized = [str(path) for path in reference_paths if path.stat().st_size <= 0 or path.stat().st_size > MAX_REFERENCE_BYTES]
-        if oversized:
-            raise ValueError("reference image must be between 1 byte and 10MB: " + ", ".join(oversized))
-        if frame_layout_path:
-            from blue_frame import validate_layout
-            frame_layout_path = resolve_reference_path(frame_layout_path, project_root, skill_dir)
-            validate_layout(frame_layout_path, size_label, reference_items, reference_paths, prompt,
-                            inherited_base=payload.get("base_image_path"))
-
-        output = Path(args.output).expanduser()
-        if not output.is_absolute():
-            output = (Path.cwd() / output).resolve()
-        runtime_root = (
-            project_root / "工作区" / "产物"
-        ).resolve()
-        if output != runtime_root and runtime_root not in output.parents:
-            raise ValueError(f"output must stay under {runtime_root}")
-        model = MODEL
-        fingerprint = request_fingerprint(model, prompt, reference_paths, aspect_ratio, resolution)
-        state_path = task_state_path(output)
-        state = load_output_state(output)
-        if state and state.get("fingerprint") != fingerprint:
-            raise ValueError(f"existing KIE task state does not match this request; use a new output path: {state_path}")
-
-        metadata: dict[str, Any] = {
-            "valid": True,
-            "filepath": str(output),
-            "size_label": size_label,
-            "size": size_label,
-            "aspect_ratio": aspect_ratio,
-            "requested_aspect_ratio": requested_ratio or "custom",
-            "provider": "kie",
-            "model": model,
-            "resolution": resolution,
-            "estimated_credits": ESTIMATED_CREDITS_PER_IMAGE,
-            "pricing_basis": "user-account-region-screenshot; actual billing is provider-controlled",
-            "geometry": geometry_report(*map(int, size_label.split("x")), aspect_ratio) if size_label else {"aspect_ratio": aspect_ratio, "resolution": resolution},
-            "endpoint": "/api/v1/jobs/createTask",
-            "reference_images": [item["path"] for item in reference_items],
-            "reference_image_labels": [
-                {"label": item["label"], "role": item["role"], "asset_id": item.get("asset_id"), "path": item["path"]}
-                for item in reference_items
-            ],
-            "reference_images_resolved": [str(path) for path in reference_paths],
-            "prompt_used": prompt,
-            "task_state_path": str(state_path),
-        }
-        if frame_layout_path:
-            metadata["frame_layout_path"] = str(frame_layout_path)
-        if args.validate_only:
-            print(json.dumps(metadata, ensure_ascii=False, indent=2))
-            return 0
-
-        if not args.approved_in_current_task:
-            raise KieError(
-                "paid KIE generation requires --approved-in-current-task",
-                2,
-            )
-
-        api_key = str(os.environ.get("KIE_API_KEY") or "").strip()
-        if not api_key:
-            raise KieError("KIE_API_KEY is missing; configure ~/.config/onion-app-image-kie/.env", 2)
-        api_base = args.api_base or os.environ.get("KIE_BASE_URL", DEFAULT_API_BASE)
-        upload_base = args.upload_base or os.environ.get("KIE_UPLOAD_BASE_URL", DEFAULT_UPLOAD_BASE)
-
-        if state.get("status") == "downloaded" and output.is_file():
-            if state.get("sha256") == sha256_file(output):
-                metadata.update({"task_id": state.get("task_id"), "sha256": state["sha256"], "byte_count": output.stat().st_size})
-                metadata.update(output_geometry(output, size_label))
-                metadata.update(timeout_restarts=state.get("timeout_restarts", 0), previous_attempts=state.get("attempt_history", []))
-                if metadata["previous_attempts"]:
-                    metadata["review_findings"].append("超时原任务未确认取消，仍可能完成并扣费；已保留全部任务ID。")
-                if frame_layout_path:
-                    from blue_frame import attach_result
-                    attach_result(metadata, output, frame_layout_path)
-                print(json.dumps(metadata, ensure_ascii=False))
-                return 0
-        result_url, state = obtain_result(args, api_base, upload_base, api_key, prompt,
-                                          reference_paths, fingerprint, state_path, state, aspect_ratio, resolution)
-        task_id = state["task_id"]
-        metadata["credits_consumed"] = state.get("credits_consumed")
-        metadata["timeout_restarts"] = state.get("timeout_restarts", 0)
-        metadata["previous_attempts"] = state.get("attempt_history", [])
-        if metadata["previous_attempts"]:
-            metadata["review_findings"] = ["超时原任务未确认取消，仍可能完成并扣费；已保留全部任务ID。"]
-        saved = download_image(result_url, output)
-        state.update({"status": "downloaded", "task_id": task_id, "result_url": result_url, "sha256": sha256_file(saved)})
-        atomic_write_json(state_path, state)
-        metadata.update({"filepath": str(saved), "task_id": task_id, "valid": True, "sha256": sha256_file(saved), "byte_count": saved.stat().st_size})
-        geometry = output_geometry(saved, size_label)
-        geometry["review_findings"] = metadata.get("review_findings", []) + geometry["review_findings"]
-        metadata.update(geometry)
-        if frame_layout_path:
-            from blue_frame import attach_result
-            attach_result(metadata, saved, frame_layout_path)
-        print(json.dumps(metadata, ensure_ascii=False, indent=2))
-        return 0
-    except ValueError as exc:
-        log("ERROR", str(exc))
-        return 1
-    except KieError as exc:
-        log("ERROR", str(exc))
-        return exc.exit_code
-
-
-def main() -> int:
-    args = parse_args()
-    if args.validate_only:
-        return run(args)
-    try:
-        with output_lock(Path(args.output).expanduser().resolve()):
-            return run(args)
-    except KieError as exc:
-        log("ERROR", str(exc))
-        return exc.exit_code
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except KeyboardInterrupt:
-        raise SystemExit(130)

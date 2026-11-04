@@ -1,4 +1,4 @@
-"""Pinned KIE Sunburst 1K request policy and aspect-ratio adaptation."""
+"""KIE image model registry, fixed 1K policy and aspect-ratio adaptation."""
 from __future__ import annotations
 
 import math
@@ -16,6 +16,24 @@ ASPECT_RATIOS = {
 }
 
 
+GPT_IMAGE_2 = "gpt-image-2-image-to-image"
+MODELS = {MODEL: "GPT Image 2.5 Sunburst", GPT_IMAGE_2: "GPT Image 2"}
+
+
+def normalize_model(value=None):
+    model = MODEL if value is None else value
+    if not isinstance(model,str) or model not in MODELS:
+        raise ValueError("请选择支持的图片模型")
+    return model
+
+
+def aspect_ratios(model=MODEL):
+    if normalize_model(model)==GPT_IMAGE_2:
+        labels=("1:1","3:2","2:3","4:3","3:4","5:4","4:5","16:9","9:16","2:1","1:2","3:1","1:3","21:9","9:21")
+        return {k:int(k.split(":")[0])/int(k.split(":")[1]) for k in labels}
+    return ASPECT_RATIOS
+
+
 def normalize_resolution(value=None) -> str:
     resolution = str(value or RESOLUTION).strip().upper()
     if resolution != RESOLUTION:
@@ -23,11 +41,12 @@ def normalize_resolution(value=None) -> str:
     return resolution
 
 
-def nearest_aspect_ratio(width: int, height: int) -> str:
+def nearest_aspect_ratio(width: int, height: int, model=MODEL) -> str:
     if width <= 0 or height <= 0:
         raise ValueError("target dimensions must be positive")
     target = width / height
-    return min(ASPECT_RATIOS, key=lambda label: abs(math.log(target / ASPECT_RATIOS[label])))
+    ratios=aspect_ratios(model)
+    return min(ratios, key=lambda label: abs(math.log(target / ratios[label])))
 
 
 def cover_crop_report(source_width: int, source_height: int, width: int, height: int) -> dict:
@@ -46,10 +65,10 @@ def cover_crop_report(source_width: int, source_height: int, width: int, height:
     }
 
 
-def geometry_report(width: int, height: int, aspect_ratio: str | None = None) -> dict:
-    ratio = aspect_ratio or nearest_aspect_ratio(width, height)
-    if ratio not in ASPECT_RATIOS:
-        raise ValueError(f"unsupported Sunburst 1K aspect_ratio: {ratio}")
+def geometry_report(width: int, height: int, aspect_ratio: str | None = None, model=MODEL) -> dict:
+    ratio = aspect_ratio or nearest_aspect_ratio(width, height, model)
+    if ratio not in aspect_ratios(model):
+        raise ValueError(f"unsupported model 1K aspect_ratio: {ratio}")
     report = cover_crop_report(*map(int, ratio.split(":")), width, height)
     fraction = report["crop_percent"]
     axis = report["crop_axis"]

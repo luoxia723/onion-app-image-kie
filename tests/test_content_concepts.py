@@ -7,7 +7,6 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
-import interactive_server
 import visual_directions as visual
 
 
@@ -44,14 +43,6 @@ def bound_manifest(cfg, plan, tmp_path):
                          'visual_direction_id': direction['direction_id'],
                          'prompt': rule + '\n' + direction['slot_prompt_rules'][str(slot)], 'references': refs})
     return {'request_id': cfg['request_id'], 'visual_plan_path': str(path), 'jobs': jobs}
-
-
-def test_new_saved_config_defaults_to_content_first():
-    saved = interactive_server.normalize_config_result(
-        {'delivery_name': '数学三图', 'placement_ids': ['oppo-app-slot-slot-320x210']},
-        interactive_server.slots_by_id())
-    assert saved['visual_diversity_mode'] == 'content_first'
-    assert saved['visual_style_mode'] == 'random'
 
 
 def test_complete_concepts_are_preserved_without_any_visual_pool_sampling(monkeypatch):
@@ -128,48 +119,6 @@ def test_user_fixed_visual_requirements_are_kept_with_the_scene():
     for direction in visual.plan_directions(cfg)['directions']:
         assert cfg['visual_direction']['style_prompt'] in direction['base_prompt_rule']
         assert layout['prompt'] in direction['base_prompt_rule']
-
-
-def test_content_first_triptych_passes_batch_preflight_and_rejects_wrong_action(tmp_path,monkeypatch):
-    import argparse
-    import direct_batch
-    import render
-    from logo_reference import build_logo_reference, logo_prompt_rule
-    from series_chain import text_rule
-
-    cfg=content_config(); cfg['visual_diversity_mode']='content_first'
-    plan=visual.plan_directions(cfg)
-    manifest=bound_manifest(cfg,plan,tmp_path)
-    directions={d['set_id']:d for d in plan['directions']}
-    monkeypatch.setenv('ONION_IMAGE_WORKSPACE',str(tmp_path))
-    monkeypatch.setattr(render,'request_json',lambda *a,**k:pytest.fail('paid API during preflight'))
-    for job in manifest['jobs']:
-        direction=directions[job['set_id']];slot=job['slot']
-        base_id=job['set_id']+'-slot-01'
-        base_path=tmp_path/'工作区/产物/03_候选'/f'{base_id}.png'
-        job.update(job_id=job['set_id']+f'-slot-{slot:02d}',copy_text=cfg['copy_refs'][0][f'short{slot}'],
-                   resolution='1K',size='320x210',
-                   output=str(tmp_path/'工作区/产物/03_候选'/f'{job["set_id"]}-slot-{slot:02d}.png'),
-                   depends_on=[] if slot==1 else [base_id])
-        if slot==1:
-            job['references']=[build_logo_reference(cfg),
-                {'label':'参考图2','asset_id':direction['ip_asset_id'],'path':direction['ip_reference_path']},
-                {'label':'参考图3','path':direction['font_reference_path']}]
-            job['prompt']+='\n参考图1为Logo，参考图2为IP，参考图3为字体。'+logo_prompt_rule()
-        else:
-            job['base_job_id']=base_id
-            job['references']=[{'label':'参考图1','path':str(base_path)}]
-            job['prompt']+='\n参考图1为本套首张。'
-        job['prompt']+='\n'+text_rule(job['copy_text'],cfg['logo'])
-    cfg_path=tmp_path/'config.json'; manifest_path=tmp_path/'manifest.json'
-    cfg_path.write_text(json.dumps(cfg,ensure_ascii=False));manifest_path.write_text(json.dumps(manifest,ensure_ascii=False))
-    args=argparse.Namespace(manifest=manifest_path,config=cfg_path,validate_only=True,approved_in_current_task=False,approved_count=None)
-    assert direct_batch.execute(args)==0
-    first=plan['directions'][0]
-    manifest['jobs'][1]['prompt']=manifest['jobs'][1]['prompt'].replace(first['slot_prompt_rules']['2'],first['slot_prompt_rules']['1'])
-    manifest_path.write_text(json.dumps(manifest,ensure_ascii=False))
-    monkeypatch.setattr(direct_batch,'invoke',lambda *a,**k:pytest.fail('render called before validating all scene actions'))
-    with pytest.raises(ValueError,match='planned scene action'):direct_batch.execute(args)
 
 
 def random_style_config(sets=6):

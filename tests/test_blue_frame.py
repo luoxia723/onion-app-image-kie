@@ -10,7 +10,6 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 import blue_frame
 from kie_model import geometry_report
-from prepare_accepted_deliveries import prepare_accepted_deliveries
 
 
 @pytest.mark.parametrize('width,height,enabled', [(720,1559,True),(1200,480,True),(690,360,True),(1280,720,False),(474,768,False)])
@@ -93,30 +92,57 @@ def test_layout_hash_and_reference_binding_are_checked(tmp_path):
         blue_frame.validate_layout(result['frame_layout_path'],'720x1559',[ref],[guide],result['prompt_rule'])
 
 
-@pytest.mark.parametrize('has_frame',[True,False])
-def test_accepted_delivery_uses_frame_result_and_never_delivers_failed_crop(tmp_path,has_frame):
-    root=tmp_path/'task';version=root/'v001'
-    for phase in ['02_过程','03_候选','04_交付','05_质检']:
-        (version/phase).mkdir(parents=True)
-    (root/'任务索引.json').write_text(json.dumps({'task_id':'test','file_stem':'frame-test'}))
-    layout=blue_frame.prepare_layout(720,1559,version/'02_过程')
-    source=version/'03_候选/raw.png'
-    guide=Image.open(layout['reference']['path']).convert('RGB')
-    if not has_frame:guide=Image.new('RGB',guide.size,'white')
-    guide.save(source)
-    job={'job_id':'one','set_id':'one','slot':1,'output':str(source),'frame_layout_path':layout['frame_layout_path'],'target_width':720,'target_height':1559,'target_kb':150}
-    (version/'02_过程/image-render-manifest.json').write_text(json.dumps({'jobs':[job]}))
-    (version/'02_过程/image-config-result.json').write_text(json.dumps({'placements':[{'target_width':720,'target_height':1559,'max_file_size_kb':150}]}))
-    selection=version/'03_候选/image-selection-result.json'
-    selection.write_text(json.dumps({'accepted_schemes':[{'set_id':'one','thumb':['raw.png']}]}))
-    if not has_frame:
-        with pytest.raises(ValueError):prepare_accepted_deliveries(selection)
-        assert not list((version/'04_交付').iterdir())
-    else:
-        result=prepare_accepted_deliveries(selection)
-        delivered=Image.open(result['files'][0]['delivery'])
-        assert delivered.size==(720,1559)
-        assert all(min(pixel)>240 for pixel in delivered.get_flattened_data())
-        assert result['files'][0]['frame_processing']['output_size']==[720,1559]
-        resumed=prepare_accepted_deliveries(selection)
-        assert resumed['files'][0]['reused_existing']
+def expanded_frame_fixture(tmp_path, nested=False):
+    layout=blue_frame.prepare_layout(720,1559,tmp_path/'layout')
+    spec=json.loads(Path(layout['frame_layout_path']).read_text())
+    image=np.full((1672,941,3),255,np.uint8)
+    # Provider kept the reference canvas ratio but expanded the frame almost to its edges.
+    cv2.rectangle(image,(27,20),(914,1647),(214,99,22),5)
+    cv2.rectangle(image,(42,40),(897,1627),(190,220,240),-1)
+    cv2.rectangle(image,(48,55),(90,90),(20,40,220),-1)
+    cv2.rectangle(image,(850,1560),(890,1610),(20,180,30),-1)
+    cv2.line(image,(100,1608),(840,1608),(214,99,22),4) # Long blue artwork is not the outer guide.
+    if nested:cv2.rectangle(image,(40,33),(901,1634),(214,99,22),4)
+    return image,spec
+
+
+def test_expanded_complete_frame_is_removed_before_preview(tmp_path):
+    image,spec=expanded_frame_fixture(tmp_path)
+    output,record=blue_frame.detect_and_resize(image,spec)
+    assert output.shape==(1559,720,3)
+    assert record['detection_method']=='outer_rectangle'
+    assert record['crop_xyxy'][0]<40 and record['crop_xyxy'][2]>900
+    assert np.count_nonzero(blue_frame.blue_mask(output)[:5])==0
+    assert np.count_nonzero(blue_frame.blue_mask(output)[:,:3])==0
+    assert np.count_nonzero((output[:100,:100,2]>180)&(output[:100,:100,0]<60))>100
+    assert np.count_nonzero((output[-120:,-100:,1]>130)&(output[-120:,-100:,2]<60))>100
+
+
+def test_expanded_nested_frames_are_never_guessed(tmp_path):
+    image,spec=expanded_frame_fixture(tmp_path,nested=True)
+    with pytest.raises(ValueError):blue_frame.detect_and_resize(image,spec)
+
+
+def test_thin_frame_inner_outer_contours_do_not_count_as_two_frames(tmp_path):
+    layout=blue_frame.prepare_layout(720,1559,tmp_path)
+    spec=json.loads(Path(layout['frame_layout_path']).read_text())
+    image=np.full((1600,900,3),255,np.uint8)
+    cv2.rectangle(image,(60,20),(840,1580),(214,99,22),1)
+    cv2.rectangle(image,(150,200),(750,1400),(120,160,80),-1)
+    output,record=blue_frame.detect_and_resize(image,spec)
+    assert record['detection_method']=='outer_rectangle'
+    assert output.shape==(1559,720,3)
+    border=np.concatenate([blue_frame.blue_mask(output)[0,:],blue_frame.blue_mask(output)[-1,:],blue_frame.blue_mask(output)[:,0],blue_frame.blue_mask(output)[:,-1]])
+    assert np.count_nonzero(border)==0
+    assert record['crop_xyxy'][0]<70 and record['crop_xyxy'][2]>830
+
+
+def test_complete_white_exterior_frame_validates_template_aspect_drift(tmp_path):
+    layout=blue_frame.prepare_layout(720,1559,tmp_path)
+    spec=json.loads(Path(layout['frame_layout_path']).read_text())
+    source=cv2.imread(layout['reference']['path'])
+    spec['target_size']=[720,1700]
+    output,record=blue_frame.detect_and_resize(source,spec)
+    assert record['detection_method']=='outer_rectangle'
+    assert record['aspect_change_percent']>4
+    assert output.shape==(1700,720,3) and np.all(output==255)

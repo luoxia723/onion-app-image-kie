@@ -1,49 +1,51 @@
-# APP 图片生成 · KIE API 独立版
+# 洋葱广告图本机工作台
 
-将已确认的 APP 图片文案，经配置卡、KIE GPT Image 2.5 Sunburst 1K 生成、候选选择和本地规格处理，转成采纳图片。保留原版Logo、IP和字体参考，当前仅启用用户在投表的8个渠道、19个版位组合；旧102版位停用归档。直接调用KIE API。
+将已确认文案制作成多渠道广告图片，支持单图、双图和三图，提供画面规划、KIE生图、逐张提示词编辑、挑选与本机交付。
 
-当前锁定 `gpt-image-2-5-sunburst-image-to-image` 和 `1K`，至少需要一张原版参考图，不自动升级分辨率或更换入口。预算按用户账号截图的3积分/张估算，实际扣费以账号区域报价为准。比例差距大时生成后重点确认，详细结果见[尺寸比例适配报告](references/model-size-compatibility.md)。
+## 启动
 
-预计常规裁切达到6%的版位使用[白底蓝框生成、OpenCV去框后拉伸](references/blue-frame-adaptation.md)，低于门槛沿用常规适配。去框预览与生成原图分别保存，用户采纳后再按渠道KB上限正式交付。
+- Mac：双击 `启动.command`。
+- Windows：双击 `启动.bat`。
+- 命令行：`python bootstrap.py`，或使用已安装依赖的 `.venv/bin/python run.py`。
 
-画面按[艺术定调层级](references/art-direction.md)设计：画风→世界与场景→故事→构图→光色材质，再编译成逐张提示词。批量默认按套随机主画风并优先不重复，单图逐张独立设计，同套双/三图风格一致；场景、构图和配色仍整体协调，不独立随机拼接。用户指定画风时优先遵从指定。
+首次启动需要Python 3.10–3.14，启动器准备本项目的虚拟环境。设置里填写规划API Key和KIE Key，可选择GPT Image 2或GPT Image 2.5 Sunburst，均为1K。具体见[本机工作台说明](本机工作台说明.md)。运行工作台不需要Node.js、Codex或测试依赖。
 
-## 使用
+## 工作流
 
-将整个仓库作为一个 Skill 文件夹安装，保留文件名 `onion-app-image-kie`。支持 Skill 的 Agent 从根目录 [SKILL.md](SKILL.md) 读取流程。直接向 Agent 提出：
+配置与草稿 → 规划与生成队列 → 本机图片处理 → 预览挑选 → 保存图包。多个窗口共享同一个后台；同套首图完成后，第二、三张引用本套首图PNG。人工编辑以用户内容为准，原文与参考顺序按图片版本记录。
 
-> 使用 onion-app-image-kie，按我已确认的文案打开配置卡，生成 APP 图片候选，并按我的选择交付。
+当前规格由 `config/channel-placement-rules.json` 提供：8个渠道、19个尺寸与形式组合。素材分配、模型、文案和规划按轮次冻结；全局并发可以调整。蓝框由OpenCV识别并去掉框线、框外白边，成品使用JPEG/RGB并检查精确尺寸、KB和哈希。
 
-首次配置需要 Python 3.10+ 和 KIE API Key。在本地创建虚拟环境并安装依赖：
+历史、任务、回执与图片版本由SQLite和本地文件保存。已有目录和图包继续有效；归档、清理与删除分别管理，历史不自动过期。导出使用当前采纳版本的成品JPEG，旧ZIP保持不变。
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-```
+## 当前代码入口
 
-Windows 使用 `.venv\Scripts\python.exe`。运行脚本时使用安装了依赖的 Python。
+- `bootstrap.py`、`run.py`：启动同一个本机工作台。
+- `frontend/`：本机网页。
+- `local_app/`：任务、队列、规划API、KIE执行、历史与交付。
+- `scripts/`：工作台使用的共享规划、HTTP、图片处理与资产函数，以及源码打包、测试辅助工具。
+- [SKILL.md](SKILL.md)：供规划模型或Agent读取的画面设计方法，不再启动另一套配置卡或批处理流程。
 
-在本机 `~/.config/onion-app-image-kie/.env` 中配置 `KIE_API_KEY`，或通过同名进程环境变量提供。不要将真实 Key 放入仓库或聊天。配置详情和任务恢复方式见 [KIE API 合同](references/provider-contract.md)。
+旧配置卡、旧候选选择页、旧批量执行与旧交付打包入口已经移除。当前任务恢复不依赖这些入口；KIE回执解析与请求指纹保护继续保留。
 
-运行工作目录由 `ONION_IMAGE_WORKSPACE` 指定，未设置时使用当前目录。图片和任务写入该目录的 `工作区/产物/`；Skill 安装位置与工作目录可以不同。产品事实由用户提供当前确认的资料；仓库携带品牌图片，不包含完整的价格、权益或渠道时效资料。
-
-## 验证
+## 开发检查
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests -q
+.venv/bin/python scripts/check_workbench.py
+.venv/bin/python scripts/check_workbench.py --suite transport
+.venv/bin/python scripts/check_workbench.py --suite history
 ```
 
-自动测试强制使用假凭据、拦截外部网络，子进程仅连接本机模拟API；当前207项测试通过，包含分层艺术定调、正向一段式Prompt、七类视觉约束逐张传入与缺失拦截、文案元数据校验、无IP自由主体、清晰示意UI、批量随机主画风、同套继承、独立提示词、完整画面方案与逐张动作绑定、模型锁定、6%阈值边界、单张入口蓝框校验、多重蓝框拒绝、分支付费前预检、损坏任务状态拦截和明确平台过滤。已完成一次真实KIE候选生成验证：OPPO横版三图2套，共6张，同套分支引用首张PNG；下载中断后复用原任务恢复，未新建生图任务。该批候选尚未完成用户采纳与正式JPEG交付，不视为完整端到端验收。正式使用前仍需配置有效Key，并确认本次参考图上传和生图数量。
+默认检查当前工作台、共享核心与前端。`transport` 在本机HTTP模拟服务中完整走上传、创建、查询、下载与恢复，覆盖两种1K模型。`history` 检查保留的历史格式，不是运行旧入口。`--collect` 可先查看范围，数量以实际收集结果为准。
 
-## 来源与维护
+自动测试只连接本机回环服务，不产生生图用量。真实API验证按明确的最少图片范围另外执行并保留回执；离线测试不能代表外部服务可用性或视觉效果。
 
-由 `content-automation` 中的 APP 图片 Skill 独立适配而来。本仓库维护 KIE API 变体，原 MCP 版本保持原有维护位置。
+## 使用与维护资料
 
-关联任务：[content-automation#119](https://github.com/luoxia723/content-automation/issues/119)。仓库包含洋葱品牌参考资产；这些品牌资产不因源码公开而获得额外使用授权。
+- [工作台行为](references/workbench-behavior.md)
+- [整体优化方案](references/workbench-optimization-plan.md)
+- [KIE请求与恢复](references/provider-contract.md)
+- [原始规格快照](config/current-channel-source.json)
 
-每张均有学生或选定IP参与具体学习场景，无IP方案使用普通原创学生；带IP允许少量画风或时代元素融入服装与配饰，保留主要识别特征。场景可探索古代、中世纪、现代与幻想设定。屏幕可显示清晰示意UI，无需强制模糊；只有要还原实际界面时才需要真实截图。
-
-新任务提示词使用一段正向自然语言：直接描述画面、动作、确认文案和必要素材用途。画面文字白名单、负面提示段与内部制作编号不进入Prompt；模型、尺寸、压缩、素材绑定和任务依赖由配置与代码处理。参见[Prompt规则](references/prompt-rules.md)和[示例](references/prompt-examples.md)。
-
-批量默认3路并发：同套首张落盘后，后续张并发引用首张。新配置按单次4分钟等待、超时最多重开一次执行；原任务未确认取消，可能继续收费，配置卡同时显示正常预算和含重开的上限。未知提交或查询状态仍只恢复原任务，不盲目重开；历史配置缺少新执行策略时不自动增加付费尝试。详见[KIE合同](references/provider-contract.md)。
+项目由原APP图片Skill适配而来，保留其品牌素材、画面方法和有效渠道规格。品牌资产不因源码分享而获得额外使用授权。

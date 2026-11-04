@@ -1,0 +1,36 @@
+from local_app.planning import PLACEMENTS
+from kie_model import geometry_report
+from logo_reference import logo_position
+
+def test_only_current_table_combinations_are_available():
+    expected = {
+        ('华为','单图',984,422):200,
+        ('vivo','三图',320,211):80,
+        ('OPPO','单图',1280,720):500,
+        ('OPPO','双图',474,768):500,
+        ('OPPO','三图',320,210):500,
+        ('小米','单图',960,540):500,
+        ('小米','双图',960,540):500,
+        ('小米','三图',320,320):300,
+        ('小米','单图',480,320):500,
+        ('荣耀','单图',1280,720):500,
+        ('荣耀','三图',1080,1920):500,
+        ('微博粉丝通','单图',1280,720):5120,
+        ('喜马拉雅','单图',1280,720):150,
+        ('喜马拉雅','单图',720,1280):150,
+        ('喜马拉雅','单图',1200,480):150,
+        ('喜马拉雅','单图',1000,1000):150,
+        ('喜马拉雅','单图',720,1559):150,
+        ('CPA','单图',690,360):500,
+        ('CPA','单图',1080,1920):800,
+    }
+    slots = PLACEMENTS
+    actual = {(s['platform'],s['image_form'],s['target_width'],s['target_height']):s['max_file_size_kb'] for s in slots if s['enabled']}
+    assert actual == expected
+    assert len(slots) == len(expected)
+    assert sum(geometry_report(s['target_width'],s['target_height'])['needs_safe_area'] for s in slots) == 3
+    for slot in slots:
+        assert slot['source_revision'] == 105
+        if slot['platform']=='喜马拉雅' and slot['target_size'] in ['720x1280','720x1559']:
+            assert slot['logo_policy']=='required'
+            assert logo_position({'placements':[slot]})=='上方居中'

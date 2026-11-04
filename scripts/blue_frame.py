@@ -6,7 +6,7 @@ import math
 import json
 import cv2
 import numpy as np
-from kie_model import geometry_report, nearest_aspect_ratio, CROP_REVIEW_THRESHOLD_PERCENT
+from kie_model import geometry_report, nearest_aspect_ratio, CROP_REVIEW_THRESHOLD_PERCENT, MODEL
 
 
 def legacy_prompt_rule(label):
@@ -29,14 +29,14 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def prepare_layout(width, height, directory, label='参考图2'):
+def prepare_layout(width, height, directory, label='参考图2', model=MODEL):
     from PIL import Image, ImageDraw
-    report = geometry_report(width, height)
+    report = geometry_report(width, height, model=model)
     if not report['needs_safe_area']:
         return {'enabled': False, 'geometry': report}
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    ratio = nearest_aspect_ratio(width, height)
+    ratio = nearest_aspect_ratio(width, height, model)
     a, b = map(int, ratio.split(':'))
     multiple = math.ceil(900 / min(a, b))
     canvas_w, canvas_h = a * multiple, b * multiple
@@ -61,6 +61,7 @@ def prepare_layout(width, height, directory, label='参考图2'):
             'guide_path': str(guide), 'guide_sha256': hashlib.sha256(content).hexdigest(),
             'reference_label': label, 'inset_pixels': 2, 'resize_mode': 'stretch',
             'trigger_cover_crop_percent': report['crop_percent']}
+    if model!=MODEL: spec['image_model']=model
     if spec_path.exists() and json.loads(spec_path.read_text()) != spec:
         raise ValueError('已有蓝框配置不同，请使用新版本或新目录。')
     if guide.exists() and guide.read_bytes() != content:
@@ -72,13 +73,13 @@ def prepare_layout(width, height, directory, label='参考图2'):
             'prompt_rule': prompt_rule(label), 'geometry': report}
 
 
-def validate_layout(path, target_size, reference_items, reference_paths, prompt, inherited_base=None):
+def validate_layout(path, target_size, reference_items, reference_paths, prompt, inherited_base=None, check_prompt=True):
     spec = json.loads(Path(path).read_text())
     if spec.get('schema_version') != 'blue_frame_v1' or spec.get('resize_mode') != 'stretch':
         raise ValueError('无效的白底蓝框配置。')
     if list(map(int, target_size.split('x'))) != spec['target_size']:
         raise ValueError('蓝框目标尺寸与版位不符。')
-    if spec['aspect_ratio'] != nearest_aspect_ratio(*spec['target_size']):
+    if spec['aspect_ratio'] != nearest_aspect_ratio(*spec['target_size'],model=spec.get('image_model',MODEL)):
         raise ValueError('蓝框画布比例与生成比例不符。')
     guide = Path(spec['guide_path']).resolve()
     if sha256(guide) != spec['guide_sha256']:
@@ -93,7 +94,7 @@ def validate_layout(path, target_size, reference_items, reference_paths, prompt,
                for item, file in zip(reference_items, reference_paths)):
         raise ValueError('参考图编号或文件与蓝框配置不符。')
     label = reference_items[0]['label'] if inherits_frame else spec['reference_label']
-    if not has_prompt_rule(prompt, label):
+    if check_prompt and not has_prompt_rule(prompt, label):
         raise ValueError('Prompt缺少本轮蓝框生成范围规则。')
     return spec
 
@@ -122,7 +123,9 @@ def process_candidate(source, spec_path):
     intersection = max(0, min(expected[2], actual[2]) - max(expected[0], actual[0])) * max(0, min(expected[3], actual[3]) - max(expected[1], actual[1]))
     additional = max(0, 1 - intersection / ((expected[2] - expected[0]) * (expected[3] - expected[1]))) * 100
     record['additional_template_area_removed_percent'] = round(additional, 4)
-    record['needs_crop_review'] = additional >= CROP_REVIEW_THRESHOLD_PERCENT
+    record['needs_crop_review'] = additional >= CROP_REVIEW_THRESHOLD_PERCENT or record['aspect_change_percent'] >= 4
+    record['review_reason'] = ('content_crop' if additional >= CROP_REVIEW_THRESHOLD_PERCENT
+                               else 'aspect_change' if record['aspect_change_percent'] >= 4 else None)
     if not cv2.imwrite(str(path), output):
         raise OSError('无法保存去框结果。')
     record['candidate_sha256'] = sha256(path)
@@ -138,7 +141,8 @@ def attach_result(metadata, source, spec_path):
         record = process_candidate(source, spec_path)
         metadata.update(frame_status='processed', frame_processing=record, candidate_filepath=record['candidate_filepath'])
         if record['needs_crop_review']:
-            metadata['review_findings'].append('框内新增裁切达到6%，请重点查看实际裁切范围。')
+            metadata['review_findings'].append('框内新增裁切达到6%，请重点查看实际裁切范围。' if record['review_reason']=='content_crop'
+                                               else '实际蓝框比例与目标不同，已去框并调整比例，请确认人物和文字效果。')
         if max(record['scale_x'], record['scale_y']) >= 1.25:
             metadata['review_findings'].append('框内图像放大至少1.25倍，请检查小字与边缘清晰度。')
     except (ValueError, OSError, cv2.error) as exc:
@@ -188,6 +192,54 @@ def line_band(mask, axis, expected, span, radius):
     return {'start': lo, 'end_inclusive': hi, 'coverage': round(float(np.mean(scores[group - start])), 4)}
 
 
+def outer_frame_edges(image, mask):
+    """Find a complete outer guide when the model moved it beyond the template window.
+
+    All four long, thin sides and a white exterior are required. Never infer a
+    missing side from template coordinates or choose between nested rectangles.
+    """
+    height, width = mask.shape
+    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    candidates = []
+    rectangles = []
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        if w < width*.70 or h < height*.70 or w*h < width*height*.65: continue
+        if max(x/width, y/height, (width-x-w)/width, (height-y-h)/height) > .15: continue
+        # The guide is a rectangle, not a blue background or a character silhouette.
+        approx = cv2.approxPolyDP(contour, .005*cv2.arcLength(contour, True), True)
+        if len(approx) != 4: continue
+        rectangles.append((x,y,w,h))
+        white = np.min(image, axis=2) >= 235
+        exterior = np.ones((height,width),bool)
+        exterior[max(0,y-2):min(height,y+h+2),max(0,x-2):min(width,x+w+2)] = False
+        if exterior.sum() < width*height*.005 or np.mean(white[exterior]) < .97: continue
+        candidates.append((x,y,w,h))
+    # A thin stroke has both an inner and an outer contour. Collapse only
+    # nearly coincident bounds, leaving genuinely nested frames ambiguous.
+    tolerance=max(2,min(8,round(min(width,height)*.006)))
+    groups=[]
+    for candidate in sorted(candidates,key=lambda b:b[2]*b[3],reverse=True):
+        bounds=(candidate[0],candidate[1],candidate[0]+candidate[2],candidate[1]+candidate[3])
+        if not any(max(abs(a-b) for a,b in zip(bounds,(g[0],g[1],g[0]+g[2],g[1]+g[3])))<=tolerance for g in groups):groups.append(candidate)
+    if len(groups) != 1: raise ValueError('无法唯一识别完整外框，停止自动裁切。')
+    x,y,w,h = groups[0]
+    horizontal = (round(x+w*.18),round(x+w*.82))
+    vertical = (round(y+h*.04),round(y+h*.96))
+    radius=max(5,min(12,round(min(width,height)*.008)))
+    edges = {
+        'left':line_band(mask,'x',x,vertical,radius),
+        'right':line_band(mask,'x',x+w-1,vertical,radius),
+        'top':line_band(mask,'y',y,horizontal,radius),
+        'bottom':line_band(mask,'y',y+h-1,horizontal,radius),
+    }
+    stroke = max(edge['end_inclusive']-edge['start']+1 for edge in edges.values())
+    for nx,ny,nw,nh in rectangles:
+        if min(nx-x,ny-y,x+w-nx-nw,y+h-ny-nh) > stroke+2:
+            raise ValueError('出现嵌套候选框线，停止自动裁切。')
+    return edges
+
+
 def detect_and_resize(image, spec, inset=2):
     height, width = image.shape[:2]
     canvas_w, canvas_h = spec['guide_canvas']
@@ -199,17 +251,27 @@ def detect_and_resize(image, spec, inset=2):
     iw, ih = (fx2 - fx1) * sx, (fy2 - fy1) * sy
     horizontal_span = (round(fx1 * sx + iw * 0.18), round(fx2 * sx - iw * 0.18))
     vertical_span = (round(fy1 * sy + ih * 0.04), round(fy1 * sy + ih * 0.30))
-    edges = {
-        'left': line_band(mask, 'x', fx1 * width / canvas_w, vertical_span, width * 0.035),
-        'right': line_band(mask, 'x', fx2 * width / canvas_w, vertical_span, width * 0.035),
-        'top': line_band(mask, 'y', fy1 * height / canvas_h, horizontal_span, height * 0.025),
-        'bottom': line_band(mask, 'y', fy2 * height / canvas_h, horizontal_span, height * 0.025),
-    }
+    detection_method = 'template_window'
+    try:
+        edges = {
+            'left': line_band(mask, 'x', fx1 * width / canvas_w, vertical_span, width * 0.035),
+            'right': line_band(mask, 'x', fx2 * width / canvas_w, vertical_span, width * 0.035),
+            'top': line_band(mask, 'y', fy1 * height / canvas_h, horizontal_span, height * 0.025),
+            'bottom': line_band(mask, 'y', fy2 * height / canvas_h, horizontal_span, height * 0.025),
+        }
+        tw,th=spec['target_size']
+        ew=edges['right']['start']-edges['left']['end_inclusive']-1
+        eh=edges['bottom']['start']-edges['top']['end_inclusive']-1
+        if ew<=0 or eh<=0 or abs((ew/eh)/(tw/th)-1)>.04:raise ValueError('模板窗口内框线比例偏离，核对完整外框。')
+    except ValueError:
+        edges = outer_frame_edges(image,mask)
+        detection_method = 'outer_rectangle'
     interior = [edges['left']['end_inclusive'] + 1, edges['top']['end_inclusive'] + 1,
                 edges['right']['start'], edges['bottom']['start']]
     x1, y1, x2, y2 = interior
     target_w, target_h = spec['target_size']
-    if x2 <= x1 or y2 <= y1 or abs(((x2 - x1) / (y2 - y1)) / (target_w / target_h) - 1) > 0.04:
+    aspect_change = abs(((x2-x1)/(y2-y1))/(target_w/target_h)-1) if x2>x1 and y2>y1 else 1
+    if x2 <= x1 or y2 <= y1 or aspect_change > (.30 if detection_method=='outer_rectangle' else .04):
         raise ValueError('检测框的大小或比例异常，停止自动裁切。')
     if inset < 0 or inset > 8:
         raise ValueError('本次试裁仅允许0–8像素内缩。')
@@ -217,10 +279,11 @@ def detect_and_resize(image, spec, inset=2):
     x1, y1, x2, y2 = box
     cropped = image[y1:y2, x1:x2].copy()
     interpolation = cv2.INTER_AREA if target_w <= cropped.shape[1] and target_h <= cropped.shape[0] else cv2.INTER_CUBIC
-    # Explicitly permit a small aspect change, as requested. No second ratio crop.
+    # Adapt the detected interior by resizing, never by a second cover crop.
     output = cv2.resize(cropped, (target_w, target_h), interpolation=interpolation)
     scale_x, scale_y = target_w / cropped.shape[1], target_h / cropped.shape[0]
     return output, {'source_size': [width, height], 'detected_frame_edges': edges,
+                    'detection_method':detection_method, 'aspect_change_percent':round(aspect_change*100,4),
                     'detected_interior_xyxy': interior, 'extra_inset_per_side_pixels': inset,
                     'crop_xyxy': box, 'cropped_size': [cropped.shape[1], cropped.shape[0]],
                     'output_size': [target_w, target_h], 'scale_x': round(scale_x, 7),

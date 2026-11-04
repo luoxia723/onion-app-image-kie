@@ -173,6 +173,11 @@ def validate_asset_reference_bindings(
         expected_path = str(asset.get("path") or "")
         actual_path = str(item.get("path") or "")
         if actual_path != expected_path:
+            snapshot=item.get('snapshot_sha256')
+            candidate=Path(actual_path)
+            if item.get('original_asset_path')==expected_path and snapshot and candidate.is_file():
+                import hashlib
+                if hashlib.sha256(candidate.read_bytes()).hexdigest()==snapshot:continue
             raise ValueError(
                 f"asset_id 与 path 不匹配：{asset_id} 应使用 {expected_path}，实际为 {actual_path}"
             )
