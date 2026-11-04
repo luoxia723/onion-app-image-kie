@@ -7,7 +7,6 @@ let CFG={kie:false,path:'',base:DEF_BASE,up:DEF_UP,simulation:true},CONN={};
 let S={tasks:[],cur:null,view:'form',draft:defParams(),tab:'all',pf:'all',pv:null,miss:false,cfgOpen:false,tried:false,drafts:[],draftId:null,draftSequence:0,draftRevision:0};
 let lastRefreshAt=0;
 let storage={used_bytes:0},busy=false,loading=false,pollTimer,searchTimer,viewEpoch=0,refreshFailures=0;
-let pickAdvanceTimer;
 
 async function request(path,method='GET',body){
   const response=await fetch('/api'+path,{method,headers:method==='GET'?{}:{'Content-Type':'application/json','X-Onion-Request':'1'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -81,7 +80,7 @@ async function refresh(){if(loading)return;loading=true;lastRefreshAt=Date.now()
  if(!S.ren){if(S.view==='form'){const list=$('.tasks');if(list&&!S.menu)list.innerHTML=taskList()||'<li class="empty-list">还没有任务</li>';const q=$('#queue-overview');if(q)q.textContent=queueText()}else softRender()}
 }catch(e){refreshFailures++;if(refreshFailures>=2){S.connectionLost=true;softRender()}if(!S.summaries?.length)report(e)}finally{loading=false;if(query!==(S.q||''))refresh()}}
 function searchTasks(q){S.q=q;S.searchPending=true;S.draftSearching=true;S.draftLimit=20;updateDraftList();clearTimeout(searchTimer);searchTimer=setTimeout(()=>{refresh();refreshDraftList().catch(report)},180)}
-function beginNavigation(){if(S.submitting){toast('正在提交配置，请稍候');return null}clearTimeout(pickAdvanceTimer);S.pickMore=false;const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
+function beginNavigation(){if(S.submitting){toast('正在提交配置，请稍候');return null}S.pickMore=false;const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
 function finishNavigation(epoch){if(epoch===viewEpoch){S.navigationPending=false;render()}}
 async function newTask(){return newDraft()}
 async function openTask(id){
@@ -121,34 +120,15 @@ async function changeSelection(name,data){
 }
 async function toggleSel(n,inPv,pid){
   pid=pid||curPvSlot()?.pid||R().params.pids[0];
-  const adopted=!R().sel[selectionKey(pid,n)],roundId=R().id,task=S.cur;
-  clearTimeout(pickAdvanceTimer);
-  const changed=await changeSelection('adopt',{set:n,placement_id:pid,adopted});
-  if(changed&&adopted&&!inPv&&!S.pv&&S.cur===task&&R()?.id===roundId)schedulePickAdvance(pid);
+  const adopted=!R().sel[selectionKey(pid,n)];
+  await changeSelection('adopt',{set:n,placement_id:pid,adopted});
 }
-function setPickPlacement(pid){clearTimeout(pickAdvanceTimer);S.pickPid=pid;S.pf='all';render();$('.sample-stage')?.scrollTo({top:0});$('#sets')?.scrollTo({left:0});document.querySelector(`[data-pick-placement="${pid}"]`)?.scrollIntoView({block:'nearest'})}
-function setAutoNext(enabled){S.autoNext=enabled;localStorage.setItem('onion.pick.autoNext',String(enabled));if(!enabled)clearTimeout(pickAdvanceTimer)}
-function schedulePickAdvance(pid){
-  clearTimeout(pickAdvanceTimer);
-  const round=R(),roundId=round.id,task=S.cur,epoch=viewEpoch;
-  if(S.autoNext===false||S.view!=='pick'||S.navigationPending||pickPlacement(round)!==pid)return;
-  const groups=setsOf(round);
-  if(!groups.some(group=>group.pid===pid&&selectedSet(round,group)&&readySet(group)))return;
-  pickAdvanceTimer=setTimeout(()=>{
-    if(S.autoNext===false||S.view!=='pick'||S.navigationPending||S.cur!==task||R()?.id!==roundId||viewEpoch!==epoch||S.pv||pickPlacement(R())!==pid)return;
-    const current=R(),sets=setsOf(current),order=current.params.pids,index=order.indexOf(pid);
-    if(!sets.some(group=>group.pid===pid&&selectedSet(current,group)&&readySet(group)))return;
-    const next=[...order.slice(index+1),...order.slice(0,index)].find(id=>!sets.some(group=>group.pid===id&&selectedSet(current,group)&&readySet(group))&&sets.some(group=>group.pid===id&&readySet(group)&&!selectedSet(current,group)));
-    if(next)setPickPlacement(next);
-  },400);
-}
+function setPickPlacement(pid){S.pickPid=pid;S.pf='all';render();$('.sample-stage')?.scrollTo({top:0});$('#sets')?.scrollTo({left:0});document.querySelector(`[data-pick-placement="${pid}"]`)?.scrollIntoView({block:'nearest'})}
 async function selectVisible(adopted){
-  const roundId=R().id,task=S.cur,pid=pickPlacement(R());clearTimeout(pickAdvanceTimer);
   const sets=selectionScope(R()).map(g=>({placement_id:g.pid,set:g.n}));
-  if(sets.length&&await changeSelection('adopt-bulk',{sets,adopted})&&adopted&&S.cur===task&&R()?.id===roundId)schedulePickAdvance(pid);
+  if(sets.length)await changeSelection('adopt-bulk',{sets,adopted});
 }
 async function clearVisibleSelection(){
-  clearTimeout(pickAdvanceTimer);
   const r=R(),sets=selectionScope(r).filter(g=>selectedSet(r,g)).map(g=>({placement_id:g.pid,set:g.n}));
   if(sets.length)await changeSelection('adopt-bulk',{sets,adopted:false});
 }
@@ -254,11 +234,11 @@ async function addVariant(pid){await action('add-variant',{placement_id:pid});re
 function locateIncomplete(){const key=R()?.delivery?.incomplete_keys?.[0];if(key){setPickPlacement(key.split('::')[0]);document.querySelector(`[data-sel="${key}"]`)?.closest('.set')?.scrollIntoView({block:'center',inline:'center'})}}
 async function boot(){
  try{
-  S.autoNext=localStorage.getItem('onion.pick.autoNext')!=='false';
-  const [b,s,d]=await Promise.all([request('/bootstrap'),request('/settings'),request('/drafts?summary=1')]);
+  const [b,s,d]=await Promise.all([request('/bootstrap'),request('/settings'),request('/drafts')]);
   PLACEMENTS=b.placements;ASSETS=b.assets;IPS=ASSETS.ips;LOGO=ASSETS.logos.find(a=>/standard/.test(a.id))||ASSETS.logos[0];FONTS=ASSETS.fonts;STYLES=ASSETS.styles;FORM_DEFAULTS=b.form_defaults||{};S.planner=b.planner;S.product=b.product;S.drafts=d.drafts;applySettings(s);
   const hash=new URLSearchParams(location.hash.slice(1));S.cur=hash.get('task');S.view=['form','pick','dl'].includes(hash.get('view'))?hash.get('view'):'form';
   await refresh();
+  S.draft.image_form=S.summaries?.[0]?.image_form||Object.keys(FORM_DEFAULTS).at(-1)||'单图';
   if(hash.get('draft')){S.view='pick';await openDraft(hash.get('draft'))}
   else if(T()&&S.view==='form')await editTaskDraft();
   else if(!T()){const last=S.drafts.find(d=>!d.editing_task_id);if(last){S.view='pick';await openDraft(last.id)}else await newDraft()}

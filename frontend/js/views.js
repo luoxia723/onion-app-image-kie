@@ -219,7 +219,7 @@ function cellHtml(r,s){
  else content=`<span class="vlab">${label}</span>`;
  if(frame)actions=`<div class="sample-actions"><button ${S.localProcessing?'disabled':''} onclick="reprocessFrame('${s.id}')">重新去框</button><button ${S.localProcessing?'disabled':''} onclick="fitImage('${s.id}')">整图适配</button></div>`;
  else if(failed){const retry=imageRetry(r,s),planning=s.reason_code==='planning_failed';actions=`<div class="sample-actions"><button data-redo="${s.id}" ${retry.disabled?'disabled':''} onclick="${planning?'retryPlanning()':retry.blocked?"openPv('"+retry.head?.id+"')":retry.query?"resumeImage('"+s.id+"')":"repairSet('"+s.pid+"',"+s.set+")"}">${planning?'重试规划':retry.blocked?'查看图 1':retry.query?'恢复查询':'补齐'}</button></div>`}
- return`<div class="sample-unit"><div class="cell ${frame?'frame-pending':failed?'fail':s.state==='done'?'done':waiting?'wait':'gen'}" style="aspect-ratio:${p.target_width}/${p.target_height};--image-ratio:${p.target_width/p.target_height}" data-slot="${s.id}" data-st="${s.state}" title="${esc(failed?failMsg(r,s):s.state==='done'?'已完成':waitLabel(r,s))}" ${s.state==='done'?`role="button" tabindex="0" aria-label="套 ${s.set} · ${esc(pname(p))} 图 ${s.idx}，查看大图" onclick="openPv('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPv('${s.id}')}"`:`role="img" aria-label="${label}"`}>${content}</div>${actions}<div class="sample-caption">${p.image_count>1?'图 '+s.idx+' · ':''}${psz(p)}</div></div>`;
+ return`<div class="sample-unit"><div class="cell ${frame?'frame-pending':failed?'fail':s.state==='done'?'done':waiting?'wait':'gen'}" style="aspect-ratio:${p.target_width}/${p.target_height};--image-ratio:${p.target_width/p.target_height}" data-slot="${s.id}" data-st="${s.state}" title="${esc(failed?failMsg(r,s):s.state==='done'?'已完成':waitLabel(r,s))}" ${s.state==='done'?`role="button" tabindex="0" aria-label="套 ${s.set} · ${esc(pname(p))} 图 ${s.idx}，查看大图" onclick="openPv('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPv('${s.id}')}"`:`role="img" aria-label="${label}"`}>${content}</div>${actions}${p.image_count>1?`<div class="sample-caption">图 ${s.idx}</div>`:''}</div>`;
 }
 function imageRetry(r,s){
  const head=r.slots.find(x=>x.id===s.first_id),query=!!s.query_required||['unknown','timeout'].includes(s.reason_code),blockedFirst=blocked(r,s)||s.state==='blocked_first_failed';
@@ -264,7 +264,35 @@ function softRender(){if(!S.pv&&!S.cfgOpen&&!S.maintenanceOpen)return render();c
  const body=S.view==="form"?viewForm():S.view==="pick"?viewPick():viewDl();const d=document.createElement("div");d.innerHTML=`<div class="app ${S.view==='pick'?'pick-mode':''}">${viewSide()}<main id="main">${viewHead()}<div class="body" id="body">${body}</div>${S.view!=='form'?viewSelectionFooter():''}</main></div>`;const tl=$(".sidebar-scroll")||$(".tasks"),ty=tl?tl.scrollTop:0;a.replaceWith(d.firstElementChild);const tl2=$(".sidebar-scroll")||$(".tasks");if(tl2)tl2.scrollTop=ty;const m2=$("main");if(m2){m2.scrollTop=y;setHH()}if(fref){const e=document.querySelector(fref);if(e)e.focus({preventScroll:true})}updTimers();syncSelectionControls();
  const updatedStage=$('.sample-stage');if(updatedStage){updatedStage.scrollTop=stageTop;$('#sets').scrollLeft=setsLeft;$('.dir-list').scrollTop=directoryTop}
 }
-function setHH(){const m2=$("main"),h=$("#head"),tb=document.querySelector(".toolbar");if(!m2||!h)return;m2.style.setProperty("--hh",h.offsetHeight+"px");m2.style.setProperty("--sp",(h.offsetHeight+(tb&&S.view==="pick"?tb.offsetHeight+8:0)+8)+"px")}
+function setHH(){
+ const m2=$("main"),h=$("#head"),tb=document.querySelector(".toolbar");if(!m2||!h)return;
+ m2.style.setProperty("--hh",h.offsetHeight+"px");m2.style.setProperty("--sp",(h.offsetHeight+(tb&&S.view==="pick"?tb.offsetHeight+8:0)+8)+"px");
+ const sets=$('#sets');if(!sets)return;
+ const cards=[...sets.querySelectorAll('.set')];if(!cards.length)return;
+ const style=getComputedStyle(sets),cardStyle=getComputedStyle(cards[0]);
+ const width=sets.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),gapX=parseFloat(style.columnGap),gapY=parseFloat(style.rowGap);
+ const images=+style.getPropertyValue('--images'),ratio=+style.getPropertyValue('--image-ratio'),imageGap=parseFloat(style.getPropertyValue('--sample-gap'));
+ const paddingX=parseFloat(cardStyle.paddingLeft)+parseFloat(cardStyle.paddingRight)+parseFloat(cardStyle.borderLeftWidth)+parseFloat(cardStyle.borderRightWidth);
+ const paddingY=parseFloat(cardStyle.paddingTop)+parseFloat(cardStyle.paddingBottom)+parseFloat(cardStyle.borderTopWidth)+parseFloat(cardStyle.borderBottomWidth);
+ let best={imageHeight:-1};
+ // Compare every same-screen layout before considering a single scrolling row.
+ for(let columns=1;columns<=cards.length+1;columns++){
+  const scroll=columns>cards.length;if(scroll&&best.imageHeight>=160)break;
+  const cols=scroll?cards.length:columns,rows=scroll?1:Math.ceil(cards.length/cols);
+  const cardWidth=scroll?width:(width-(cols-1)*gapX)/cols;
+  sets.dataset.scroll=String(scroll);sets.style.setProperty('--sample-columns',cols);sets.style.setProperty('--sample-card-width',cardWidth+'px');
+  const overhead=paddingY+Math.max(...cards.map(card=>{
+   const header=card.querySelector('.sethead'),headerStyle=getComputedStyle(header);
+   const details=Math.max(...[...card.querySelectorAll('.sample-unit')].map(unit=>unit.getBoundingClientRect().height-unit.querySelector('.cell').getBoundingClientRect().height));
+   return header.getBoundingClientRect().height+parseFloat(headerStyle.marginTop)+parseFloat(headerStyle.marginBottom)+details;
+  }));
+  const height=sets.clientHeight-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom);
+  const imageHeight=Math.max(0,Math.min((cardWidth-paddingX-(images-1)*imageGap)/images/ratio,(height-(rows-1)*gapY)/rows-overhead));
+  if(scroll||imageHeight>best.imageHeight)best={columns:cols,cardWidth,cardHeight:imageHeight+overhead,imageHeight,scroll};
+ }
+ sets.dataset.scroll=String(best.scroll);sets.style.setProperty('--sample-columns',best.columns);sets.style.setProperty('--sample-card-width',best.cardWidth+'px');
+ sets.style.setProperty('--sample-card-height',best.cardHeight+'px');sets.style.setProperty('--sample-image-width',best.imageHeight*ratio+'px');
+}
 function render(){const ae=document.activeElement,fk=ae&&ae.id,fref=ae&&ae!==document.body?trapRef(ae):null,ss=ae&&(ae.selectionStart||(ae.value&&ae.matches&&ae.matches('input[type=search],#styleq')?ae.value.length:ae.selectionStart)),m=$("main"),y=m?m.scrollTop:0;
  const stage=$('.sample-stage'),stageTop=stage?.scrollTop||0,setsLeft=$('#sets')?.scrollLeft||0,directoryTop=$('.dir-list')?.scrollTop||0;
  const body=S.view==="form"?viewForm():S.view==="pick"?viewPick():viewDl();
@@ -298,7 +326,11 @@ function cfgBack(){const e=document.querySelector(window._cfgFrom||"#cfgbtn")||$
 function closeCfg(){S.cfgOpen=false;render();cfgBack()}
 
 /* 键盘:Esc 关闭最上层弹窗;弹窗内锁焦点 */
-document.addEventListener("keydown",e=>{const m=S.cfgOpen?$("#cfgdlg"):S.pv?$("#pv"):null;if(!m)return;
+document.addEventListener("keydown",e=>{
+ if(S.view==='pick'&&!S.cfgOpen&&!S.pv&&!S.navigationPending&&['ArrowDown','ArrowUp'].includes(e.key)&&!e.target.closest('input,textarea,select,[contenteditable]')){
+  e.preventDefault();const r=R(),next=r.params.pids[r.params.pids.indexOf(pickPlacement(r))+(e.key==='ArrowDown'?1:-1)];if(next)setPickPlacement(next);return;
+ }
+ const m=S.cfgOpen?$("#cfgdlg"):S.pv?$("#pv"):null;if(!m)return;
  if(e.key==="Escape"){e.preventDefault();S.cfgOpen?closeCfg():closePv();return}
  if(!S.cfgOpen&&(e.key==="ArrowLeft"||e.key==="ArrowRight")&&!e.target.closest('input,textarea,select,[contenteditable]')){e.preventDefault();$(e.key==="ArrowLeft"?'#pvprev':'#pvnext')?.click();return}
  if(e.key==="Tab"){const f=[...m.querySelectorAll("input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,button:not([disabled])")].filter(x=>x.offsetParent!==null);if(!f.length)return;const a=f[0],z=f[f.length-1];if(!m.contains(document.activeElement)){e.preventDefault();(e.shiftKey?z:a).focus()}else if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}}});
@@ -341,10 +373,11 @@ function viewPick(){
   const groups=setsOf(r),pid=pickPlacement(r),p=plOf(pid),visible=groups.filter(g=>g.pid===pid).sort((first,second)=>first.n-second.n);
   const directory=r.params.pids.map(id=>{
     const placement=plOf(id),sets=groups.filter(g=>g.pid===id),slots=sets.flatMap(g=>g.sl),done=slots.filter(s=>s.state==='done').length;
+    const completed=sets.filter(g=>g.sl.length===placement.image_count&&g.sl.every(s=>s.state==='done')).length;
     const selected=sets.filter(g=>selectedSet(r,g)).length,problems=sets.filter(g=>attentionSet(r,g)||g.sl.some(s=>s.delivery_eligible===false)).length;
     const running=slots.some(s=>['queued','generating','waiting_first'].includes(s.state));
     const progress=running?`<span class="dir-gen-progress">${done}/${slots.length}<span class="mini-progress-track" role="progressbar" aria-label="${esc(pname(placement))}生成进度" aria-valuemin="0" aria-valuemax="${slots.length}" aria-valuenow="${done}"><i style="width:${done/Math.max(1,slots.length)*100}%"></i></span></span>`:'';
-    return`<button class="dir-item ${id===pid?'active':''}" data-pick-placement="${id}" aria-current="${id===pid?'true':'false'}" onclick="setPickPlacement('${id}')"><span class="dir-item-name">${esc(pname(placement))}</span><span class="dir-item-size">${psz(placement)}</span><span class="dir-status-cols"><span>${problems?`<span class="dir-problem-text">${problems} 问题</span>`:progress}</span><span>${selected?`<span class="badge-selected">✓ ${selected}</span>`:!running&&!problems?`<span class="badge-unselected-ready">0/${sets.length} 待选</span>`:''}</span></span></button>`;
+    return`<button class="dir-item ${id===pid?'active':''}" data-pick-placement="${id}" aria-current="${id===pid?'true':'false'}" onclick="setPickPlacement('${id}')"><span class="dir-item-name">${esc(pname(placement))}</span><span class="dir-item-size">${psz(placement)}</span><span class="dir-status-cols">${progress}<span class="${selected?'badge-selected':'badge-unselected-ready'}">已选 ${selected}/${completed}</span>${problems?`<span class="dir-problem-text">· ${problems} 问题</span>`:''}</span></button>`;
   }).join('');
   const bulk=bulkSelectionState(r);
   const selectionBar=`<div class="selection-bar"><label class="select-all"><input id="select-visible" type="checkbox" aria-label="全选当前版位" aria-checked="${bulk.mixed?'mixed':bulk.all?'true':'false'}" ${bulk.all?'checked':''} ${!bulk.scope.length||S.selectionBusy?'disabled':''} onchange="selectVisible(this.checked)"><span>全选当前版位</span></label><button class="ghost" id="clear-visible" ${!bulk.selected||S.selectionBusy?'disabled':''} onclick="clearVisibleSelection()">取消选择</button></div>`;
@@ -354,7 +387,8 @@ function viewPick(){
     const on=selectedSet(r,g),ready=readySet(g),problem=attentionSet(r,g)||g.sl.some(s=>s.delivery_eligible===false);
     return`<section class="set ${on?'chosen':''} ${problem?'has-problem':''}" data-set="${g.n}" data-placement="${g.pid}" aria-label="${esc(pname(p))} · 套 ${g.n}" onclick="pickCardClick(event,${g.n},'${g.pid}')"><div class="sethead"><b>第 ${g.n} 套</b><label class="set-check" title="${on?'取消选择':'选择这一套'}"><input type="checkbox" data-sel="${g.id}" aria-label="选择 ${esc(pname(p))} 套 ${g.n}" ${on?'checked':''} ${!ready&&!on||S.selectionBusy?'disabled':''} onchange="toggleSel(${g.n},false,'${g.pid}')"><span aria-hidden="true">✓</span></label></div><div class="sample-row" style="--images:${p.image_count}">${[...g.sl].sort((first,second)=>first.idx-second.idx).map(s=>cellHtml(r,s)).join('')}</div></section>`;
   }).join('');
-  return`<div class="pick-workbench"><nav class="placement-dir" aria-label="本轮版位目录"><label class="dir-top-switch"><input id="auto-next" type="checkbox" ${S.autoNext!==false?'checked':''} onchange="setAutoNext(this.checked)"><span>勾完自动跳到下一版位</span></label><div class="dir-list">${directory}</div></nav><section class="sample-stage"><div class="placement-head"><h2>${esc(pname(p))} <span>${psz(p)}</span></h2><button ${['queued','running'].includes(r.planning_status)||visible.length>=20?'disabled':''} onclick="addVariant('${pid}')">＋ 再出一套</button></div>${legacy}${planError}${selectionBar}<div class="suite-grid" id="sets" style="--columns:${Math.min(p.image_count>1?2:3,visible.length)||1}">${cards||'<div class="tnone">暂无套图</div>'}</div></section></div>`;
+  const next=r.params.pids[r.params.pids.indexOf(pid)+1];
+  return`<div class="pick-workbench"><nav class="placement-dir" aria-label="本轮版位目录"><div class="dir-list">${directory}</div></nav><section class="sample-stage"><div class="placement-head"><h2>${esc(pname(p))} <span>${psz(p)}</span></h2><div><button ${['queued','running'].includes(r.planning_status)||visible.length>=20?'disabled':''} onclick="addVariant('${pid}')">＋ 再出一套</button><button id="next-placement" ${next?'':'disabled'} onclick="setPickPlacement('${next||pid}')">下一版位 →</button></div></div>${legacy}${planError}${selectionBar}<div class="suite-grid" id="sets" style="--images:${p.image_count};--image-ratio:${p.target_width/p.target_height}">${cards||'<div class="tnone">暂无套图</div>'}</div></section></div>`;
 }
 function viewSelectionFooter(){
   const r=R();if(!r)return'';const d=r.delivery||{};

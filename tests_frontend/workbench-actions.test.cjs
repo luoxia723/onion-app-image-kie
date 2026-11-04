@@ -5,11 +5,10 @@ const vm=require('node:vm');
 const path=require('node:path');
 
 function setup(){
- const timers=new Map(),saved=new Map(),calls=[];
+ const timers=new Map(),calls=[],listeners={};
  let timerId=0;
  const ctx=vm.createContext({
-  document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},
-  localStorage:{setItem(key,value){saved.set(key,value)},getItem(key){return saved.get(key)??null}},
+  document:{addEventListener(name,fn){(listeners[name]??=[]).push(fn)},querySelector(){return null}},window:{addEventListener(){}},
   setTimeout(callback,delay){timers.set(++timerId,{callback,delay});return timerId},clearTimeout(id){timers.delete(id)},calls,
  });
  for(const name of ['views','app']){
@@ -18,56 +17,56 @@ function setup(){
  }
  vm.runInContext(`
   PLACEMENTS=['first','second','third'].map(id=>({id,platform:id,name:'单图',image_count:1,target_width:720,target_height:1559}));
-  S.cur='task';S.view='pick';S.autoNext=true;
+  S.cur='task';S.view='pick';
   S.tasks=[{id:'task',ri:0,rounds:[{id:'round',params:{pids:['first','second','third']},sel:{},slots:PLACEMENTS.map(placement=>({id:placement.id,pid:placement.id,set:1,idx:1,state:'done'}))}]}];
   render=()=>{};softRender=()=>{};report=()=>{};toast=()=>{};
   action=async(name,data)=>{calls.push({name,...data});if(name==='adopt')R().sel[selectionKey(data.placement_id,data.set)]=data.adopted;return T()};
   pickPlacement(R());
  `,ctx);
- return{ctx,timers,saved,calls,run:code=>vm.runInContext(code,ctx)};
+ return{ctx,timers,calls,listeners,run:code=>vm.runInContext(code,ctx)};
 }
 
-test('勾选成功后400毫秒跳过已选版位，定位下一待选版位',async()=>{
- const {run,timers,calls}=setup();run('R().sel["second::1"]=true');
- await run('toggleSel(1,false,"first")');
- assert.equal(calls[0].name,'adopt');assert.equal(calls[0].placement_id,'first');
- assert.equal(run('S.pickPid'),'first');assert.equal(timers.size,1);
- const timer=[...timers.values()][0];assert.equal(timer.delay,400);timer.callback();
- assert.equal(run('S.pickPid'),'third');
-});
-
-test('开关写入localStorage，关闭时取消待执行跳转',async()=>{
- const {run,timers,saved}=setup();await run('toggleSel(1,false,"first")');assert.equal(timers.size,1);
- run('setAutoNext(false)');assert.equal(saved.get('onion.pick.autoNext'),'false');assert.equal(timers.size,0);
- await run('toggleSel(1,false,"second")');assert.equal(timers.size,0);
- run('setAutoNext(true)');assert.equal(saved.get('onion.pick.autoNext'),'true');
-});
-
-test('首次启动默认开启自动跳转，重新启动读取已保存的关闭偏好',()=>{
- const initial=setup();initial.run('S.autoNext=false;request=()=>new Promise(()=>{});boot()');assert.equal(initial.run('S.autoNext'),true);
- const restored=setup();restored.saved.set('onion.pick.autoNext','false');
- restored.run('request=()=>new Promise(()=>{});boot()');assert.equal(restored.run('S.autoNext'),false);
-});
-
-test('取消勾选、请求失败和预览内勾选都不自动跳转',async()=>{
- const {run,timers}=setup();run('R().sel["first::1"]=true');await run('toggleSel(1,false,"first")');assert.equal(timers.size,0);
- run('action=async()=>{throw Error("offline")}');await run('toggleSel(1,false,"first")');assert.equal(timers.size,0);
- run('action=async(name,data)=>{R().sel[selectionKey(data.placement_id,data.set)]=data.adopted}');
+test('单套勾选、取消、预览勾选和批量勾选都不切换版位',async()=>{
+ const {run,timers,calls}=setup();
+ await run('toggleSel(1,false,"first")');assert.equal(calls[0].name,'adopt');
+ assert.equal(calls[0].placement_id,'first');assert.equal(run('S.pickPid'),'first');assert.equal(timers.size,0);
+ await run('toggleSel(1,false,"first")');assert.equal(timers.size,0);
  await run('toggleSel(1,true,"first")');assert.equal(timers.size,0);
+ run('action=async(name,data)=>{for(const group of data.sets)R().sel[selectionKey(group.placement_id,group.set)]=data.adopted}');
+ await run('selectVisible(true)');assert.equal(run('S.pickPid'),'first');assert.equal(timers.size,0);
+ await run('clearVisibleSelection()');
+ assert.equal(run('S.pickPid'),'first');assert.equal(timers.size,0);
 });
 
-test('手动换版位和跨任务导航取消跳转，换轮或打开弹层不误跳',async()=>{
- for(const mutation of ['setPickPlacement("third")','beginNavigation()','R().id="another-round"','S.pv="image"','S.view="form"']){
-  const {run,timers}=setup();await run('toggleSel(1,false,"first")');const callback=[...timers.values()][0].callback;
-  run(mutation);const placement=run('S.pickPid');callback();assert.equal(run('S.pickPid'),placement,mutation);
+test('下一版位按钮沿目录顺序切换，包括生成中的版位，到最后禁用',()=>{
+ const {run}=setup();run('R().slots[1].state="generating"');
+ let html=run('viewPick()');assert(!html.includes('auto-next'));assert(!html.includes('勾完自动跳到下一版位'));
+ assert.match(html,/id="next-placement"[^>]*onclick="setPickPlacement\('second'\)"/);
+ run(html.match(/id="next-placement"[^>]*onclick="([^"]+)"/)[1]);assert.equal(run('S.pickPid'),'second');
+ html=run('viewPick()');run(html.match(/id="next-placement"[^>]*onclick="([^"]+)"/)[1]);
+ assert.equal(run('S.pickPid'),'third');assert.match(run('viewPick()'),/id="next-placement"[^>]*disabled/);
+});
+
+test('方向键上下切换版位，到边界保持原位',()=>{
+ const {run,listeners}=setup();let prevented=0;
+ const key=key=>listeners.keydown.forEach(fn=>fn({key,target:{closest(){return null}},preventDefault(){prevented++}}));
+ key('ArrowUp');assert.equal(run('S.pickPid'),'first');
+ key('ArrowDown');assert.equal(run('S.pickPid'),'second');
+ key('ArrowDown');key('ArrowDown');assert.equal(run('S.pickPid'),'third');
+ key('ArrowUp');assert.equal(run('S.pickPid'),'second');assert.equal(prevented,5);
+});
+
+test('输入控件、可编辑内容、大图、配置弹层和配置页中方向键不换版位',()=>{
+ for(const state of ['S.pv="image"','S.cfgOpen=true','S.view="form"','S.navigationPending=true']){
+  const {run,listeners}=setup();run(state);let prevented=false;
+  listeners.keydown.forEach(fn=>fn({key:'ArrowDown',target:{closest(){return null}},preventDefault(){prevented=true}}));
+  assert.equal(run('S.pickPid'),'first',state);assert.equal(prevented,false,state);
  }
-});
-
-test('只有尚在生成的版位时不跳转，批量勾选复用同一延时规则',async()=>{
- const {run,timers}=setup();run('R().slots[1].state="generating";R().sel["third::1"]=true');
- await run('toggleSel(1,false,"first")');[...timers.values()][0].callback();assert.equal(run('S.pickPid'),'first');
- run('R().slots[1].state="done";action=async(name,data)=>{for(const group of data.sets)R().sel[selectionKey(group.placement_id,group.set)]=data.adopted}');
- await run('selectVisible(true)');[...timers.values()].at(-1).callback();assert.equal(run('S.pickPid'),'second');
+ for(const control of ['input','textarea','select','[contenteditable]']){
+  const {run,listeners}=setup();let prevented=false;
+  listeners.keydown.forEach(fn=>fn({key:'ArrowDown',target:{closest(selector){return selector.split(',').includes(control)?{}:null}},preventDefault(){prevented=true}}));
+  assert.equal(run('S.pickPid'),'first',control);assert.equal(prevented,false,control);
+ }
 });
 
 test('生成失败补齐和保存只提交原有接口参数',async()=>{

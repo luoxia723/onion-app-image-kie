@@ -7,8 +7,11 @@ function draftPayload(){return{draft:structuredClone(S.draft),form_drafts:struct
 function showDraftStatus(text,error=false){S.draftStatus=text;const e=document.querySelector('#draft-status');if(e){e.textContent=text;e.classList.toggle('errtx',error)}}
 function scheduleDraftSave(){
   if(S.view!=='form'||S.loadingDraft)return;
+  clearTimeout(draftTimer);
+  const defaults={...defParams(imageFormOf(S.draft)),product_facts:S.product?.text||'',facts_version:S.product?.revision||0};
+  if(!S.draftId&&Object.entries(S.draft).every(([key,value])=>JSON.stringify(value)===JSON.stringify(defaults[key]))&&!Object.values(S.formDrafts||{}).some(pr=>['t1','t2','s1','s2','s3'].some(key=>pr[key]?.trim())))return;
   if(!S.draftId){S.draftId=draftId();S.draftRevision=0;S.draftSequence=0;save(false)}
-  clearTimeout(draftTimer);showDraftStatus('正在保存');
+  showDraftStatus('正在保存');
   draftTimer=setTimeout(()=>persistDraft().catch(e=>{showDraftStatus('保存失败，可重试',true);report(e)}),550);
 }
 async function persistDraft(){
@@ -22,14 +25,14 @@ async function persistDraft(){
 }
 function updateDraftList(){const e=document.querySelector('#draft-list');if(e)e.innerHTML=draftListHtml()}
 async function refreshDraftList(){
-  const q=S.q||'',value=await request('/drafts?summary=1&q='+encodeURIComponent(q));
+  const q=S.q||'',value=await request('/drafts');
   if(q!==(S.q||''))return;S.drafts=value.drafts||[];S.draftSearching=false;updateDraftList();
 }
 function showMoreDrafts(){S.draftLimit=(S.draftLimit||20)+20;updateDraftList()}
 function draftListHtml(){
   if(S.draftSearching)return '<li class="tnone">正在搜索草稿…</li>';
-  const drafts=S.drafts||[],shown=drafts.slice(0,S.draftLimit||20);
-  return drafts.length?`<li class="gh fixed"><span>草稿</span><span>${drafts.length}</span></li>`+shown.map(d=>`<li class="trow"><button class="task ${S.draftId===d.id?'on':''}" onclick="openDraft('${d.id}')"><span class="noimg draft-icon">✎</span><div><div class="t1">${esc(d.name)}</div><div class="t2">${esc(d.draft.image_form||'待填写')}</div></div></button><button class="more" aria-label="删除草稿" onclick="removeDraft('${d.id}')">×</button></li>`).join('')+(shown.length<drafts.length?`<li><button class="lnk draft-more" onclick="showMoreDrafts()">加载更多草稿（还有 ${drafts.length-shown.length} 份）</button></li>`:''):'';
+  const drafts=(S.drafts||[]).filter(d=>JSON.stringify(d.draft).toLowerCase().includes((S.q||'').toLowerCase())),shown=drafts.slice(0,S.draftLimit||20);
+  return drafts.length?`<li class="gh fixed"><span>草稿</span><span>${drafts.length}</span></li>`+shown.map(d=>`<li class="trow"><button class="task ${S.draftId===d.id?'on':''}" onclick="openDraft('${d.id}')"><span class="noimg draft-icon">✎</span><div><div class="t1">${esc(d.name)}</div><div class="t2">${esc(d.draft.channel?[d.draft.channel,d.draft.image_form].filter(Boolean).join(' · '):'待填写')}</div></div></button><button class="more" aria-label="删除草稿" onmousedown="event.preventDefault()" onclick="removeDraft('${d.id}')">×</button></li>`).join('')+(shown.length<drafts.length?`<li><button class="lnk draft-more" onclick="showMoreDrafts()">加载更多草稿（还有 ${drafts.length-shown.length} 份）</button></li>`:''):'';
 }
 async function openDraft(id){
   const epoch=beginNavigation();if(epoch===null)return;try{
@@ -48,16 +51,21 @@ async function openDraft(id){
 }
 async function removeDraft(id){
   if(S.submitting)return toast('正在提交配置，请稍候');
+  if(S.draftId===id)clearTimeout(draftTimer);
   await request('/drafts/'+id,'DELETE',{});await refreshDraftList();
-  if(S.draftId===id){S.draftId=null;S.cur=null;S.editing=null;loadDraft(defParams());S.formDrafts={};S.view='form'}save(false);render();
+  if(S.draftId===id){S.draftId=null;S.cur=null;S.editing=null;loadDraft(defParams(imageFormOf(S.draft)));S.formDrafts={};S.view='form';showDraftStatus('')}save(false);render();
 }
 async function newDraft(params=null,editing=null){
   const epoch=beginNavigation();if(epoch===null)return;try{
   await persistDraft();if(epoch!==viewEpoch)return;
-  if(!params){const product=await request('/product');if(epoch!==viewEpoch)return;S.product=product;params={...defParams(),product_facts:product.text||'',facts_version:product.revision||0}}
-  S.cur=editing?.taskId||null;S.editing=S.cur;S.view='form';S.draftId=draftId();S.submitKey=null;S.submitFingerprint=null;S.draftRevision=0;S.draftSequence=0;
+  if(!params){
+    const empty=(S.drafts||[]).find(d=>!d.editing_task_id&&![d.draft,...Object.values(d.form_drafts||{})].some(pr=>pr.channel||['t1','t2','s1','s2','s3'].some(key=>pr[key]?.trim())));
+    if(empty)return openDraft(empty.id);
+    const b=await request('/bootstrap');if(epoch!==viewEpoch)return;S.product=b.product;FORM_DEFAULTS=b.form_defaults||{};params={...defParams(imageFormOf(S.draft)),product_facts:b.product.text||'',facts_version:b.product.revision||0};
+  }
+  S.cur=editing?.taskId||null;S.editing=S.cur;S.view='form';S.draftId=null;S.submitKey=null;S.submitFingerprint=null;S.draftRevision=0;S.draftSequence=0;
   loadDraft(params);S.formDrafts={};S.tried=false;S.tab='all';S.pf='all';
-  save(false);render();await persistDraft();if(epoch===viewEpoch)document.querySelector('#main').scrollTop=0;
+  showDraftStatus('');save();render();await persistDraft();if(epoch===viewEpoch)document.querySelector('#main').scrollTop=0;
   }finally{finishNavigation(epoch)}
 }
 async function editTaskDraft(){

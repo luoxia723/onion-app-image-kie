@@ -44,28 +44,28 @@ test('裁切错误不把长文本压在窄缩略图上',()=>{
  assert(html.includes('需去框'));
  assert(html.includes('reprocessFrame('));assert(html.includes('fitImage('));
  assert(!html.includes('自动去框失败'));
- assert(html.indexOf('class="sample-actions"')<html.indexOf('class="sample-caption"'));
+ assert(html.includes('class="sample-actions"'));assert(!html.includes('320×210</div>'));
 });
 
 test('目录列出本轮全部版位，看样台只渲染当前版位并使用真实比例',()=>{
  const ctx=setup();let html=vm.runInContext('viewPick()',ctx);
  assert(html.includes('data-pick-placement="oppo"'));assert(html.includes('data-pick-placement="xiaomi"'));
  assert(html.includes('data-slot="oppo11"'));assert(!html.includes('data-slot="xiaomi11"'));
- assert(html.includes('aspect-ratio:320/210'));assert(html.includes('图 2 · 320×210'));
+ assert(html.includes('aspect-ratio:320/210'));assert(html.includes('class="sample-caption">图 2</div>'));assert(!html.includes('图 2 · 320×210'));
  assert(html.includes('--image-ratio:'+320/210));
- assert(html.includes('勾完自动跳到下一版位'));assert(/id="auto-next"[^>]*checked/.test(html));
+ assert(!html.includes('勾完自动跳到下一版位'));assert(html.includes('下一版位 →'));
  ctx.S.pickPid='xiaomi';html=vm.runInContext('viewPick()',ctx);
  assert(html.includes('data-slot="xiaomi11"'));assert(!html.includes('data-slot="oppo11"'));
- assert(html.includes('2/4'));assert(html.includes('mini-progress-track'));
+ assert(html.includes('2/4'));assert(html.includes('mini-progress-track'));assert(html.includes('已选 0/1'));
  assert(/data-sel="xiaomi::2"[^>]*disabled/.test(html));
 });
 
 test('目录区分已选、出齐待选及问题套数',()=>{
- const ctx=setup();let html=vm.runInContext('viewPick()',ctx);assert(html.includes('badge-selected">✓ 1'));
+ const ctx=setup();let html=vm.runInContext('viewPick()',ctx);assert(html.includes('badge-selected">已选 1/2'));
  ctx.round.sel={};ctx.round.slots.forEach(slot=>slot.state='done');html=vm.runInContext('viewPick()',ctx);
- assert.equal((html.match(/0\/2 待选/g)||[]).length,2);
+ assert.equal((html.match(/已选 0\/2/g)||[]).length,2);
  ctx.round.slots[0].delivery_eligible=false;ctx.round.slots[1].state='failed';html=vm.runInContext('viewPick()',ctx);
- assert(html.includes('1 问题'));assert(!html.includes('2 问题'));
+ assert(html.includes('· 1 问题'));assert(html.includes('已选 0/1'));assert(!html.includes('2 问题'));
  assert(html.includes("repairSet('oppo',1)"));assert(html.includes('需去框'));
  assert(/data-sel="oppo::1"[^>]*disabled/.test(html));
 });
