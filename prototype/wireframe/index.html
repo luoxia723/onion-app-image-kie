@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>洋葱学园 · 广告图工作台（灰度线框原型）</title>
+  <link rel="stylesheet" href="wireframe.css" />
+</head>
+<body>
+  <!-- 原型顶部切换栏（仅作原型导航，不属于产品界面） -->
+  <header class="proto-bar" aria-label="原型画面切换栏">
+    <div class="proto-bar-left">
+      <span class="proto-badge">WIREFRAME NAV</span>
+      <span>原型导航栏（不属于产品界面，点击切换 4 个核心画面）：</span>
+    </div>
+    <nav class="proto-nav">
+      <a class="proto-link active" href="#config">1. #config 一屏配置</a>
+      <a class="proto-link" href="#config-custom">2. #config-custom 定制画面展开</a>
+      <a class="proto-link" href="#workbench">3. #workbench 挑选工作台</a>
+      <a class="proto-link" href="#lightbox">4. #lightbox 大图弹层</a>
+    </nav>
+  </header>
+
+  <!-- 全局框架（4 个画面共用） -->
+  <div class="app-shell">
+    <!-- 左侧窄侧栏 -->
+    <aside class="global-sidebar" aria-label="全局任务侧栏">
+      <div class="brand-box">洋葱学园 · 广告图</div>
+      <button type="button" class="btn-primary new-task-btn" onclick="location.hash='#config'">＋ 新建任务</button>
+      <input type="search" class="sidebar-search" placeholder="搜索任务名称 / 文案..." />
+
+      <div class="sidebar-groups">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">草稿</div>
+          <ul class="sidebar-list">
+            <li id="sidebar-active-draft" class="sidebar-item active" onclick="location.hash='#config'">
+              <span>新任务（未命名草稿）</span>
+              <span class="sidebar-item-sub">单图 · 已勾 7 个版位</span>
+            </li>
+            <li class="sidebar-item" onclick="location.hash='#config-custom'">
+              <span>几何辅助线怎么添？</span>
+              <span class="sidebar-item-sub">单图 · 含参考风格图</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">正在处理</div>
+          <ul class="sidebar-list">
+            <li id="sidebar-active-processing" class="sidebar-item" onclick="location.hash='#workbench'">
+              <span>这不看不懂？点开听一听</span>
+              <span class="sidebar-item-sub">已出 9 / 21 张 · 生成中</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">历史</div>
+          <ul class="sidebar-list">
+            <li class="sidebar-item" onclick="location.hash='#workbench'">
+              <span>错题反复错？先找薄弱点</span>
+              <span class="sidebar-item-sub">已存 7 套 · 昨天 18:20</span>
+            </li>
+            <li class="sidebar-item" onclick="location.hash='#workbench'">
+              <span>寒假预习不用愁，动画精讲</span>
+              <span class="sidebar-item-sub">已存 12 套 · 11-01</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button type="button" class="sidebar-settings-btn">⚙ 设置</button>
+      </div>
+    </aside>
+
+    <!-- 主舞台区域 -->
+    <main class="stage-container">
+      <!-- =====================================================
+           画面 1 (#config) & 画面 2 (#config-custom)
+           ===================================================== -->
+      <section id="screen-config" class="view-screen active">
+        <div class="top-header">
+          <div class="breadcrumb">任务 / <strong>新任务</strong></div>
+          <div class="stepper">
+            <span class="step-pill active">① 配置生成</span>
+            <span class="step-arrow">→</span>
+            <span class="step-pill">② 挑选保存</span>
+          </div>
+        </div>
+
+        <div id="config-body" class="config-body">
+          <!-- 主区左栏（宽） -->
+          <div class="config-main-col">
+            <!-- 1. 图片形式 + 文案输入 -->
+            <div class="panel-card">
+              <div class="form-top-bar">
+                <span class="section-title">1. 图片形式与文案</span>
+                <div class="seg-group" role="group" aria-label="图片形式">
+                  <button type="button" class="seg-btn active">单图</button>
+                  <button type="button" class="seg-btn">双图</button>
+                  <button type="button" class="seg-btn">三图</button>
+                </div>
+              </div>
+              <div class="copy-fields-grid">
+                <label class="field-item">
+                  <span class="field-label">主标题</span>
+                  <input id="input-main-title" type="text" value="这不看不懂？点开听一听" />
+                </label>
+                <label class="field-item">
+                  <span class="field-label">副标题</span>
+                  <input type="text" value="拍题看分步解析，不懂还能接着问" />
+                </label>
+                <label class="field-item">
+                  <span class="field-label">按钮文字</span>
+                  <input type="text" value="立即体验" />
+                </label>
+              </div>
+            </div>
+
+            <!-- 2. 版位选择（按渠道分组，紧凑勾选标签，默认勾选 7 个） -->
+            <div class="panel-card">
+              <div class="section-row-head" style="margin-bottom: 4px;">
+                <span class="section-title">2. 版位（单图版位）</span>
+                <span class="muted-note">按渠道分组，点击标签勾选目标投放尺寸</span>
+              </div>
+
+              <!-- 应用商店（5 项，默认勾选 3 项） -->
+              <div class="channel-group">
+                <div class="channel-label">应用商店</div>
+                <div class="placement-tags">
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>华为 单图 984×422</span>
+                  </label>
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>OPPO 横版大图 1280×720</span>
+                  </label>
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>小米 大图 960×540</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>小米 小图 480×320</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>荣耀 大图文 1280×720</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 信息流（8 项，默认勾选 4 项，合共 7 项） -->
+              <div class="channel-group">
+                <div class="channel-label">信息流</div>
+                <div class="placement-tags">
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>微博粉丝通 横版单图 1280×720</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>喜马拉雅 单图 1280×720</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>喜马拉雅 单图 720×1280</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>喜马拉雅 单图 1200×480</span>
+                  </label>
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>喜马拉雅 单图 1000×1000</span>
+                  </label>
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>喜马拉雅 单图 720×1559</span>
+                  </label>
+                  <label class="placement-tag">
+                    <input type="checkbox" class="placement-checkbox" />
+                    <span>CPA 横图 690×360</span>
+                  </label>
+                  <label class="placement-tag checked">
+                    <input type="checkbox" class="placement-checkbox" checked />
+                    <span>CPA 竖图 1080×1920</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 每版位套数：数字步进器（− 3 ＋） -->
+            <div class="panel-card compact-inline-card">
+              <div class="inline-left">
+                <span class="section-title">3. 每版位套数</span>
+                <div class="stepper-control" aria-label="每版位套数步进器">
+                  <button type="button" id="sets-minus-btn" class="stepper-btn">−</button>
+                  <span id="sets-stepper-val" class="stepper-val">3</span>
+                  <button type="button" id="sets-plus-btn" class="stepper-btn">＋</button>
+                </div>
+                <span class="muted-note">每个版位并行生成不同构图与 IP 方案供挑选</span>
+              </div>
+            </div>
+
+            <!-- 4A. 画面设定（#config 默认状态：只占一行） -->
+            <div id="scene-setting-compact" class="panel-card compact-inline-card">
+              <div class="inline-left">
+                <span class="section-title">4. 画面设定</span>
+                <span class="summary-inline-text">画面：全部随机 · IP：随机 · Logo：使用</span>
+              </div>
+              <button type="button" id="open-custom-btn" class="btn-sm">定制</button>
+            </div>
+
+            <!-- 4B. 画面设定（#config-custom 展开面板） -->
+            <div id="scene-setting-expanded" class="panel-card" style="display: none;">
+              <div class="custom-panel-header">
+                <span class="section-title">4. 画面设定（定制已展开）</span>
+                <button type="button" id="collapse-custom-btn" class="btn-sm">收起定制</button>
+              </div>
+
+              <!-- 画面来源分段按钮 -->
+              <div class="custom-source-row">
+                <span class="field-label" style="font-size: 12px; color: #222;">画面来源</span>
+                <div class="seg-group" role="group" aria-label="画面来源">
+                  <button type="button" class="seg-btn">随机</button>
+                  <button type="button" class="seg-btn active">按参考图</button>
+                </div>
+              </div>
+
+              <!-- 三个并列的固定上传位卡片 -->
+              <div class="upload-cards-grid">
+                <!-- 卡片 1：参考风格（已上传状态） -->
+                <div class="upload-slot-card uploaded">
+                  <div class="slot-head">
+                    <span class="slot-title">参考风格</span>
+                    <span class="slot-desc">借配色、笔触、质感</span>
+                  </div>
+                  <div class="uploaded-preview-wrap">
+                    <div class="thumb-placeholder">800×600</div>
+                    <div class="uploaded-meta">
+                      <strong>已上传风格参考图</strong>
+                      <span>拖入或点击上传，1 张（可替换）</span>
+                    </div>
+                  </div>
+                  <div class="extracted-points-box">
+                    <div class="extracted-points-label">系统整理的要点（点击标签可直接编辑）：</div>
+                    <div class="points-tag-list">
+                      <span class="point-editable-tag" contenteditable="true" spellcheck="false">低饱和暖色</span>
+                      <span class="point-editable-tag" contenteditable="true" spellcheck="false">水彩笔触</span>
+                      <span class="point-editable-tag" contenteditable="true" spellcheck="false">柔和顶光</span>
+                    </div>
+                    <div class="points-Confirm-row">
+                      <button type="button" class="btn-sm btn-primary">确认要点</button>
+                    </div>
+                  </div>
+                  <input type="text" placeholder="补充说明（选填）" value="保持纸张颗粒感，背景不要杂乱" />
+                </div>
+
+                <!-- 卡片 2：参考排版 -->
+                <div class="upload-slot-card">
+                  <div class="slot-head">
+                    <span class="slot-title">参考排版</span>
+                    <span class="slot-desc">借主体位置、文字区域</span>
+                  </div>
+                  <div class="dropzone-box">拖入或点击上传，1 张</div>
+                  <input type="text" placeholder="补充说明（选填）" />
+                </div>
+
+                <!-- 卡片 3：产品界面 -->
+                <div class="upload-slot-card">
+                  <div class="slot-head">
+                    <span class="slot-title">产品界面</span>
+                    <span class="slot-desc">放进画面里的屏幕，界面文字不改</span>
+                  </div>
+                  <div class="dropzone-box">拖入或点击上传，1 张</div>
+                  <input type="text" placeholder="补充说明（选填）" />
+                </div>
+              </div>
+
+              <!-- 画风锁定说明 + 紧凑控件（IP / Logo / 标题字体） -->
+              <div class="custom-options-bar">
+                <div class="compact-ctrl-item">
+                  <span class="field-label">画风：</span>
+                  <span class="locked-badge">🔒 按参考图（锁定）</span>
+                  <span class="muted-note">放了风格图，所有套统一用这个风格</span>
+                </div>
+
+                <label class="compact-ctrl-item">
+                  <span class="field-label">IP：</span>
+                  <select>
+                    <option value="random" selected>随机</option>
+                    <option value="custom">指定</option>
+                    <option value="none">不用</option>
+                  </select>
+                </label>
+
+                <label class="compact-ctrl-item">
+                  <span class="field-label">Logo：</span>
+                  <select>
+                    <option value="use" selected>使用</option>
+                    <option value="none">不用</option>
+                  </select>
+                </label>
+
+                <label class="compact-ctrl-item">
+                  <span class="field-label">标题字体：</span>
+                  <select>
+                    <option value="random" selected>随机</option>
+                    <option value="none">不用</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <!-- 5. 「高级」折叠行（默认收起状态，里面是方向名，默认取主标题） -->
+            <details class="advanced-details">
+              <summary>5. 高级</summary>
+              <div class="advanced-body">
+                <label class="field-label" for="input-direction-name">方向名（默认取主标题）：</label>
+                <input
+                  id="input-direction-name"
+                  type="text"
+                  value="这不看不懂？点开听一听"
+                  style="flex: 1; max-width: 360px;"
+                />
+              </div>
+            </details>
+          </div>
+
+          <!-- 主区右栏（窄，固定在视口内） -->
+          <aside class="config-summary-col" aria-label="本次生成汇总">
+            <div class="summary-title">本次生成</div>
+            <div class="summary-metrics">
+              <div class="summary-metric-row">
+                <span>版位</span>
+                <strong id="summary-placement-count">7 个</strong>
+              </div>
+              <div class="summary-metric-row">
+                <span>每版位</span>
+                <strong id="summary-sets-count">3 套</strong>
+              </div>
+            </div>
+
+            <div class="summary-total-box">
+              <span class="summary-total-label">总计出图</span>
+              <span id="summary-total-images" class="summary-total-num">共 21 张</span>
+            </div>
+
+            <label class="field-item">
+              <span class="field-label">图片模型</span>
+              <select>
+                <option value="gpt-image-2.5-sunburst-1k" selected>GPT Image 2.5 Sunburst · 1K</option>
+                <option value="gpt-image-2-1k">GPT Image 2 · 1K</option>
+              </select>
+            </label>
+
+            <button type="button" id="start-gen-btn" class="btn-primary start-gen-btn">开始生成</button>
+          </aside>
+        </div>
+      </section>
+
+      <!-- =====================================================
+           画面 3 (#workbench) 挑选工作台（边出边挑）
+           ===================================================== -->
+      <section id="screen-workbench" class="view-screen">
+        <!-- 顶部任务栏 -->
+        <div class="top-header">
+          <div class="workbench-header-left">
+            <span class="workbench-task-title">这不看不懂？点开听一听</span>
+            <span class="workbench-progress-pill">已出 9 / 21 张 · 生成中</span>
+            <span class="muted-note">可以离开，回来从侧栏继续</span>
+          </div>
+          <div class="workbench-header-actions">
+            <button type="button" id="btn-edit-config">修改配置</button>
+            <button type="button" onclick="location.hash='#config'">复制为新任务</button>
+          </div>
+        </div>
+
+        <!-- 工作台主区：左栏版位目录 + 右栏大图画廊 -->
+        <div class="workbench-main">
+          <!-- 左栏：版位目录（7 项） -->
+          <aside class="placement-dir" aria-label="版位目录">
+            <label class="dir-top-switch">
+              <input type="checkbox" checked />
+              <span>勾完自动跳到下一个版位</span>
+            </label>
+            <ul class="dir-list">
+              <li class="dir-item active" data-placement-title="喜马拉雅 单图 720×1559">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-status status-done">✓ 已选 1 套</span>
+                </div>
+                <div class="dir-item-size">720×1559</div>
+              </li>
+              <li class="dir-item" data-placement-title="华为 单图 984×422">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">华为 单图</span>
+                  <span class="dir-item-status status-done">✓ 已选 1 套</span>
+                </div>
+                <div class="dir-item-size">984×422</div>
+              </li>
+              <li class="dir-item" data-placement-title="OPPO 横版大图 1280×720">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">OPPO 横版大图</span>
+                  <span class="dir-item-status">3 套待挑</span>
+                </div>
+                <div class="dir-item-size">1280×720</div>
+              </li>
+              <li class="dir-item" data-placement-title="小米 大图 960×540">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">小米 大图</span>
+                  <span class="dir-item-status status-problem">1 个问题</span>
+                </div>
+                <div class="dir-item-size">960×540</div>
+              </li>
+              <li class="dir-item" data-placement-title="微博粉丝通 横版单图 1280×720">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">微博粉丝通 横版单图</span>
+                  <span class="dir-item-status status-done">✓ 已选 1 套</span>
+                </div>
+                <div class="dir-item-size">1280×720</div>
+              </li>
+              <li class="dir-item" data-placement-title="喜马拉雅 单图 1000×1000">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-status status-done">✓ 已选 1 套</span>
+                </div>
+                <div class="dir-item-size">1000×1000</div>
+              </li>
+              <li class="dir-item" data-placement-title="CPA 竖图 1080×1920">
+                <div class="dir-item-top">
+                  <span class="dir-item-name">CPA 竖图</span>
+                  <span class="dir-item-status">生成中 1/3</span>
+                </div>
+                <div class="dir-item-size">1080×1920</div>
+              </li>
+            </ul>
+          </aside>
+
+          <!-- 主区：当前版位标题 + 3 套横向并排大图画廊 + 底部固定保存栏 -->
+          <div class="workbench-gallery-pane">
+            <div class="gallery-header">
+              <div id="workbench-current-placement-title" class="gallery-title">喜马拉雅 单图 720×1559</div>
+              <button type="button">＋ 再出一套</button>
+            </div>
+
+            <div class="gallery-cards-stage">
+              <!-- 第 1 套：已完成，可勾选 -->
+              <div class="set-card-wrap">
+                <div id="set-1-card" class="set-card selected">
+                  <label class="set-card-checkbox-label">
+                    <input id="set-1-checkbox" type="checkbox" checked />
+                    <span id="set-1-checkbox-text">已勾选</span>
+                  </label>
+                  <div class="ratio-rect-720x1559 clickable js-open-lightbox" title="点击放大查看详情 (#lightbox)">
+                    <div class="ratio-dim-label">720×1559</div>
+                    <div class="ratio-sub-copy">
+                      这不看不懂？点开听一听<br />
+                      拍题看分步解析，不懂还能接着问<br />
+                      [立即体验]
+                    </div>
+                    <div class="muted-note" style="margin-top: 10px;">（点击图片打开大图弹层）</div>
+                  </div>
+                </div>
+                <div class="set-meta-footer">
+                  <strong>第 1 套</strong>
+                  <span>IP：豆花</span>
+                </div>
+              </div>
+
+              <!-- 第 2 套：生成中（骨架占位，写「生成中」，复选框置灰不可勾选） -->
+              <div class="set-card-wrap">
+                <div class="set-card">
+                  <label class="set-card-checkbox-label disabled" title="生成中不可勾选">
+                    <input type="checkbox" disabled />
+                    <span>不可勾选</span>
+                  </label>
+                  <div class="ratio-rect-720x1559 skeleton">
+                    <div class="ratio-dim-label">720×1559</div>
+                    <div class="ratio-sub-copy" style="font-weight: 700; font-size: 13px; color: #333;">生成中</div>
+                  </div>
+                </div>
+                <div class="set-meta-footer">
+                  <strong>第 2 套</strong>
+                  <span>IP：洋葱头</span>
+                </div>
+              </div>
+
+              <!-- 第 3 套：有问题（标签「去框失败」，按钮「重新去框」「整图适配」，复选框置灰不可勾选） -->
+              <div class="set-card-wrap">
+                <div class="set-card">
+                  <span class="problem-badge">去框失败</span>
+                  <label class="set-card-checkbox-label disabled" title="去框失败不可勾选">
+                    <input type="checkbox" disabled />
+                    <span>不可勾选</span>
+                  </label>
+                  <div class="ratio-rect-720x1559">
+                    <div class="ratio-dim-label">720×1559</div>
+                    <div class="ratio-sub-copy">边缘检测到残留留白框</div>
+                    <div class="problem-actions-box">
+                      <div class="problem-btn-row">
+                        <button type="button" class="btn-sm">重新去框</button>
+                        <button type="button" class="btn-sm">整图适配</button>
+                      </div>
+                      <div class="muted-note">本机处理，不花钱</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="set-meta-footer">
+                  <strong>第 3 套</strong>
+                  <span>IP：狗蛋</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部固定保存栏 -->
+            <div class="workbench-save-bar">
+              <div id="workbench-save-status" class="save-bar-status">
+                已选 4 套 · 覆盖 5/7 个版位 · 还有 2 套在出
+              </div>
+              <div class="save-bar-right">
+                <button type="button" id="workbench-save-btn" class="btn-primary">保存已合格的 4 套</button>
+                <span class="muted-note">没出完的套，出完可再存</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =====================================================
+             画面 4 (#lightbox) 大图弹层（盖住整个视口含左侧栏）
+             ===================================================== -->
+        <div id="lightbox-overlay" class="lightbox-backdrop" role="dialog" aria-label="大图预览弹层">
+          <div class="lightbox-stage">
+            <div class="lightbox-figure-row">
+              <button type="button" class="lightbox-nav-btn" aria-label="上一套">←</button>
+              <div class="lightbox-center-col">
+                <div class="lightbox-image-frame">
+                  <div class="ratio-dim-label" style="font-size: 18px;">720×1559</div>
+                  <div class="ratio-sub-copy" style="font-size: 13px; margin-top: 10px;">
+                    <strong>这不看不懂？点开听一听</strong><br />
+                    拍题看分步解析，不懂还能接着问<br /><br />
+                    <span style="border: 1px solid #333; padding: 3px 10px; border-radius: 3px;">立即体验</span>
+                  </div>
+                </div>
+                <div class="lightbox-counter">第 1 / 3 套</div>
+              </div>
+              <button type="button" class="lightbox-nav-btn" aria-label="下一套">→</button>
+            </div>
+          </div>
+
+          <!-- 右侧窄面板 -->
+          <aside class="lightbox-side-panel">
+            <div class="lightbox-panel-top">
+              <div>
+                <div class="lightbox-placement-title">喜马拉雅 单图 720×1559</div>
+                <div class="muted-note">第 1 套 · IP：豆花</div>
+              </div>
+              <button type="button" id="close-lightbox-btn" class="lightbox-close-btn">✕ 关闭</button>
+            </div>
+
+            <div class="lightbox-action-stack">
+              <button type="button" id="lightbox-toggle-select-btn" class="btn-primary">勾选这一套</button>
+              <button type="button">重出本张</button>
+            </div>
+
+            <details class="advanced-details">
+              <summary>高级</summary>
+              <div class="lightbox-adv-stack">
+                <label class="field-item">
+                  <span class="field-label">提示词</span>
+                  <textarea class="lightbox-prompt-textarea">竖版 720x1559 教育广告图，角色豆花正在拿着放大镜看数学几何题，上方大字标题「这不看不懂？点开听一听」，副标题「拍题看分步解析，不懂还能接着问」，底部按钮「立即体验」，柔和顶光，干净背景。</textarea>
+                </label>
+
+                <div class="field-item">
+                  <span class="field-label">参考图缩略图</span>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <div class="thumb-placeholder">800×600</div>
+                    <span class="muted-note">风格参考：低饱和暖色、水彩笔触</span>
+                  </div>
+                </div>
+
+                <label class="field-item">
+                  <span class="field-label">图片版本</span>
+                  <select>
+                    <option value="v2" selected>v2 · 去框精修版（当前）</option>
+                    <option value="v1">v1 · 原始生成图</option>
+                  </select>
+                </label>
+              </div>
+            </details>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="wireframe.js"></script>
+</body>
+</html>

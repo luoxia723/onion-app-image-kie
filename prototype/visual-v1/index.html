@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>洋葱学园 · 广告图工作台（visual-v1）</title>
+  <link rel="stylesheet" href="wireframe.css?v=12" />
+  <link rel="stylesheet" href="visual.css?v=12" />
+</head>
+<body>
+  <!-- 原型导航栏（独立于产品界面） -->
+  <header class="proto-bar" aria-label="原型导航">
+    <div class="proto-bar-left">
+      <span class="proto-badge">VISUAL v1</span>
+    </div>
+    <nav class="proto-nav">
+      <a class="proto-link active" href="#config">#config</a>
+      <a class="proto-link" href="#config-app3">#config-app3</a>
+      <a class="proto-link" href="#config-custom">#config-custom</a>
+      <a class="proto-link" href="#workbench">#workbench</a>
+      <a class="proto-link" href="#workbench-3">#workbench-3</a>
+      <a class="proto-link" href="#lightbox">#lightbox</a>
+    </nav>
+  </header>
+
+  <!-- 产品全局框架 -->
+  <div class="app-shell">
+    <!-- 全局左侧栏：新建任务、搜索、草稿、正在处理、历史、设置 -->
+    <aside class="global-sidebar" aria-label="全局侧栏">
+      <div class="sidebar-brand">
+        <img src="assets/logo.png" alt="洋葱学园" class="sidebar-logo-img" />
+      </div>
+      <button type="button" class="new-task-btn" onclick="location.hash='#config'">
+        <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+        <span>新建任务</span>
+      </button>
+      <input type="search" class="sidebar-search" placeholder="搜索" />
+
+      <div class="sidebar-groups">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">草稿</div>
+          <ul class="sidebar-list">
+            <li id="sidebar-active-draft" class="sidebar-item active" onclick="location.hash='#config'">
+              <span class="sidebar-item-title">这不看不懂？点开听一听</span>
+              <span class="sidebar-item-meta">信息流 · 7 版位</span>
+            </li>
+            <li id="sidebar-draft-app3" class="sidebar-item" onclick="location.hash='#config-app3'">
+              <span class="sidebar-item-title">搜题三步讲透</span>
+              <span class="sidebar-item-meta">商店三图 · 4 版位</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">正在处理</div>
+          <ul class="sidebar-list">
+            <li id="sidebar-active-processing" class="sidebar-item" onclick="location.hash='#workbench'">
+              <span class="sidebar-item-title">这不看不懂？点开听一听</span>
+              <span class="sidebar-item-meta">16 / 21</span>
+            </li>
+            <li id="sidebar-proc-app3" class="sidebar-item" onclick="location.hash='#workbench-3'">
+              <span class="sidebar-item-title">搜题三步讲透</span>
+              <span class="sidebar-item-meta">14 / 24</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">历史</div>
+          <ul class="sidebar-list">
+            <li class="sidebar-item" onclick="location.hash='#workbench'">
+              <span class="sidebar-item-title">拍题看分步解析</span>
+              <span class="sidebar-item-meta">11-03</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button type="button" class="sidebar-settings-btn">设置</button>
+      </div>
+    </aside>
+
+    <!-- 主工作区 -->
+    <main class="stage-container">
+      <!-- =====================================================
+           页面 1：一屏配置 (#config & #config-custom)
+           ===================================================== -->
+      <section id="screen-config" class="view-screen active">
+        <div id="config-body" class="config-body">
+          <!-- 左侧主角区：图片形式与文案 + 版位 + 画面设定 -->
+          <div class="config-main-col">
+            <!-- 区块 A：渠道（第一行单选） + 形式（仅应用商店显示） + 文案 + 全局按钮文字 -->
+            <div class="panel-card">
+              <div class="channel-format-header">
+                <div class="ctrl-row">
+                  <span class="row-label">渠道</span>
+                  <div class="seg-group" id="channel-seg-group" role="group" aria-label="投放渠道">
+                    <button type="button" class="seg-btn" data-channel="appstore">应用商店</button>
+                    <button type="button" class="seg-btn active" data-channel="feed">信息流</button>
+                    <button type="button" class="seg-btn" data-channel="device">学习机</button>
+                  </div>
+                  <button type="button" id="clear-channel-btn" class="link-btn ml-auto" title="演示未选渠道置灰态">清空选择</button>
+                </div>
+
+                <div class="ctrl-row" id="format-row" style="display: none;">
+                  <span class="row-label">形式</span>
+                  <div class="seg-group" id="format-seg-group" role="group" aria-label="图片形式">
+                    <button type="button" class="seg-btn active" data-format="single">单图</button>
+                    <button type="button" class="seg-btn" data-format="double">双图</button>
+                    <button type="button" class="seg-btn" data-format="triple">三图</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 渠道选好前或选学习机时，下方文案受控 -->
+              <div id="copy-section-wrap" class="channel-dependent">
+                <!-- 单图文案：主标题 + 副标题 + 按钮文字 -->
+                <div id="copy-single" class="copy-grid-single">
+                  <label class="field-item">
+                    <span class="field-label">主标题</span>
+                    <input id="input-main-title" type="text" value="这不看不懂？点开听一听" />
+                  </label>
+                  <label class="field-item">
+                    <span class="field-label">副标题</span>
+                    <input id="input-sub-title" type="text" value="拍题看分步解析，不懂还能接着问" />
+                  </label>
+                  <div class="field-item" id="global-cta-box">
+                    <div class="field-label-row">
+                      <span class="field-label">默认按钮文字</span>
+                      <label class="inline-toggle">
+                        <input type="checkbox" id="global-cta-enabled" checked />
+                        <span>默认加按钮</span>
+                      </label>
+                    </div>
+                    <input id="global-cta-input" type="text" value="立即体验" />
+                  </div>
+                </div>
+
+                <!-- 双图/三图文案：句 1、句 2、（句 3） + 按钮文字 -->
+                <div id="copy-multi" class="copy-grid-multi" style="display: none;">
+                  <label class="field-item">
+                    <span class="field-label">句 1</span>
+                    <input id="input-line-1" type="text" value="遇到难题别发愁，拍一下就有思路" />
+                  </label>
+                  <label class="field-item">
+                    <span class="field-label">句 2</span>
+                    <input id="input-line-2" type="text" value="动画分步讲透考点，比看答案更懂" />
+                  </label>
+                  <label class="field-item" id="copy-multi-line3" style="display: none;">
+                    <span class="field-label">句 3</span>
+                    <input id="input-line-3" type="text" value="举一反三练同类题，下次考到稳拿分" />
+                  </label>
+                  <div class="field-item">
+                    <div class="field-label-row">
+                      <span class="field-label">默认按钮文字</span>
+                      <label class="inline-toggle">
+                        <input type="checkbox" id="global-cta-enabled-multi" checked />
+                        <span>默认加按钮</span>
+                      </label>
+                    </div>
+                    <input id="global-cta-input-multi" type="text" value="立即体验" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 区块 B：版位（取决于 渠道 × 形式，紧凑对齐列表行） -->
+            <div class="panel-card placements-card channel-dependent" id="placements-panel">
+              <div class="placements-header-bar">
+                <span class="section-label">版位</span>
+                <span id="placement-combo-badge" class="combo-badge">信息流 · 单图（已选 7/8）</span>
+              </div>
+
+              <!-- 列表容器：按平台分组双列排布，默认静态渲染信息流·单图 -->
+              <div id="placement-rows-container" class="platform-groups-grid">
+                <div class="platform-group">
+                  <div class="platform-group-title">微博粉丝通</div>
+                  <div class="platform-items-list">
+                    <div class="placement-row checked" data-id="feed-wb" data-cta-mode="inherit" data-cta-custom="">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">横版单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">1280×720</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="platform-group">
+                  <div class="platform-group-title">CPA</div>
+                  <div class="platform-items-list">
+                    <div class="placement-row" data-id="feed-cpa-h" data-cta-mode="inherit" data-cta-custom="">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" />
+                        <span class="row-name">横图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">690×360</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                    <div class="placement-row checked" data-id="feed-cpa-v" data-cta-mode="none" data-cta-custom="">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">竖图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">1080×1920</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-none"><span class="chip-cta-label">无按钮</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="platform-group span-2">
+                  <div class="platform-group-title">喜马拉雅</div>
+                  <div class="platform-items-list grid-2col">
+                    <div class="placement-row checked" data-id="feed-xm-1280" data-cta-mode="inherit" data-cta-custom="">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">1280×720</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                    <div class="placement-row checked" data-id="feed-xm-720x1280" data-cta-mode="inherit" data-cta-custom="" data-force-logo="true">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">720×1280</span><span class="logo-lock-icon" title="固定带 Logo">🔒Logo</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                    <div class="placement-row checked" data-id="feed-xm-1200x480" data-cta-mode="inherit" data-cta-custom="">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">1200×480</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                    <div class="placement-row checked" data-id="feed-xm-1000" data-cta-mode="custom" data-cta-custom="马上听">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">1000×1000</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-custom"><span class="chip-cta-label">马上听</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                    <div class="placement-row checked" data-id="feed-xm-720x1559" data-cta-mode="inherit" data-cta-custom="" data-force-logo="true">
+                      <label class="row-check-label">
+                        <input type="checkbox" class="placement-checkbox" checked />
+                        <span class="row-name">单图</span>
+                      </label>
+                      <span class="row-size-cell"><span class="row-size">720×1559</span><span class="logo-lock-icon" title="固定带 Logo">🔒Logo</span></span>
+                      <div class="row-trailing">
+                        <button type="button" class="chip-cta mode-inherit"><span class="chip-cta-label">立即体验</span><span class="chip-cta-caret">▾</span></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 学习机空态占位 -->
+              <div id="device-empty-state" class="device-empty-box" style="display: none;">
+                学习机版位暂未接入
+              </div>
+
+              <!-- 单个版位按钮文字紧凑下拉菜单（3 选项：跟随统一 / 自定义 / 无按钮） -->
+              <div id="cta-popover" class="cta-dropdown-menu" style="display: none;">
+                <button type="button" id="cta-opt-inherit" class="cta-menu-item">跟随统一<span id="cta-inherit-text" class="cta-menu-current"> · 立即体验</span></button>
+                <button type="button" id="cta-opt-custom" class="cta-menu-item">自定义</button>
+                <button type="button" id="cta-opt-none" class="cta-menu-item">无按钮</button>
+              </div>
+            </div>
+
+            <!-- 区块 C1：画面设定（默认收起，只占极小一行空间） -->
+            <div id="scene-setting-compact" class="panel-card compact-scene-bar channel-dependent">
+              <div class="scene-summary-left">
+                <span class="section-label">画面设定</span>
+                <span class="scene-pill">全部随机</span>
+              </div>
+              <button type="button" id="open-custom-btn" class="btn-sm">定制 ▾</button>
+            </div>
+
+            <!-- 区块 C2：画面设定（#config-custom 展开定制） -->
+            <div id="scene-setting-expanded" class="panel-card custom-scene-panel channel-dependent" style="display: none;">
+              <div class="custom-panel-top">
+                <div class="custom-source-bar">
+                  <span class="section-label">画面设定</span>
+                  <div class="seg-group" id="source-seg-group" role="group" aria-label="画面来源">
+                    <button type="button" class="seg-btn" data-source="random">随机</button>
+                    <button type="button" class="seg-btn active" data-source="ref">按参考图</button>
+                  </div>
+                </div>
+                <button type="button" id="collapse-custom-btn" class="btn-sm">收起 ▴</button>
+              </div>
+
+              <!-- 按参考图：三个固定上传位 -->
+              <div id="ref-upload-grid" class="upload-cards-grid">
+                <!-- 1. 参考风格（默认展示待确认状态：可删/加标签 + 确认按钮） -->
+                <div class="upload-slot-card uploaded" id="style-slot-card">
+                  <div class="slot-header">
+                    <span class="slot-title">参考风格</span>
+                    <button type="button" class="slot-clear-btn" id="toggle-style-upload-btn">移除</button>
+                  </div>
+                  <div class="slot-body-uploaded" id="style-uploaded-view">
+                    <div class="ratio-thumb-4x3">
+                      <img class="sample-img" src="assets/samples/feed-1280x720-1.jpg" alt="参考风格缩略图" />
+                    </div>
+                    <div class="points-confirm-area" id="points-confirm-area" data-status="pending">
+                      <div class="points-tag-list" id="points-tag-list">
+                        <span class="point-tag">
+                          <span class="point-tag-text" contenteditable="true" spellcheck="false">低饱和暖色</span>
+                          <button type="button" class="point-tag-del" aria-label="删除">×</button>
+                        </span>
+                        <span class="point-tag">
+                          <span class="point-tag-text" contenteditable="true" spellcheck="false">水彩笔触</span>
+                          <button type="button" class="point-tag-del" aria-label="删除">×</button>
+                        </span>
+                        <span class="point-tag">
+                          <span class="point-tag-text" contenteditable="true" spellcheck="false">柔和顶光</span>
+                          <button type="button" class="point-tag-del" aria-label="删除">×</button>
+                        </span>
+                        <button type="button" id="add-point-btn" class="point-add-btn">＋ 添加要点</button>
+                      </div>
+                      <div class="points-action-row">
+                        <button type="button" id="confirm-points-btn" class="btn-sm">确认</button>
+                        <button type="button" id="edit-points-link" class="link-btn" style="display: none;">修改</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="dropzone-box" id="style-empty-view" style="display: none;">＋ 上传 1 张</div>
+                  <input type="text" class="slot-note-input" placeholder="补充说明" />
+                </div>
+
+                <!-- 2. 参考排版 -->
+                <div class="upload-slot-card">
+                  <div class="slot-header">
+                    <span class="slot-title">参考排版</span>
+                  </div>
+                  <div class="dropzone-box">＋ 上传 1 张</div>
+                  <input type="text" class="slot-note-input" placeholder="补充说明" />
+                </div>
+
+                <!-- 3. 产品界面 -->
+                <div class="upload-slot-card">
+                  <div class="slot-header">
+                    <span class="slot-title">产品界面</span>
+                  </div>
+                  <div class="dropzone-box">＋ 上传 1 张</div>
+                  <input type="text" class="slot-note-input" placeholder="补充说明" />
+                </div>
+              </div>
+
+              <!-- 画风锁定 + IP角色 + Logo + 标题字体 -->
+              <div class="custom-controls-row">
+                <div class="ctrl-group">
+                  <span class="field-label">画风</span>
+                  <span id="style-lock-pill" class="style-status-pill">随机</span>
+                </div>
+
+                <div class="ctrl-group">
+                  <span class="field-label">IP 角色</span>
+                  <select id="ip-mode-select">
+                    <option value="random" selected>随机</option>
+                    <option value="custom">指定</option>
+                    <option value="none">不用</option>
+                  </select>
+                  <div id="ip-roster-pills" class="ip-roster" style="display: none;">
+                    <label class="mini-check"><input type="checkbox" checked /><span>豆包</span></label>
+                    <label class="mini-check"><input type="checkbox" /><span>上官</span></label>
+                    <label class="mini-check"><input type="checkbox" /><span>小锤</span></label>
+                    <label class="mini-check"><input type="checkbox" /><span>雷婷</span></label>
+                    <label class="mini-check"><input type="checkbox" checked /><span>豆花</span></label>
+                    <label class="mini-check"><input type="checkbox" /><span>狗蛋</span></label>
+                  </div>
+                </div>
+
+                <div class="ctrl-group">
+                  <span class="field-label">Logo</span>
+                  <div class="seg-group seg-sm" id="global-logo-seg">
+                    <button type="button" class="seg-btn active" data-logo="use">使用</button>
+                    <button type="button" class="seg-btn" data-logo="none">不用</button>
+                  </div>
+                </div>
+
+                <div class="ctrl-group">
+                  <span class="field-label">标题字体</span>
+                  <div class="seg-group seg-sm">
+                    <button type="button" class="seg-btn active">随机</button>
+                    <button type="button" class="seg-btn">不用</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧生成动作栏：套数（1–20）+ 模型 + 共 N 张 + 开始生成 -->
+          <aside class="config-action-col channel-dependent" id="config-action-col" aria-label="生成操作区">
+            <div class="action-card">
+              <div class="field-item">
+                <span class="field-label">每版位套数</span>
+                <div class="stepper-control">
+                  <button type="button" id="sets-minus-btn" class="stepper-btn">−</button>
+                  <input type="number" id="sets-input" class="stepper-input" min="1" max="20" value="3" />
+                  <button type="button" id="sets-plus-btn" class="stepper-btn">＋</button>
+                </div>
+              </div>
+
+              <div class="field-item">
+                <span class="field-label">图片模型</span>
+                <select id="model-select">
+                  <option value="gpt-image-2.5-sunburst-1k" selected>Sunburst 2.5 · 1K</option>
+                  <option value="gpt-image-2-1k">GPT Image 2 · 1K</option>
+                </select>
+              </div>
+
+              <div class="total-action-box">
+                <div id="summary-total-images" class="total-count-text">共 21 张</div>
+                <div id="summary-formula-sub" class="total-formula-sub">7 版位 × 3 套</div>
+                <button type="button" id="start-gen-btn" class="btn-primary start-gen-btn">开始生成</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- =====================================================
+           页面 2：挑选工作台 (#workbench & #workbench-3)
+           ===================================================== -->
+      <section id="screen-workbench" class="view-screen">
+        <!-- 紧凑顶栏 -->
+        <div class="top-header">
+          <div class="workbench-header-left">
+            <span id="wb-task-title" class="workbench-task-title">这不看不懂？点开听一听</span>
+            <span id="wb-progress-pill" class="workbench-progress-pill">已出 16 / 21 张</span>
+          </div>
+          <div class="workbench-header-actions">
+            <button type="button" id="btn-edit-config">修改配置</button>
+            <button type="button" onclick="location.hash='#config'">复制为新任务</button>
+          </div>
+        </div>
+
+        <!-- 主体：左侧版位目录 + 右侧等比大图并排画廊 -->
+        <div class="workbench-main">
+          <!-- 版位目录 -->
+          <aside class="placement-dir" aria-label="版位目录">
+            <label class="dir-top-switch">
+              <input type="checkbox" id="auto-jump-checkbox" checked />
+              <span>勾完自动跳下一版位</span>
+            </label>
+            <ul class="dir-list" id="dir-list-feed">
+              <li class="dir-item active" data-placement-title="喜马拉雅 单图 720×1559" data-force-logo="true" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-size">720×1559</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"><span class="dir-problem-text">1 问题</span></div>
+                  <div class="dir-col-selected"><span id="active-dir-selected-badge" class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="微博粉丝通 横版单图 1280×720" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">微博粉丝通 横版单图</span>
+                  <span class="dir-item-size">1280×720</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="喜马拉雅 单图 1280×720" data-selected="0">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-size">1280×720</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-unselected-ready">0/3 待选</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="喜马拉雅 单图 720×1280" data-force-logo="true" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-size">720×1280</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="喜马拉雅 单图 1200×480" data-selected="0">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-size">1200×480</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"><span class="dir-problem-text">1 问题</span></div>
+                  <div class="dir-col-selected"><span class="badge-unselected-ready">0/2 待选</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="喜马拉雅 单图 1000×1000" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">喜马拉雅 单图</span>
+                  <span class="dir-item-size">1000×1000</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+
+              <li class="dir-item" data-placement-title="CPA 竖图 1080×1920" data-selected="0">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">CPA 竖图</span>
+                  <span class="dir-item-size">1080×1920</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress">
+                    <div class="dir-gen-progress">
+                      <span>1/3</span>
+                      <span class="mini-progress-track"><span class="mini-progress-fill" style="width: 33%;"></span></span>
+                    </div>
+                  </div>
+                  <div class="dir-col-selected"></div>
+                </div>
+              </li>
+            </ul>
+
+            <!-- #workbench-3 目录 -->
+            <ul class="dir-list" id="dir-list-app3" style="display: none;">
+              <li class="dir-item active" data-placement-title="OPPO 横版三图 320×210" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">OPPO 横版三图</span>
+                  <span class="dir-item-size">320×210</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress">
+                    <div class="dir-gen-progress">
+                      <span>1/3</span>
+                      <span class="mini-progress-track"><span class="mini-progress-fill" style="width: 33%;"></span></span>
+                    </div>
+                  </div>
+                  <div class="dir-col-selected"><span id="app3-dir-selected-badge" class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+              <li class="dir-item" data-placement-title="vivo 搜索三图 320×211" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">vivo 搜索三图</span>
+                  <span class="dir-item-size">320×211</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+              <li class="dir-item" data-placement-title="小米 搜索三图 320×320" data-selected="0">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">小米 搜索三图</span>
+                  <span class="dir-item-size">320×320</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"><span class="dir-problem-text">1 问题</span></div>
+                  <div class="dir-col-selected"><span class="badge-unselected-ready">0/2 待选</span></div>
+                </div>
+              </li>
+              <li class="dir-item" data-placement-title="荣耀 三图文 1080×1920" data-selected="1">
+                <div class="dir-item-main">
+                  <span class="dir-item-name">荣耀 三图文</span>
+                  <span class="dir-item-size">1080×1920</span>
+                </div>
+                <div class="dir-status-cols">
+                  <div class="dir-col-progress"></div>
+                  <div class="dir-col-selected"><span class="badge-selected">✓ 1</span></div>
+                </div>
+              </li>
+            </ul>
+          </aside>
+
+          <!-- 右栏：当前版位并排比较 + 底栏 -->
+          <div class="workbench-gallery-pane">
+            <div class="gallery-header">
+              <div id="workbench-current-placement-title" class="gallery-title">喜马拉雅 单图 720×1559</div>
+              <button type="button" class="btn-sm btn-with-icon">
+                <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+                <span>再出一套</span>
+              </button>
+            </div>
+
+            <!-- 画廊 1：#workbench 单图并排 -->
+            <div id="gallery-stage-single" class="gallery-cards-stage" data-force-logo="true">
+              <!-- 套 1：已完成且已选 -->
+              <div id="set-1-card" class="set-card selected">
+                <button type="button" id="set-1-check-btn" class="card-check-corner checked" aria-label="勾选此套">
+                  <svg class="ui-icon check-svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.25l3 3 6-6.5"/></svg>
+                </button>
+                <div class="ratio-rect-720x1559 clickable js-open-lightbox sample-sheet">
+                  <img class="sample-img" src="assets/samples/xmly-720x1559-1.jpg" alt="喜马拉雅 单图 第 1 套" />
+                </div>
+                <div class="sheet-dim-caption" title="固定带 Logo">
+                  <svg class="ui-icon lock-mini-svg" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7.25" width="9" height="6.25" rx="1.5"/><path d="M5.5 7.25V5.25a2.5 2.5 0 0 1 5 0v2"/></svg>
+                  <span>Logo</span>
+                </div>
+              </div>
+
+              <!-- 套 2：生成中（点一下触发从中心向外显影成完成的图） -->
+              <div id="set-2-card" class="set-card is-generating" title="点击演示显影完成">
+                <button type="button" id="set-2-check-btn" class="card-check-corner" aria-label="勾选此套">
+                  <svg class="ui-icon check-svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.25l3 3 6-6.5"/></svg>
+                </button>
+                <div id="set-2-frame" class="ratio-rect-720x1559 skeleton sample-sheet">
+                  <span id="set-2-state-pill" class="slot-state-pill">生成中</span>
+                  <div class="developing-reveal-layer">
+                    <img class="sample-img" src="assets/samples/xmly-720x1559-1.jpg" alt="喜马拉雅 单图 第 2 套" />
+                  </div>
+                </div>
+                <div class="sheet-dim-caption" title="固定带 Logo">
+                  <svg class="ui-icon lock-mini-svg" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7.25" width="9" height="6.25" rx="1.5"/><path d="M5.5 7.25V5.25a2.5 2.5 0 0 1 5 0v2"/></svg>
+                  <span>Logo</span>
+                </div>
+              </div>
+
+              <!-- 套 3：需去框（或非去框版位切换为生成失败 + 补齐） -->
+              <div id="single-problem-card" class="set-card has-problem is-warning">
+                <span id="single-problem-tag" class="problem-corner-tag">需去框</span>
+                <div class="ratio-rect-720x1559 problem-canvas sample-sheet">
+                  <img class="sample-img" src="assets/samples/xmly-720x1559-2.jpg" alt="喜马拉雅 单图 第 3 套（需去框）" />
+                </div>
+                <div class="problem-footer-bar">
+                  <div id="single-problem-deframe-actions" class="problem-inline-actions">
+                    <button type="button" class="btn-sm">重新去框</button>
+                    <button type="button" class="btn-sm">整图适配</button>
+                  </div>
+                  <div id="single-problem-gen-actions" class="problem-inline-actions" style="display: none;">
+                    <button type="button" class="btn-sm">补齐</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 画廊 2：#workbench-3 应用商店三图（OPPO 横版三图 320×210，每套并排图 1/2/3） -->
+            <div id="gallery-stage-triple" class="gallery-triple-stage" style="display: none;">
+              <!-- 第 1 套：三张都完成（可勾选） -->
+              <div id="triple-set-1-card" class="set-card triple-set-card selected">
+                <button type="button" id="triple-set-1-check-btn" class="card-check-corner checked" aria-label="勾选此套">
+                  <svg class="ui-icon check-svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.25l3 3 6-6.5"/></svg>
+                </button>
+                <div class="triple-card-top">
+                  <span class="triple-set-title">第 1 套</span>
+                </div>
+                <div class="triple-slots-row">
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box done clickable js-open-lightbox sample-sheet">
+                      <img class="sample-img" src="assets/samples/oppo3-320x210-1.jpg" alt="OPPO 横版三图 第 1 套 图 1" />
+                    </div>
+                    <div class="sheet-dim-caption">图 1</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box done clickable js-open-lightbox sample-sheet">
+                      <img class="sample-img" src="assets/samples/oppo3-320x210-2.jpg" alt="OPPO 横版三图 第 1 套 图 2" />
+                    </div>
+                    <div class="sheet-dim-caption">图 2</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box done clickable js-open-lightbox sample-sheet">
+                      <img class="sample-img" src="assets/samples/oppo3-320x210-3.jpg" alt="OPPO 横版三图 第 1 套 图 3" />
+                    </div>
+                    <div class="sheet-dim-caption">图 3</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 第 2 套：图 1 完成，图 2、图 3 生成中 -->
+              <div class="set-card triple-set-card">
+                <div class="triple-card-top">
+                  <span class="triple-set-title">第 2 套</span>
+                  <span class="triple-set-status">1/3 生成中</span>
+                </div>
+                <div class="triple-slots-row">
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box done clickable js-open-lightbox sample-sheet">
+                      <img class="sample-img" src="assets/samples/oppo3-320x210-4.jpg" alt="OPPO 横版三图 第 2 套 图 1" />
+                    </div>
+                    <div class="sheet-dim-caption">图 1</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box generating sample-sheet">
+                      <span class="slot-state-pill">生成中</span>
+                    </div>
+                    <div class="sheet-dim-caption">图 2</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box generating sample-sheet">
+                      <span class="slot-state-pill">生成中</span>
+                    </div>
+                    <div class="sheet-dim-caption">图 3</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 第 3 套：图 1 生成中，图 2、图 3 在等图 1 -->
+              <div class="set-card triple-set-card">
+                <div class="triple-card-top">
+                  <span class="triple-set-title">第 3 套</span>
+                  <span class="triple-set-status">0/3 生成中</span>
+                </div>
+                <div class="triple-slots-row">
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box generating sample-sheet">
+                      <span class="slot-state-pill">生成中</span>
+                    </div>
+                    <div class="sheet-dim-caption">图 1</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box waiting sample-sheet">
+                      <span class="slot-wait-pill">等图 1</span>
+                    </div>
+                    <div class="sheet-dim-caption">图 2</div>
+                  </div>
+                  <div class="triple-slot-unit">
+                    <div class="triple-img-box waiting sample-sheet">
+                      <span class="slot-wait-pill">等图 1</span>
+                    </div>
+                    <div class="sheet-dim-caption">图 3</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部保存栏：左侧事实统计 + 右侧唯一主动作 -->
+            <div class="workbench-save-bar">
+              <div id="workbench-save-status" class="save-bar-facts">已选 4 套 · 4/7 个版位</div>
+              <button type="button" id="workbench-save-btn" class="btn-primary save-main-btn">保存已合格的 4 套</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- =====================================================
+       大图弹层 (#lightbox) — 遮罩盖住整个视口
+       ===================================================== -->
+  <div id="lightbox-overlay" class="lightbox-backdrop" role="dialog" aria-modal="true" aria-label="大图预览">
+    <div class="lightbox-stage">
+      <button type="button" id="lightbox-prev-btn" class="lightbox-nav-btn" aria-label="上一套">←</button>
+      <div class="lightbox-center-col">
+        <div class="lightbox-image-frame">
+          <img class="sample-img" src="assets/samples/xmly-720x1559-1.jpg" alt="喜马拉雅 单图 720×1559 大图预览" />
+        </div>
+        <div id="lightbox-counter" class="lightbox-counter">1 / 3</div>
+      </div>
+      <button type="button" id="lightbox-next-btn" class="lightbox-nav-btn" aria-label="下一套">→</button>
+    </div>
+
+    <aside class="lightbox-side-panel">
+      <div class="lightbox-panel-top">
+        <div class="lightbox-placement-title">喜马拉雅 单图 720×1559</div>
+        <button type="button" id="close-lightbox-btn" class="lightbox-close-btn" aria-label="关闭">✕</button>
+      </div>
+
+      <div class="lightbox-action-stack">
+        <button type="button" id="lightbox-toggle-select-btn" class="lightbox-select-btn checked">
+          <span id="lightbox-check-box" class="ui-check-box checked">✓</span>
+          <span>选这一套</span>
+        </button>
+        <button type="button">重出本张</button>
+      </div>
+
+      <details class="advanced-details">
+        <summary>高级</summary>
+        <div class="lightbox-adv-stack">
+          <label class="field-item">
+            <span class="field-label">提示词</span>
+            <textarea class="lightbox-prompt-textarea">720×1559，豆花，主标题「这不看不懂？点开听一听」，副标题「拍题看分步解析，不懂还能接着问」，按钮「立即体验」。</textarea>
+          </label>
+
+          <div class="field-item">
+            <span class="field-label">参考图</span>
+            <div class="ratio-thumb-4x3">4:3</div>
+          </div>
+
+          <label class="field-item">
+            <span class="field-label">图片版本</span>
+            <select>
+              <option value="v2" selected>v2 · 去框后</option>
+              <option value="v1">v1 · 原图</option>
+            </select>
+          </label>
+        </div>
+      </details>
+    </aside>
+  </div>
+
+  <script src="wireframe.js?v=12"></script>
+</body>
+</html>
