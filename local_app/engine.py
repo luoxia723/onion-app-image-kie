@@ -190,10 +190,11 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
             cache=Path(t['output_dir'])/'.cache'/t['id']/uuid.uuid4().hex
             pr=json.loads(json.dumps(pr))
             pr['direction']=direction
+            remembered_references=self.document('form_defaults').get(pr['image_form'],{}).get('references',[])
             for ref in pr.get('references',[]):
                 path=Path(ref.get('path','')).resolve()
                 uploads=(self.settings.state_dir/'uploads').resolve()
-                valid_task_upload=any(path==Path(old['path']).resolve() for rr in t['rounds'] for old in rr['params'].get('references',[]))
+                valid_task_upload=any(path==Path(old['path']).resolve() for old in [*existing_references,*remembered_references])
                 if not path.is_file() or (uploads not in path.parents and not valid_task_upload): raise UserError('参考图不存在，请重新上传')
                 dest=cache/'references'/path.name
                 dest.parent.mkdir(parents=True,exist_ok=True)
@@ -249,7 +250,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
 
     def remember_form(self,pr):
         saved=self.document('form_defaults')
-        saved[pr['image_form']]={k:pr[k] for k in ('channel','pids','sets','ip','style','font','noLogo','cta','cta_enabled','cta_overrides') if k in pr}
+        saved[pr['image_form']]={k:pr[k] for k in ('channel','pids','sets','ip','style','font','noLogo','cta','cta_enabled','cta_overrides','references') if k in pr}
         self.put_document('form_defaults',saved)
 
     def extend(self,t,r,pr,idem,*,draft_id=None,pairs=None):

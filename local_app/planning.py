@@ -26,6 +26,12 @@ STYLES = visual_directions.load_catalog()['styles']
 REFERENCE_PURPOSES={'style':'画风参考','composition':'构图参考','ui':'真实 UI 截图','legacy':'画风/构图参考'}
 
 
+def reference_note(ref):
+    note=ref.get('note','')
+    if not ref.get('points'): return note
+    return '；'.join(part for part in ('、'.join(ref['points']),note) if part.strip())
+
+
 def bootstrap():
     assets = {'ips': [], 'logos': [], 'fonts': [], 'styles': STYLES}
     for a in ASSETS:
@@ -90,6 +96,9 @@ def validate(pr, output, *, existing_references=()):
         if isinstance(ref,dict) and (not isinstance(ref.get('purpose','legacy'),str) or ref.get('purpose','legacy') not in REFERENCE_PURPOSES):raise UserError('请选择参考图用途：画风、构图或真实 UI 截图')
         if not isinstance(ref,dict) or not isinstance(ref.get('note',''),str) or len(ref.get('note',''))>200:
             raise UserError('参考图说明最多 200 字')
+        points=ref.get('points',[])
+        if not isinstance(points,list) or len(points)>6 or any(not isinstance(point,str) or not point.strip() or len(point)>16 for point in points):
+            raise UserError('参考图要点最多 6 条，每条 1–16 字')
         if ref.get('purpose','legacy')=='legacy' and not any(old.get('id')==ref.get('id') and old.get('purpose','legacy')=='legacy' for old in existing_references):
             raise UserError('请选择参考图用途：画风、构图或真实 UI 截图')
     purposes=[ref.get('purpose','legacy') for ref in refs if ref.get('purpose','legacy')!='legacy']
@@ -131,7 +140,7 @@ def copy_signature(pr):
     value['font']=pr.get('font') or 'random'
     value['cta_enabled']=pr.get('cta_enabled',True)
     value['cta_overrides']=pr.get('cta_overrides',{})
-    value['references']=[{'id':x.get('id'),'note':x.get('note'),'purpose':x.get('purpose','legacy')} for x in pr.get('references',[])]
+    value['references']=[{'id':x.get('id'),'note':x.get('note'),'purpose':x.get('purpose','legacy'),**({'points':x['points']} if x.get('points') else {})} for x in pr.get('references',[])]
     return hashlib.sha256(json.dumps(value,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
 
@@ -153,7 +162,7 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
     reference=next((x for x in pr.get('references',[]) if x.get('purpose')=='style'),None)
     reference_style=None
     if reference is not None:
-        note=reference.get('note','').strip()
+        note=reference_note(reference).strip()
         reference_style={'id':'reference','name':'参考风格图','prompt':'沿用参考风格图的配色、笔触、材质和光影'+('；'+note if note else '')}
     else:
         style_cfg={'request_id':rid,'sets':count,'copy_refs':[{}],'prompt_format':positive_prompt.FORMAT,
@@ -201,7 +210,7 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
                 if cfg['logo']!='不用': refs.append(logo_reference.build_logo_reference(cfg))
                 if meta['ip_id']: refs.append({'asset_id':meta['ip_id'],'path':next(a['path'] for a in ASSETS if a['asset_id']==meta['ip_id']),'role':'角色 IP'})
                 if meta['font_path']:refs.append({'path':meta['font_path'],'role':'标题字体参考'})
-                refs.extend({'path':x['path'],'purpose':x.get('purpose','legacy'),'role':REFERENCE_PURPOSES[x.get('purpose','legacy')]+('：'+x['note'] if x.get('note','').strip() else '')} for x in pr.get('references',[]))
+                refs.extend({'path':x['path'],'purpose':x.get('purpose','legacy'),'role':REFERENCE_PURPOSES[x.get('purpose','legacy')]+('：'+reference_note(x) if reference_note(x).strip() else '')} for x in pr.get('references',[]))
                 for j,ref in enumerate(refs,1): ref['label']='参考图'+str(j)
                 if geometry_report(p['target_width'],p['target_height'],model=image_model)['needs_safe_area']:
                     frame=blue_frame.prepare_layout(p['target_width'],p['target_height'],cache/(sid+'-frame'),label='参考图'+str(len(refs)+1),model=image_model)
@@ -246,7 +255,7 @@ def compile_plans(r,result,*,apply=True):
         prompts=[]
         extra=r['params'].get('feature_note','')
         first=next(s for s in group if s['idx']==1)
-        notes=[ref['label']+'用于'+REFERENCE_PURPOSES.get(x.get('purpose','legacy'),'画风参考')+('，'+x['note'] if x.get('note','').strip() else '') for ref,x in zip([a for a in first['refs'] if a.get('purpose') in REFERENCE_PURPOSES or a.get('role','').startswith('风格/构图')],r['params'].get('references',[]))]
+        notes=[ref['label']+'用于'+REFERENCE_PURPOSES.get(x.get('purpose','legacy'),'画风参考')+('，'+reference_note(x) if reference_note(x).strip() else '') for ref,x in zip([a for a in first['refs'] if a.get('purpose') in REFERENCE_PURPOSES or a.get('role','').startswith('风格/构图')],r['params'].get('references',[]))]
         scoped=cfg.get('prompt_context_version')=='per_image_v1'
         direction['base_prompt_rule']=positive_prompt.paragraph(direction['base_prompt_rule'],'' if scoped else extra,*notes)
         direction['branch_prompt_rule']=positive_prompt.paragraph(direction['branch_prompt_rule'],'' if scoped else extra)

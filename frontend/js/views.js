@@ -104,6 +104,7 @@ function loadDraft(params){
   S.draft.image_form=imageFormOf(params)||(params.image_form!==undefined||params.pids?.length?'':form);
   if(!Object.hasOwn(params,'channel')){const channels=[...new Set(S.draft.pids.map(plOf).filter(Boolean).map(p=>p.category))];S.draft.channel=channels.length===1?channels[0]:''}
   S.visualOpen=visualCustomized(S.draft);S.referenceMode=!!S.draft.references.length;
+  S.referencePointsPending={};
   S.formDrafts={};
   S.formError=null;
 }
@@ -149,6 +150,7 @@ function formIssue(pr){
   for(const [id,value] of Object.entries(pr.cta_overrides||{}))if(value.mode==='custom'&&(!value.text.trim()||value.text.length>12))return{field:'cta-'+id,message:'版位按钮文字请填写 1–12 字'};
   const refs=pr.references||[];
   if(refs.some(r=>(r.note||'').length>200))return{field:'reference-options',message:'参考图说明最多 200 字'};
+  if(refs.some(r=>r.points!==undefined&&(!Array.isArray(r.points)||r.points.length>6||r.points.some(p=>typeof p!=='string'||!p.trim()||[...p].length>16))))return{field:'reference-options',message:'参考图要点最多 6 条，每条 1–16 字'};
   if(new Set(refs.map(r=>r.purpose)).size!==refs.length)return{field:'reference-options',message:'每种用途最多上传 1 张参考图'};
   return null;
 }
@@ -157,7 +159,9 @@ function visualCustomized(pr){return !!((pr.references||[]).length||pr.ip!=='ran
 const REFERENCE_PURPOSES={style:'参考风格',composition:'参考排版',ui:'产品界面'};
 function viewReferenceOptions(pr){return `<div class="reference-slots" id="reference-options" tabindex="-1">${Object.entries(REFERENCE_PURPOSES).map(([purpose,label])=>{
   const i=(pr.references||[]).findIndex(r=>r.purpose===purpose),r=pr.references?.[i];
-  return `<section class="reference-slot ${r?'uploaded':''}" data-purpose="${purpose}"><div class="slot-heading"><h4>${label}</h4>${r?`<button ${S.uploadingPurpose?'disabled':''} onclick="removeReference(${i})" aria-label="移除${label}">移除</button>`:''}</div>${r?`<img class="reference-thumb" src="${esc(r.thumbnail_url||r.preview||'')}" alt="${esc(r.name)}"><label class="slot-note">补充说明（选填）<textarea id="ref-note-${purpose}" maxlength="200" rows="2" oninput="setReferenceNote(${i},this.value)">${esc(r.note||'')}</textarea></label>`:`<button class="reference-upload" ${S.uploadingPurpose?'disabled':''} onclick="uploadReference('${purpose}')">${S.uploadingPurpose===purpose?'正在上传…':'＋ 上传图片'}</button>`}</section>`;
+  const pending=S.referencePointsPending?.[purpose],extracting=pending?.draft===S.draftId&&pending?.id===r?.id;
+  const points=r?`<div class="points-tag-list">${extracting?'<span class="points-pending" role="status">提炼中…</span>':(r.points||[]).map((point,j)=>`<span class="point-tag"><input class="point-tag-text" id="ref-point-${purpose}-${j}" aria-label="${label}要点 ${j+1}" value="${esc(point)}" maxlength="16" size="${Math.max(2,[...point].length*2)}" oninput="setReferencePoint(${i},${j},this.value);this.size=Math.max(2,[...this.value].length*2)"><button type="button" class="point-tag-del" aria-label="删除${label}要点 ${j+1}" onclick="removeReferencePoint(${i},${j})">×</button></span>`).join('')}<button type="button" class="point-add-btn" ${extracting||(r.points||[]).length>=6?'disabled':''} onclick="addReferencePoint(${i})">＋ 添加要点</button></div>`:'';
+  return `<section class="reference-slot ${r?'uploaded':''}" data-purpose="${purpose}"><div class="slot-heading"><h4>${label}</h4>${r?`<button ${S.uploadingPurpose?'disabled':''} onclick="removeReference(${i})" aria-label="移除${label}">移除</button>`:''}</div>${r?`<img class="reference-thumb" src="${esc(r.thumbnail_url||r.preview||'')}" alt="${esc(r.name)}">${points}<label class="slot-note">补充说明（选填）<textarea id="ref-note-${purpose}" maxlength="200" rows="2" oninput="setReferenceNote(${i},this.value)">${esc(r.note||'')}</textarea></label>`:`<button class="reference-upload" ${S.uploadingPurpose?'disabled':''} onclick="uploadReference('${purpose}')">${S.uploadingPurpose===purpose?'正在上传…':'＋ 上传图片'}</button>`}</section>`;
 }).join('')}</div>`}
 function viewVisualOptions(pr){
   const open=S.visualOpen??visualCustomized(pr),reference=!!(pr.references||[]).some(r=>r.purpose==='style'),fonts=typeof FONTS!=='undefined'?FONTS:[];

@@ -141,6 +141,12 @@ class Handler(BaseHTTPRequestHandler):
                     selected=p.stdout.strip()
                 return self.json({'path':selected})
             except Exception: raise UserError('无法打开目录选择器，请直接填写保存路径')
+        if path=='/api/references/points' and method=='POST':
+            rid=body.get('id')
+            if not isinstance(rid,str) or not re.fullmatch('[a-f0-9]{64}',rid): raise UserError('参考图不存在',404)
+            uploaded=next((settings.state_dir/'uploads'/(rid+suffix) for suffix in ('.png','.jpg','.webp') if (settings.state_dir/'uploads'/(rid+suffix)).is_file()),None)
+            if uploaded is None: raise UserError('参考图不存在',404)
+            return self.json(ApiScenePlanner(settings).reference_points(uploaded,body.get('purpose')))
         if path=='/api/uploads' and method=='POST':
             note=str(body.get('note','')).strip()
             from .planning import REFERENCE_PURPOSES

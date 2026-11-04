@@ -208,6 +208,7 @@ async function addReference(file,purpose){
   if(S.draft.references.some(r=>r.purpose===purpose))return toast('每种用途最多上传 1 张参考图');
   if(file.size>10*1024*1024)return toast('参考图不能超过 10MB');
   const draft=S.draftId;
+  let pending;
   S.uploadingPurpose=purpose;render();
   try{
     const preview=await referencePreview(file),bytes=new Uint8Array(await file.arrayBuffer());let binary='';
@@ -215,17 +216,35 @@ async function addReference(file,purpose){
     const r=await request('/uploads','POST',{name:file.name,note:'',purpose,data:btoa(binary)});
     if(draft!==S.draftId)return;
     if(S.draft.references.some(x=>x.id===r.id))return toast('这张图片已在其他上传位使用');
-    S.draft.references.push({...r,preview});S.referenceMode=true;S.visualOpen=true;save();
+    pending={draft,id:r.id};
+    S.referencePointsPending=S.referencePointsPending||{};S.referencePointsPending[purpose]=pending;
+    S.draft.references.push({...r,preview,points:[]});S.referenceMode=true;S.visualOpen=true;save();pending.draft=S.draftId;
   }catch(e){report(e)}finally{S.uploadingPurpose=null;render()}
+  if(!pending)return;
+  try{
+    const result=await request('/references/points','POST',{id:pending.id,purpose});
+    if(S.referencePointsPending?.[purpose]!==pending||pending.draft!==S.draftId||S.submitting||S.navigationPending)return;
+    const ref=S.draft.references.find(r=>r.id===pending.id&&r.purpose===purpose);
+    if(ref){ref.points=result.points;save()}
+  }catch{}finally{
+    if(S.referencePointsPending?.[purpose]===pending){delete S.referencePointsPending[purpose];render()}
+  }
 }
 function setReferenceMode(reference){
   if(S.submitting||S.navigationPending||S.uploadingPurpose)return;
   S.referenceMode=reference;
-  if(!reference)S.draft.references=[];
+  if(!reference){S.draft.references=[];S.referencePointsPending={}}
   save();render();
 }
-function removeReference(i){if(S.submitting||S.navigationPending)return;S.draft.references.splice(i,1);S.referenceMode=!!S.draft.references.length;save();render()}
+function removeReference(i){if(S.submitting||S.navigationPending)return;delete S.referencePointsPending?.[S.draft.references[i].purpose];S.draft.references.splice(i,1);S.referenceMode=!!S.draft.references.length;save();render()}
 function setReferenceNote(i,value){if(S.submitting||S.navigationPending)return;S.draft.references[i].note=value;save();updSum()}
+function addReferencePoint(i){
+  if(S.submitting||S.navigationPending||S.referencePointsPending?.[S.draft.references[i].purpose])return;
+  const ref=S.draft.references[i];ref.points=ref.points||[];if(ref.points.length>=6)return;
+  ref.points.push('');save();render();document.getElementById(`ref-point-${ref.purpose}-${ref.points.length-1}`)?.focus();
+}
+function setReferencePoint(i,j,value){if(S.submitting||S.navigationPending)return;S.draft.references[i].points[j]=value;save()}
+function removeReferencePoint(i,j){if(S.submitting||S.navigationPending)return;S.draft.references[i].points.splice(j,1);save();render()}
 document.addEventListener('click',e=>{if(S.menu&&!e.target.closest('.tmenu,.more')){S.menu=null;render()}});
 window.addEventListener('resize',()=>setHH());
 async function useLatestProduct(){if(S.submitting)return;const draft=S.draftId;const p=await request('/product');if(draft!==S.draftId||S.submitting||S.navigationPending)return;S.product=p;S.draft.product_facts=p.text;S.draft.facts_version=p.revision;save();render()}

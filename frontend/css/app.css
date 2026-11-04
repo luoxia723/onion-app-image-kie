@@ -338,6 +338,12 @@ input[type=checkbox]{accent-color:var(--accent-blue)}
 .slot-heading button{height:24px;padding:0 7px}
 .reference-upload{display:block;min-height:64px;width:100%;border-style:dashed;background:#F6F7F9;color:var(--text-secondary)}
 .reference-thumb{width:100%;height:84px;object-fit:contain;border-radius:6px;background:#F5F7FA}
+.points-tag-list{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px}
+.point-tag{display:inline-flex;align-items:center;gap:3px;max-width:100%;padding:2px 7px;background:var(--surface-panel);border:1px solid var(--border-line);border-radius:var(--radius-tag);font-size:12px;color:var(--text-ink)}
+.point-tag .point-tag-text{width:auto;min-width:0;max-width:100%;height:22px;padding:0;border:0;background:transparent;font-size:12px;color:inherit}
+.point-tag .point-tag-del{height:22px;padding:0 2px;border:0;background:transparent;color:var(--text-secondary)}
+.points-tag-list .point-add-btn{height:26px;padding:2px 8px;border:0;background:transparent;color:var(--text-secondary);font-size:12px}
+.points-pending{font-size:12px;color:var(--text-secondary)}
 .slot-note,.scene-note{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-secondary);margin-top:8px}
 .slot-note textarea{width:100%;resize:vertical;min-height:56px}
 .custom-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-line)}
