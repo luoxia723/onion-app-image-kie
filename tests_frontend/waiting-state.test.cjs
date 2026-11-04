@@ -16,11 +16,11 @@ test('规划等待时显示动画、真实阶段和可离开页面的边界',()=
  assert(html.includes('可以切换任务或关闭网页'));
  assert(html.includes('保持本机服务运行'));
 });
-test('规划中的占位图与等待首图区分显示',()=>{
+test('规划中的占位图与等待图 1 区分显示',()=>{
  const ctx=setup();let html=vm.runInContext('cellHtml(R(),R().slots[0],132)',ctx);
  assert(html.includes('规划中'));
  ctx.round.slots.forEach(s=>s.plan_ready=true);ctx.round.planning_status='done';ctx.round.slots[0].state='generating';
- html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('等待首图'));
+ html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('等待图 1'));
 });
 test('全部排队时头部仍显示阶段和完成数量',()=>{
  const ctx=setup(),html=vm.runInContext('viewHead()',ctx);
@@ -43,15 +43,15 @@ test('连接失效时不继续承诺任务正在后台执行',()=>{
  assert(!html.includes('wait-spinner'));
  assert(!html.includes('后台会继续'));
 });
-test('首图与分支明确显示不同重出范围，未知任务只恢复查询',()=>{
+test('图 1 与分支明确显示不同重出范围，未知任务只恢复查询',()=>{
  const ctx=setup();ctx.round.planning_status='done';ctx.round.slots.forEach(s=>s.state='done');
- let retry=vm.runInContext('imageRetry(R(),R().slots[0])',ctx);assert.equal(retry.label,'重出首图及后续图');
+ let retry=vm.runInContext('imageRetry(R(),R().slots[0])',ctx);assert.equal(retry.label,'重出图 1 及后续图');
  retry=vm.runInContext('imageRetry(R(),R().slots[1])',ctx);assert.equal(retry.label,'重出本张');assert(retry.note.includes('继续引用'));
  ctx.round.slots[1].state='failed';ctx.round.slots[1].reason_code='timeout';
  const html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('resumeImage'));assert(!html.includes('onclick="redo('));
  retry=vm.runInContext('imageRetry(R(),R().slots[1])',ctx);assert.equal(retry.label,'恢复查询');
 });
-test('首图失败时分支按钮只定位首图，不隐式重出整套',()=>{
+test('图 1 失败时分支按钮只定位图 1，不隐式重出整套',()=>{
  const ctx=setup();ctx.round.slots[0].state='failed';ctx.round.slots[1].state='blocked_first_failed';
- const html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('查看首图'));assert(html.includes("openPv('one')"));assert(!html.includes('onclick="redo('));
+ const html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('查看图 1'));assert(html.includes("openPv('one')"));assert(!html.includes('onclick="redo('));
 });

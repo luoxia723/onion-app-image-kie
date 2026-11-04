@@ -20,7 +20,8 @@ import positive_prompt
 def engine(tmp_path,monkeypatch):
     monkeypatch.setenv('ONION_SIM_SECONDS','.05')
     settings=Settings(tmp_path/'state',tmp_path/'.env')
-    settings.update({'output_dir':str(tmp_path),'concurrency':2})
+    settings.update({'output_dir':str(tmp_path)})
+    settings.concurrency=2
     e=Engine(settings,planner=FixturePlanner())
     yield e
     e.close()
@@ -111,13 +112,11 @@ def test_stop_cleanup_delete_restore(engine):
 def test_settings_redaction_and_validation(engine,tmp_path):
     s=engine.settings
     s.env_file.write_text('# retained\nOTHER=value\n')
-    s.update({'kie_api_key':'test-secret-123','concurrency':20,'kie_base_url':''})
+    s.update({'kie_api_key':'test-secret-123','kie_base_url':''})
     assert 'test-secret' not in json.dumps(s.public())
     assert 'OTHER=value' in s.env_file.read_text()
     s.update({'kie_api_key':''});assert s.key=='test-secret-123'
     assert s.env_file.stat().st_mode&0o777==0o600
-    for invalid in (0,21,1.5,True):
-        with pytest.raises(UserError):s.update({'concurrency':invalid})
     for name in ['CON','NUL.jpg','bad/thing','name.',' name','..']:
         with pytest.raises(UserError):safe_direction(name)
     with pytest.raises(UserError):s.update({'kie_base_url':'http://example.com'})
@@ -272,7 +271,7 @@ def test_blocked_branch_never_silently_regenerates_head(engine):
         head,second,third=r['slots'];head.update(state='failed',reason_code='no_image')
         second.update(state='blocked_first_failed',reason_code='first_failed')
         before=[s['att'] for s in r['slots']]
-        with pytest.raises(UserError,match='首图'): e.mutate(tid,'regenerate',{'image_id':second['id']})
+        with pytest.raises(UserError,match='图 1'): e.mutate(tid,'regenerate',{'image_id':second['id']})
         assert [s['att'] for s in r['slots']]==before
 
 

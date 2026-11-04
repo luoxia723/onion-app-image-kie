@@ -57,8 +57,7 @@ class Settings:
         self.image_model=get('ONION_IMAGE_MODEL',DEFAULT_IMAGE_MODEL)
         if self.image_model not in IMAGE_MODELS: self.image_model=DEFAULT_IMAGE_MODEL
         self.real = get('ONION_REAL_MODE', 'false').lower() == 'true'
-        try: self.concurrency = max(1, min(20, int(get('ONION_CONCURRENCY', '4'))))
-        except ValueError: self.concurrency = 4
+        self.concurrency = 20
         self.output = Path(get('ONION_IMAGE_WORKSPACE', str(ROOT))).expanduser().resolve()
         self.output.mkdir(parents=True, exist_ok=True)
 
@@ -94,10 +93,6 @@ class Settings:
             model = str(data['planning_model']).strip()
             if not model or len(model) > 128 or any(ord(c) <= 32 for c in model): raise UserError('请填写正确的规划模型名称')
             changes['ONION_PLANNING_MODEL'] = model
-        if 'concurrency' in data:
-            n = data['concurrency']
-            if type(n) is not int or not 1 <= n <= 20: raise UserError('并发数请填写 1–20 的整数')
-            changes['ONION_CONCURRENCY'] = str(n)
         if 'output_dir' in data:
             p = Path(str(data['output_dir'])).expanduser().resolve()
             if not p.is_dir(): raise UserError('保存位置不存在，请选择已有文件夹')

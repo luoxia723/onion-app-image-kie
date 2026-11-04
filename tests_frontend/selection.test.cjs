@@ -33,7 +33,7 @@ test('卡片用复选框表示选择，不再重复放选择按钮',()=>{
 test('选中待处理套图时仍可明确保存合格套图',()=>{
  const ctx=setup();ctx.round.delivery={selected_sets:21,ready_sets:19,incomplete_sets:2,covered_placements:7,total_placements:7,can_export:false,can_export_ready:true};
  const html=vm.runInContext('viewSelectionFooter()',ctx);
- assert(html.includes('保存可交付的 19 套'));
+ assert(html.includes('只保存合格的 19 套'));
  assert(html.includes('另 2 套待处理，不纳入本次图包'));
  assert(!/id="save-ready"[^>]*disabled/.test(html));
 });

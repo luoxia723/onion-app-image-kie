@@ -24,10 +24,10 @@ class DeliveryMixin:
         if type(ready_only) is not bool: raise UserError('图包范围不正确')
         r=self.round(t,index);delivery=self.delivery_state(t,r)
         if not delivery['selected_sets']: raise UserError('请先选中至少一套图片')
-        if delivery['incomplete_sets'] and not ready_only: raise UserError('已选套图中有 '+str(delivery['incomplete_sets'])+' 套尚未完整或规格未通过，可先保存可交付套图，或处理后保存全部')
+        if delivery['incomplete_sets'] and not ready_only: raise UserError('已选套图中有 '+str(delivery['incomplete_sets'])+' 套尚未完整或规格未通过，可先只保存合格的套，或处理后保存全部')
         excluded=set(delivery['incomplete_keys']) if ready_only else set()
         sl=[s for s in r['slots'] if r['sel'].get(selection_key(s['pid'],s['set'])) and selection_key(s['pid'],s['set']) not in excluded]
-        if not sl: raise UserError('暂无可交付的已选套图，请先处理图片')
+        if not sl: raise UserError('暂无合格的已选套图，请先处理图片')
         sl.sort(key=lambda s:(s['pid'],s['set'],s['idx']))
         for s in sl:
             verify_delivery_file(s,self.placement(t,r,s))

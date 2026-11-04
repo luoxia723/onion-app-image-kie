@@ -3,7 +3,7 @@ const SETS_MIN=1,SETS_MAX=20,DEF_CTA='立即体验';
 const DEF_BASE='https://api.kie.ai',DEF_UP='https://kieai.redpandaai.co';
 const VLAB={queued:'等待中',waiting_first:'等待中',generating:'生成中',done:'已完成',failed:'失败',blocked_first_failed:'失败',stopped:'已停止'};
 let PLACEMENTS=[],ASSETS={},IPS=[],LOGO={},FONTS=[],STYLES=[];
-let CFG={kie:false,cap:4,path:'',base:DEF_BASE,up:DEF_UP,simulation:true},CONN={};
+let CFG={kie:false,path:'',base:DEF_BASE,up:DEF_UP,simulation:true},CONN={};
 let S={tasks:[],cur:null,view:'form',draft:defParams(),tab:'all',pf:'all',pv:null,miss:false,cfgOpen:false,tried:false,drafts:[],draftId:null,draftSequence:0,draftRevision:0};
 let lastRefreshAt=0;
 let storage={used_bytes:0},busy=false,loading=false,pollTimer,searchTimer,viewEpoch=0,refreshFailures=0;
@@ -16,7 +16,7 @@ async function request(path,method='GET',body){
 }
 function report(error){toast(error.message||'操作未完成，请重试')}
 window.addEventListener('unhandledrejection',event=>{event.preventDefault();report(event.reason)});
-function applySettings(s){if(s.image_models)IMAGE_MODEL_OPTIONS=s.image_models.map(m=>[m.id,m.name]);CFG={imageModel:s.image_model,imageModels:s.image_models,kie:s.key_configured,cap:s.concurrency,path:s.output_dir,base:s.kie_base_url,up:s.kie_upload_base_url,simulation:s.simulation,planningKey:s.planning_key_configured,planningBase:s.planning_base_url,planningModel:s.planning_model}}
+function applySettings(s){if(s.image_models)IMAGE_MODEL_OPTIONS=s.image_models.map(m=>[m.id,m.name]);CFG={imageModel:s.image_model,imageModels:s.image_models,kie:s.key_configured,path:s.output_dir,base:s.kie_base_url,up:s.kie_upload_base_url,simulation:s.simulation,planningKey:s.planning_key_configured,planningBase:s.planning_base_url,planningModel:s.planning_model}}
 function save(autosave=true){
   const p=new URLSearchParams();if(S.cur)p.set('task',S.cur);p.set('view',S.view);
   if(S.view==='form'&&S.draftId)p.set('draft',S.draftId);
@@ -49,7 +49,7 @@ function storHtml(){return`<b id="storused">${gb(storage.used_bytes)}</b><button
 async function cleanNow(){const preview=await request('/storage/preview');if(!preview.files){toast('没有可清理的暂存文件，历史和原图均保留');return}const result=await request('/storage','POST',{});S.freed=result.freed_bytes;storage=await request('/storage');const e=$('#stor');if(e)e.innerHTML=storHtml();toast('已清理暂存文件，历史记录与图片保留')}
 async function openCfg(){if(S.submitting)return toast('正在提交配置，请稍候');window._cfgFrom=cfgRef(document.activeElement);CONN={};S.freed=null;const [settings,st,product]=await Promise.all([request('/settings'),request('/storage'),request('/product')]);applySettings(settings);storage=st;S.product=product;S.cfgOpen=true;render();$('#plankey')?.focus()}
 async function saveCfg(){if(busy)return;busy=true;try{
-  const data={image_model:$('#cfgimagemodel').value,kie_api_key:$('#kiekey').value,simulation:$('#cfgimagemode').value==='simulation',planning_api_key:$('#plankey').value,planning_base_url:$('#planbase').value,planning_model:$('#planmodel').value,concurrency:Number($('#cfgcap').value),output_dir:$('#cfgpath').value,kie_base_url:$('#kbase').value,kie_upload_base_url:$('#kup').value};
+  const data={image_model:$('#cfgimagemodel').value,kie_api_key:$('#kiekey').value,simulation:$('#cfgimagemode').value==='simulation',planning_api_key:$('#plankey').value,planning_base_url:$('#planbase').value,planning_model:$('#planmodel').value,output_dir:$('#cfgpath').value,kie_base_url:$('#kbase').value,kie_upload_base_url:$('#kup').value};
   data.product_text=$('#product-facts').value;data.product_revision=S.product.revision;const result=await request('/settings','PUT',data);S.product=result.product||S.product;applySettings(result);$('#kiekey').value='';S.cfgOpen=false;render();cfgBack();toast(CFG.simulation?'已保存 · 模拟预览':'已保存 · 真实生图已启用');
 }catch(e){report(e)}finally{busy=false}}
 function imageKeyEntered(){if($('#kiekey').value.trim())$('#cfgimagemode').value='real'}

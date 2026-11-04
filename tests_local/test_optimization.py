@@ -14,7 +14,7 @@ class Pool:
 
 
 def test_fair_queue_and_runtime_limit(tmp_path):
-    settings=Settings(tmp_path/'state',tmp_path/'.env');settings.update({'output_dir':str(tmp_path),'concurrency':1})
+    settings=Settings(tmp_path/'state',tmp_path/'.env');settings.update({'output_dir':str(tmp_path)});settings.concurrency=1
     e=Engine(settings,start=False,planner=FixturePlanner());pool=Pool();e.pool.shutdown();e.pool=pool
     try:
         ids=[]
@@ -25,8 +25,8 @@ def test_fair_queue_and_runtime_limit(tmp_path):
         e.dispatch_tick();assert len(pool.calls)==1
         first=pool.calls[0];first[3]['state']='done';e.running.clear()
         e.dispatch_tick();assert pool.calls[1][1]['id']==ids[1]
-        e.settings.update({'concurrency':2});e.dispatch_tick();assert len(e.running)==2
-        e.settings.update({'concurrency':1});e.dispatch_tick();assert len(e.running)==2 and len(pool.calls)==3
+        e.settings.concurrency=2;e.dispatch_tick();assert len(e.running)==2
+        e.settings.concurrency=1;e.dispatch_tick();assert len(e.running)==2 and len(pool.calls)==3
     finally:e.close()
 
 
@@ -117,7 +117,7 @@ def test_cleanup_protects_referenced_uploads(engine):
 
 
 def test_legacy_database_backup_and_pause_survive_restart(tmp_path):
-    settings=Settings(tmp_path/'state',tmp_path/'.env');settings.update({'output_dir':str(tmp_path),'concurrency':2})
+    settings=Settings(tmp_path/'state',tmp_path/'.env');settings.update({'output_dir':str(tmp_path)});settings.concurrency=2
     e=Engine(settings,start=False,planner=FixturePlanner());tid=e.create(params(True,1),'migration-history')['id'];e.mutate(tid,'pause',{})
     before=copy.deepcopy(e.task(tid));e.db.execute('PRAGMA user_version=0');e.db.commit();e.close()
     e=Engine(settings,start=False,planner=FixturePlanner())

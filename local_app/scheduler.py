@@ -52,7 +52,7 @@ class SchedulerMixin:
                         if s['state']!='queued' or not s.get('plan_ready',True) or r.get('paused') or r.get('stopped'): continue
                         head=next((x for x in r['slots'] if x['id']==s['first_id']),s)
                         if s['idx']>1 and head['state'] in ('failed','blocked_first_failed','stopped'):
-                            s.update(state='blocked_first_failed',reason_code='first_failed',msg='首图尚未完成，请先处理首图');changed=True;continue
+                            s.update(state='blocked_first_failed',reason_code='first_failed',msg='图 1 还没完成，请先处理图 1');changed=True;continue
                         if s['idx']>1 and head['state']!='done': continue
                         queues.setdefault(t['id'],[]).append((t,r,s))
                     if changed:self.persist(t)

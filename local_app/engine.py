@@ -332,7 +332,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                 s['preview_kind']='raw' if s.get('delivery_eligible') is False else 'processed'
                 s['image_url']=(s['original_image_url'] if s['preview_kind']=='raw' else f"/api/tasks/{t['id']}/images/{s['id']}?v={s['att']}") if s['state']=='done' else None
                 if s['preview_kind']=='raw':
-                    s.update(reason_code='frame_failed',msg='自动去框失败，当前显示完整原图，暂不可交付')
+                    s.update(reason_code='frame_failed',msg='自动去框失败，当前显示完整原图，暂不合格')
                 s['reference_images']=[{'label':ref.get('label','参考图'+str(i+1)),'name':ref.get('role','参考图'),'type':ref.get('role','参考图'),'upload_status':s.get('up',{}).get(str(i),'ok'),
                     'thumbnail_url':f"/api/tasks/{t['id']}/references/{s['id']}/{i}"} for i,ref in enumerate(s['refs'])]
                 s.pop('refs',None)
@@ -490,12 +490,12 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     else:
                         if r.get('planning_source')!='codex_skill': raise UserError('历史模拟任务请复制为新任务，使用原 Skill 重新规划')
                         if s.get('reason_code')=='planning_failed': raise UserError('请先重试画面规划')
-                        if s['state']=='blocked_first_failed': raise UserError('请先处理首图；后续图不能替代首图发起重出')
+                        if s['state']=='blocked_first_failed': raise UserError('请先处理图 1；后续图不能替代图 1 发起重出')
                         group=[x for x in r['slots'] if x['set']==s['set'] and x['pid']==s['pid']] if s['idx']==1 else [s]
                         if any(x['state'] in ACTIVE or x.get('local_processing') for x in group): raise UserError('图片仍在生成，请等待结束')
                         if any(self.query_required(x) for x in group): raise UserError('这套存在状态未确定的图片，请先恢复查询，不能重复提交')
                         if s['idx']>1 and next(x for x in r['slots'] if x['id']==s['first_id'])['state']!='done':
-                            raise UserError('请先处理首图，再重出本张')
+                            raise UserError('请先处理图 1，再重出本张')
                         prompt=data.get('prompt',s['prompt'])
                         manual='prompt' in data or s.get('prompt_origin')=='manual'
                         from poster_prompt import validate_text
@@ -615,7 +615,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
         except ValueError: raise UserError('图片超过渠道大小限制，请重新生成')
         record=result.get('frame_processing') or {}
         review=bool(result.get('frame_review'))
-        message=('自动去框失败，当前显示完整原图，暂不可交付' if failed else
+        message=('自动去框失败，当前显示完整原图，暂不合格' if failed else
                  '已整图适配，保留全部内容；请确认画面比例' if result.get('frame_status')=='full_image_fit' else
                  '已去框并调整画面比例，请确认人物和文字效果' if review and record.get('review_reason')=='aspect_change' else
                  '已去框，框内另有裁切，请确认画面完整' if review else '')

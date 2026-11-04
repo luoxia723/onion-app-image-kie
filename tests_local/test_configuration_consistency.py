@@ -26,19 +26,19 @@ def test_settings_failure_never_partially_updates_product(app):
 def test_settings_rejects_stale_product_editor_before_any_write(app):
     first=app.save_product('第一版');app.save_product('另一窗口的第二版')
     before=app.settings.env_file.read_bytes()
-    with pytest.raises(UserError,match='另一窗口|版本'):app.save_settings({'concurrency':8,'product_text':'旧窗口修改','product_revision':first['revision']})
+    with pytest.raises(UserError,match='另一窗口|版本'):app.save_settings({'planning_model':'new-model','product_text':'旧窗口修改','product_revision':first['revision']})
     assert app.product()['text']=='另一窗口的第二版' and app.settings.env_file.read_bytes()==before
 
 def test_settings_database_failure_rolls_back_env_and_product(app):
-    old=app.save_product('原资料');before=app.settings.env_file.read_bytes();db=app.db
+    old=app.save_product('原资料');before=app.settings.env_file.read_bytes();model=app.settings.planning_model;db=app.db
     class BrokenCommit:
         def __getattr__(self,k):return getattr(db,k)
         def commit(self):raise OSError('test disk failure')
     app.db=BrokenCommit()
     try:
-        with pytest.raises(OSError):app.save_settings({'concurrency':8,'product_text':'新资料','product_revision':old['revision']})
+        with pytest.raises(OSError):app.save_settings({'planning_model':'new-model','product_text':'新资料','product_revision':old['revision']})
     finally:app.db=db
-    assert app.product()==old and app.settings.concurrency==4 and app.settings.env_file.read_bytes()==before
+    assert app.product()==old and app.settings.planning_model==model and app.settings.env_file.read_bytes()==before
 
 def test_draft_product_is_frozen_and_all_drafts_remain_discoverable(app):
     first=app.save_product('已确认的第一版资料')
