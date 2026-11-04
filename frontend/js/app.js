@@ -125,7 +125,6 @@ async function toggleSel(n,inPv,pid){
   clearTimeout(pickAdvanceTimer);
   const changed=await changeSelection('adopt',{set:n,placement_id:pid,adopted});
   if(changed&&adopted&&!inPv&&!S.pv&&S.cur===task&&R()?.id===roundId)schedulePickAdvance(pid);
-  if(S.pv){const b=$('#pvsel');if(b)b.textContent=adopted?'已选':'选中这一套'}
 }
 function setPickPlacement(pid){clearTimeout(pickAdvanceTimer);S.pickPid=pid;S.pf='all';render();$('.sample-stage')?.scrollTo({top:0});$('#sets')?.scrollTo({left:0});document.querySelector(`[data-pick-placement="${pid}"]`)?.scrollIntoView({block:'nearest'})}
 function setAutoNext(enabled){S.autoNext=enabled;localStorage.setItem('onion.pick.autoNext',String(enabled));if(!enabled)clearTimeout(pickAdvanceTimer)}
@@ -160,7 +159,7 @@ async function stopRest(){await action('stop');render()}
 
 
 
-function togglePvOriginal(){const s=curPvSlot();if(!s)return;S.pvOriginal=!S.pvOriginal;$('#pvImg').src=S.pvOriginal?s.original_image_url:imgOf(s);$('#pvsource').textContent=S.pvOriginal?'查看成品':'查看原图';$('#pvkind').textContent=S.pvOriginal?'生成原图':'成品预览'}
+function togglePvOriginal(){S.pvOriginal=!S.pvOriginal;S.pvCompare=false;render()}
 async function reprocessFrame(id){
   if(S.pv===id)await persistPromptDraft();await action('reprocess-frame',{image_id:id});S.pvOriginal=false;
   S.promptDraft=null;await openPv(id);toast('已在本机去框，请重新勾选；未调用生图');
@@ -251,7 +250,7 @@ boot();
 
 async function archiveTask(id,on){await request('/tasks/'+id+'/'+(on?'archive':'unarchive'),'POST',{});S.menu=null;await refresh();toast(on?'已归档，可在历史中查找':'已取消归档')}
 async function pauseQueue(on){await action(on?'pause':'continue');render()}
-function queueText(){const q=S.queue;if(q?.blocked_reason)return q.blocked_reason;if(q?.maintenance)return '正在进行本机数据维护，队列暂缓提交';return q?'全局队列：处理中 '+q.running+'/'+q.limit+' · 排队 '+q.queued+' · 等待依赖 '+q.waiting+(q.paused?' · 已暂停 '+q.paused:''):'正在读取队列…'}
+function queueText(){const q=S.queue;if(q?.blocked_reason)return q.blocked_reason;if(q?.maintenance)return '正在进行本机数据维护，队列暂缓提交';return q&&(q.running||q.queued||q.waiting)?'出图中 '+q.running+' · 排队 '+(q.queued+q.waiting)+(q.paused?' · 已暂停':''):''}
 
 function syncPreviewState(){
  const s=curPvSlot();if(!s||s.is_historical)return;

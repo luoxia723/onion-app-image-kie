@@ -16,7 +16,7 @@ async function discardPromptDraft(){
 async function openPv(id,att=null){
  const token=++previewEpoch,tid=S.cur,epoch=viewEpoch;
  const current=()=>token===previewEpoch&&tid===S.cur&&epoch===viewEpoch;
- await persistPromptDraft();if(!current())return;window._pvFrom=trapRef(document.activeElement)||`[data-slot="${id}"]`;
+ await persistPromptDraft();if(!current())return;if(!S.pv)window._pvFrom=trapRef(document.activeElement)||`[data-slot="${id}"]`;
  S.pv=id;S.previewStale=false;S.pvOriginal=false;S.pvDetails=null;S.promptDraft=null;S.pvCompare=false;render();
  try{
   const s=await request('/tasks/'+tid+'/image-details/'+id+'?editor='+encodeURIComponent(DRAFT_EDITOR)+(att?'&v='+att:''));
@@ -24,7 +24,7 @@ async function openPv(id,att=null){
   if(T().ri!==s.round_index){const t=await request('/tasks/'+tid+'?view=1&round='+s.round_index);if(!current())return;installTask(t);T().ri=s.round_index}
   S.pvDetails=s;S.promptStatus=s.is_historical?'历史版本，只读':s.edit_draft?'草稿已保存，尚未生成':'当前图片的实际提示词';
   if(s.edit_draft&&!s.is_historical)S.promptDraft={id,att:s.att,value:s.edit_draft.text,dirty:false,sequence:s.edit_draft.editor_id===DRAFT_EDITOR?s.edit_draft.sequence:0};
-  render();$('#pvPrompt')?.focus();
+  render();$('#pvx')?.focus();
  }catch(e){if(current()){S.pv=null;render();report(e)}}
 }
 function pvChk(){const s=curPvSlot();if(!s||s.is_historical)return;const previous=S.promptDraft;
