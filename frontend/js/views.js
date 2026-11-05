@@ -194,7 +194,7 @@ function viewForm(){
   const pr=S.draft,form=imageFormOf(pr),definition=IMAGE_FORMS[form],placements=formPlacements(pr),grp={},forms=channelForms(pr.channel),blocked=S.submitting||S.navigationPending,unavailable=!forms.length;
   placements.forEach(p=>{(grp[p.platform]=grp[p.platform]||[]).push(p)});
   const issue=S.tried?formIssue(pr):null;
-  const fi=(key,label)=>`<label class="copy-field" for="f-${key}"><span>${label}</span><input id="f-${key}" data-k="${key}" required aria-required="true" aria-invalid="${issue?.field==='f-'+key}" value="${esc(pr[key]||'')}" class="${issue?.field==='f-'+key?'bad':''}" oninput="setF('${key}',this.value)">${issue?.field==='f-'+key?`<span class="errtx">${esc(issue.message)}</span>`:''}</label>`;
+  const fi=(key,label)=>`<label class="copy-field" for="f-${key}"><span>${label}</span><input id="f-${key}" data-k="${key}" aria-label="${esc(label)}" required aria-required="true" aria-invalid="${issue?.field==='f-'+key}" value="${esc(pr[key]||'')}" class="${issue?.field==='f-'+key?'bad':''}" oninput="setF('${key}',this.value)">${issue?.field==='f-'+key?`<span class="errtx">${esc(issue.message)}</span>`:''}</label>`;
   return `<div class="form config-form"><fieldset class="form-fields config-main" ${blocked?'disabled':''}>
     <section class="card compose-card"><div class="channel-row"><h3 id="channel-label">渠道</h3><div id="channel" class="config-segments" role="radiogroup" aria-labelledby="channel-label" tabindex="-1">${channelOptions().map(channel=>`<button role="radio" aria-checked="${pr.channel===channel}" class="${pr.channel===channel?'active':''}" onclick="setChannel('${channel}')">${esc(channel)}</button>`).join('')}</div>${issue?.field==='channel'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div>
     <fieldset class="channel-dependent" ${unavailable?'disabled':''}>
@@ -377,7 +377,7 @@ function viewPick(){
     const selected=sets.filter(g=>selectedSet(r,g)).length,problems=sets.filter(g=>attentionSet(r,g)||g.sl.some(s=>s.delivery_eligible===false)).length;
     const running=slots.some(s=>['queued','generating','waiting_first'].includes(s.state));
     const progress=running?`<span class="dir-gen-progress">${done}/${slots.length}<span class="mini-progress-track" role="progressbar" aria-label="${esc(pname(placement))}生成进度" aria-valuemin="0" aria-valuemax="${slots.length}" aria-valuenow="${done}"><i style="width:${done/Math.max(1,slots.length)*100}%"></i></span></span>`:'';
-    return`<button class="dir-item ${id===pid?'active':''}" data-pick-placement="${id}" aria-current="${id===pid?'true':'false'}" onclick="setPickPlacement('${id}')"><span class="dir-item-name">${esc(pname(placement))}</span><span class="dir-item-size">${psz(placement)}</span><span class="dir-status-cols">${progress}<span class="${selected?'badge-selected':'badge-unselected-ready'}">已选 ${selected}/${completed}</span>${problems?`<span class="dir-problem-text">· ${problems} 问题</span>`:''}</span></button>`;
+    return`<button class="dir-item ${id===pid?'active':''}" data-pick-placement="${id}" aria-current="${id===pid?'true':'false'}" onclick="setPickPlacement('${id}')"><span class="dir-item-name">${esc(pname(placement))}</span><span class="dir-item-size">${psz(placement)}</span><span class="dir-status-cols">${progress}${!running||completed>0?`<span class="${selected?'badge-selected':'badge-unselected-ready'}">已选 ${selected}/${completed}</span>`:''}${problems?`<span class="dir-problem-text">· ${problems} 问题</span>`:''}</span></button>`;
   }).join('');
   const bulk=bulkSelectionState(r);
   const selectionBar=`<div class="selection-bar"><label class="select-all"><input id="select-visible" type="checkbox" aria-label="全选当前版位" aria-checked="${bulk.mixed?'mixed':bulk.all?'true':'false'}" ${bulk.all?'checked':''} ${!bulk.scope.length||S.selectionBusy?'disabled':''} onchange="selectVisible(this.checked)"><span>全选当前版位</span></label><button class="ghost" id="clear-visible" ${!bulk.selected||S.selectionBusy?'disabled':''} onclick="clearVisibleSelection()">取消选择</button></div>`;
@@ -392,8 +392,8 @@ function viewPick(){
 }
 function viewSelectionFooter(){
   const r=R();if(!r)return'';const d=r.delivery||{};
-  const partial=d.incomplete_sets>0;
-  const saveButton=`<button id="${partial?'save-ready':'save-selected'}" class="primary" ${!d.ready_sets||!(d.can_export_ready||d.can_export)||S.exportBusy?'disabled':''} onclick="dlAll(${partial})">${S.exportBusy?'正在保存…':'保存已合格的 '+(d.ready_sets||0)+' 套'}</button>`;
+  const partial=d.incomplete_sets>0,saved=d.has_changes===false&&d.matching_version;
+  const saveButton=`<button id="${partial?'save-ready':'save-selected'}" class="primary" ${saved||!d.ready_sets||!(d.can_export_ready||d.can_export)||S.exportBusy?'disabled':''} onclick="dlAll(${partial})">${S.exportBusy?'正在保存…':saved?'已保存 '+esc(d.matching_version):'保存已合格的 '+(d.ready_sets||0)+' 套'}</button>`;
   return`<footer class="selection-footer"><div><span class="save-facts">已选 <b>${d.selected_sets||0}</b> 套 · ${d.covered_placements||0}/${d.total_placements||r.params.pids.length} 个版位</span>${partial?`<button class="lnk" onclick="locateIncomplete()" title="另 ${d.incomplete_sets} 套待处理，不纳入本次图包">${d.incomplete_sets} 套待处理</button>`:''}${d.last_version?`<button class="lnk" onclick="openFolder()">已保存 ${esc(d.last_version)}${d.has_changes?' · 勾选有变化，需重新保存':''} · 打开文件夹</button>`:''}</div>${saveButton}</footer>`;
 }
 

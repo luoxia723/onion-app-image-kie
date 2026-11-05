@@ -225,3 +225,14 @@ test('图片模型显示短名而保留原提交值',()=>{
   assert(html.includes('value="gpt-image-2-image-to-image" >GPT Image 2 · 1K</option>'));
   assert(!html.includes('后端长名'));
 });
+
+test('单图主副标题与双图三图每句输入框都有与可见标签一致的读屏名称',()=>{
+ for(const form of ['单图','双图','三图']){
+  const ctx=context(form),html=vm.runInContext('viewForm()',ctx);
+  for(const [key,label] of vm.runInContext(`IMAGE_FORMS[${JSON.stringify(form)}].fields`,ctx)){
+   const input=html.match(new RegExp('<input id="f-'+key+'"[^>]*>'))[0];
+   assert(input.includes('aria-label="'+label+'"'),form+' '+key);
+   assert(html.includes('<label class="copy-field" for="f-'+key+'"><span>'+label+'</span>'));
+  }
+ }
+});

@@ -101,3 +101,30 @@ test('任务摘要压成两行，保留状态、图片形式、进度和归档�
  assert(html.includes('class="t1">标题'));assert(html.includes('待挑选 · 三图 · 4/6 · 已归档'));
  assert(!html.includes('class="t3"'));assert(!html.includes('<img'));
 });
+
+test('保存后选择未变化时主按钮禁用并显示匹配版本，变化后恢复保存',()=>{
+ const ctx=setup();ctx.round.delivery={selected_sets:1,ready_sets:1,incomplete_sets:0,can_export:true,has_changes:false,matching_version:'v001',last_version:'v001'};
+ let html=vm.runInContext('viewSelectionFooter()',ctx),button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
+ assert.match(button,/disabled/);assert(button.endsWith('>已保存 v001</button>'));
+ ctx.round.delivery.has_changes=true;ctx.round.delivery.ready_sets=2;
+ html=vm.runInContext('viewSelectionFooter()',ctx);button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
+ assert(!button.includes('disabled'));assert(button.endsWith('>保存已合格的 2 套</button>'));
+ ctx.round.delivery.has_changes=false;ctx.round.delivery.matching_version=null;
+ html=vm.runInContext('viewSelectionFooter()',ctx);button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
+ assert(!button.includes('disabled'));assert(button.includes('保存已合格的 2 套'));
+});
+
+test('出图中尚无完整套图时目录只显示进度，出好一套后再显示已选数',()=>{
+ const ctx=setup();ctx.round.sel={};ctx.round.slots.forEach(slot=>slot.state='generating');
+ let directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
+ assert(directory.includes('0/4'));assert(directory.includes('mini-progress-track'));assert(!directory.includes('已选'));
+ ctx.round.slots.find(slot=>slot.id==='oppo11').state='done';
+ directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
+ assert(directory.includes('1/4'));assert(!directory.includes('已选'));
+ ctx.round.slots.find(slot=>slot.id==='oppo12').state='done';
+ directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
+ assert(directory.includes('2/4'));assert(directory.includes('已选 0/1'));assert(!directory.includes('已选 0/0'));
+ ctx.round.slots.forEach(slot=>slot.state='done');
+ directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
+ assert(!directory.includes('mini-progress-track'));assert.equal((directory.match(/已选 0\/2/g)||[]).length,2);
+});
