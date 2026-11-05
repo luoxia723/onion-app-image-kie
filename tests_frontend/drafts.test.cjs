@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const vm=require('node:vm');const fs=require('node:fs');const path=require('node:path');const {webcrypto}=require('node:crypto');
 function context(request){
- const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,URLSearchParams,setTimeout,clearTimeout,
+ const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,URLSearchParams,setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer},clearTimeout,
   window:{addEventListener(){}},document:{addEventListener(){},querySelector(){return null}},
   DEF_CTA:"立即体验",PLACEMENTS:[],
   S:{view:'form',draftId:'a'.repeat(32),draftRevision:1,draftSequence:1,draft:{image_form:'单图',t1:'本窗口最新输入'},formDrafts:{},drafts:[]},
@@ -29,7 +29,7 @@ test('删除活动草稿后继续输入会创建新的草稿标识',()=>{
 
 function editor(request=async url=>url==='/bootstrap'?{product:{text:'产品资料',revision:2},form_defaults:{}}:{drafts:[]}){
  const listeners={};
- const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,URLSearchParams,setTimeout,clearTimeout,
+ const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,URLSearchParams,setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer},clearTimeout,
   window:{addEventListener(name,fn){listeners[name]=fn}},history:{replaceState(){}},
   document:{addEventListener(){},querySelector(selector){return selector==='#main'?{scrollTop:0}:null}},mockRequest:request});
  for(const name of ['views','drafts','app']){
@@ -114,4 +114,23 @@ test('重新打开工作台时按最近任务形式读取服务端记忆的渠�
  ctx.location={hash:''};ctx.setInterval=()=>0;
  run('refresh=async()=>{S.summaries=[{image_form:"三图"}]}');await run('boot()');
  assert.equal(run('S.draft.image_form'),'三图');assert.equal(run('S.draft.channel'),'应用商店');assert.equal(run('S.draftId'),null);
+});
+
+test('删除当前草稿提供撤销，按新ID PUT恢复内存中的最新文案和其他形式内容',async()=>{
+ const calls=[];let restored;
+ const {ctx,run}=editor(async(url,method,body)=>{
+  calls.push({url,method,body});if(url==='/drafts/old'&&!method)return{draft:{t1:'已保存内容'},revision:1};
+  if(method==='PUT'){restored={id:url.split('/').at(-1),...body,revision:1};return restored}
+  if(url==='/drafts')return{drafts:restored?[restored]:[]};return{};
+ });ctx.setTimeout=()=>1;ctx.clearTimeout=()=>{};
+ run('S.draftId="old";S.draft.t1="尚未自动保存的内容";S.formDrafts={"三图":{s1:"保留句子"}}');
+ await run('removeDraft("old")');assert.equal(run('S.undo.draft.draft.t1'),'尚未自动保存的内容');
+ run('openDraft=async id=>{S.draftId=id}');await run('undoDel()');
+ const write=calls.find(c=>c.method==='PUT');assert(write);assert.notEqual(write.url,'/drafts/old');assert.equal(write.body.revision,0);
+ assert.equal(write.body.draft.t1,'尚未自动保存的内容');assert.equal(write.body.form_drafts['三图'].s1,'保留句子');assert.equal(run('S.undo'),null);assert.equal(run('S.draftId'),restored.id);
+});
+test('自动保存只更新草稿列表、状态和标题，不重画品牌行',async()=>{
+ let redraws=0;const writes=[];const {ctx,run}=editor(async()=>({drafts:[],revision:1}));ctx.redraw=()=>redraws++;
+ ctx.document.querySelector=selector=>['#draft-list','#draft-status','#title'].includes(selector)?{set innerHTML(value){writes.push(selector)},set textContent(value){writes.push(selector)},classList:{toggle(){}}}:null;
+ run('render=redraw;S.draftId="saved";S.draft.t1="标题"');await run('persistDraft()');assert.equal(redraws,0);assert(writes.includes('#draft-list'));assert(writes.includes('#draft-status'));
 });

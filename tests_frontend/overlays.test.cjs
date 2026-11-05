@@ -167,3 +167,9 @@ test('队列阻塞与维护仍显示原提示，并优先于任务计数',()=>{
  assert.equal(run('queueText()'),'正在进行本机数据维护，队列暂缓提交');
  run('S.queue.blocked_reason="请先配置 Key"');assert.equal(run('queueText()'),'请先配置 Key');
 });
+
+test('自动去框只显示灰色检查提示，去框失败保留琥珀提示和处理按钮',()=>{
+ const {run,html}=setup();run('S.pvDetails.reason_code="frame_review";S.pvDetails.preview_kind="raw";S.pvDetails.has_frame=true');
+ let content=html();assert(content.includes('已自动去框，请看一下人物和文字'));assert(!content.includes('需去框'));assert(!content.includes('frame-review'));assert(!content.includes('id="pvcrop"'));assert(!content.includes('id="pvfit"'));
+ run('S.pvDetails.reason_code="frame_failed"');content=html();assert(content.includes('需去框'));assert(content.includes('frame-review'));assert(content.includes('id="pvcrop"'));assert(content.includes('id="pvfit"'));
+});

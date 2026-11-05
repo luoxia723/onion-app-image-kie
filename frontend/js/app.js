@@ -80,11 +80,11 @@ async function refresh(){if(loading)return;loading=true;lastRefreshAt=Date.now()
  if(!S.ren){if(S.view==='form'){const list=$('.tasks');if(list&&!S.menu)list.innerHTML=taskList()||'<li class="empty-list">还没有任务</li>';const q=$('#queue-overview');if(q)q.textContent=queueText()}else softRender()}
 }catch(e){refreshFailures++;if(refreshFailures>=2){S.connectionLost=true;softRender()}if(!S.summaries?.length)report(e)}finally{loading=false;if(query!==(S.q||''))refresh()}}
 function searchTasks(q){S.q=q;S.searchPending=true;S.draftSearching=true;S.draftLimit=20;updateDraftList();clearTimeout(searchTimer);searchTimer=setTimeout(()=>{refresh();refreshDraftList().catch(report)},180)}
-function beginNavigation(){if(S.submitting){toast('正在提交配置，请稍候');return null}S.pickMore=false;const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
-function finishNavigation(epoch){if(epoch===viewEpoch){S.navigationPending=false;render()}}
+function beginNavigation(taskId=null){if(S.submitting){toast('正在提交配置，请稍候');return null}S.pickMore=false;S.openingTask=taskId;const epoch=++viewEpoch;S.navigationPending=true;render();return epoch}
+function finishNavigation(epoch){if(epoch===viewEpoch){S.navigationPending=false;S.openingTask=null;render()}}
 async function newTask(){return newDraft()}
 async function openTask(id){
- const epoch=beginNavigation();if(epoch===null)return;try{
+ const epoch=beginNavigation(id);if(epoch===null)return;try{
  await persistDraft();await persistPromptDraft();if(epoch!==viewEpoch)return;
  const t=await request('/tasks/'+id+'?view=1');if(epoch!==viewEpoch)return;
  installTask(t);S.pv=null;S.pvDetails=null;S.promptDraft=null;S.cur=id;t.ri=t.loaded_round;S.view='pick';S.tab='all';S.pf='all';S.editing=null;S.draftId=null;save(false);render();$('#main').scrollTop=0;
@@ -93,14 +93,14 @@ async function openTask(id){
 async function go(v){
   if(S.submitting)return toast('正在提交配置，请稍候');
   if(v==='form')return editTaskDraft();if(!R())return;
-  await persistDraft();S.view=v;S.draftId=null;S.miss=false;save(false);render();$('#main').scrollTop=0;
+  await persistDraft();S.view=v;S.pickMore=false;S.draftId=null;S.miss=false;save(false);render();$('#main').scrollTop=0;
 }
 function editRedo(){return editTaskDraft()}
 async function startGen(){if(busy||S.navigationPending||S.uploadingPurpose)return;
   if(!CFG.planningKey){toast('请先配置画面规划 API');return openCfg()}
   if(!CFG.simulation&&!CFG.kie)return openCfg();
   S.tried=true;const issue=formIssue(S.draft);if(issue){render();const field=document.getElementById(issue.field);if(field){field.scrollIntoView({block:'center'});field.focus()}return}
-  const params=JSON.parse(JSON.stringify(S.draft));params.sets=Number(params.sets);params.image_model=params.image_model||CFG.imageModel;
+  const params=JSON.parse(JSON.stringify(S.draft));if(Array.isArray(params.channel))delete params.channel;params.sets=Number(params.sets);params.image_model=params.image_model||CFG.imageModel;
   busy=true;S.submitting=true;render();
   const fingerprint=JSON.stringify(params);
   const idem=S.submitKey&&S.submitFingerprint===fingerprint?S.submitKey:crypto.randomUUID();S.submitKey=idem;S.submitFingerprint=fingerprint;
@@ -157,8 +157,14 @@ async function renOk(){if(!S.ren||window._rnd)return;const id=S.ren,name=S.renV;
 function renEnd(){S.ren=null;S.renV=null;render()}
 async function dupFrom(id){const r=await request('/tasks/'+id+'/duplicate','POST',id===S.cur?{round:T().ri}:{});r.params.direction='';return newDraft(r.params)}
 function dupTask(){return dupFrom(S.cur)}
-async function delTask(id){if(!confirm('删除此任务及候选图片？已保存到工作区的交付包保留。可在5分钟内撤销。'))return;await request('/tasks/'+id,'DELETE',{});S.menu=null;S.undo={id,cur:S.cur===id};S.tasks=S.tasks.filter(t=>t.id!==id);if(S.cur===id){S.cur=null;S.view='form'}render();clearTimeout(window._undoT);window._undoT=setTimeout(()=>{S.undo=null;render()},5000)}
-async function undoDel(){const u=S.undo;if(!u)return;installTask(await request('/tasks/'+u.id+'/restore','POST',{}));clearTimeout(window._undoT);S.undo=null;if(u.cur){S.cur=u.id;S.view='pick'}save();render()}
+async function delTask(id){await request('/tasks/'+id,'DELETE',{});S.menu=null;S.undo={id,cur:S.cur===id};S.tasks=S.tasks.filter(t=>t.id!==id);S.summaries=S.summaries?.filter(t=>t.id!==id);if(S.cur===id){S.cur=null;S.view='form'}render();clearTimeout(window._undoT);window._undoT=setTimeout(()=>{S.undo=null;render()},300000)}
+async function undoDel(){
+ const u=S.undo;if(!u)return;
+ if(u.draft){
+  const id=draftId();await request('/drafts/'+id,'PUT',{draft:u.draft.draft,form_drafts:u.draft.form_drafts||{},editing_task_id:u.draft.editing_task_id,editing_round:u.draft.editing_round,revision:0,editor_id:DRAFT_EDITOR,sequence:1});
+  await refreshDraftList();clearTimeout(window._undoT);S.undo=null;if(u.cur)await openDraft(id);else render();
+ }else{installTask(await request('/tasks/'+u.id+'/restore','POST',{}));clearTimeout(window._undoT);S.undo=null;if(u.cur){S.cur=u.id;S.view='pick'}save();render()}
+}
 function pkZip(pk){return pk.zip}
 function downloadLink(url){const a=document.createElement('a');a.href=url;a.download='';document.body.append(a);a.click();a.remove()}
 async function dlAll(readyOnly=false){

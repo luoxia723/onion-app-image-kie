@@ -128,3 +128,10 @@ test('出图中尚无完整套图时目录只显示进度，出好一套后再�
  directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
  assert(!directory.includes('mini-progress-track'));assert.equal((directory.match(/已选 0\/2/g)||[]).length,2);
 });
+
+test('切版位后的图片在load事件前显示灰色占位，加载后显示图片',()=>{
+ const ctx=setup();const html=vm.runInContext('cellHtml(R(),R().slots[0])',ctx),handler=html.match(/<img onload="([^"]+)"/)[1];
+ const classes=[];ctx.loadedImage={parentElement:{classList:{add:name=>classes.push(name)}}};
+ vm.runInContext(`(function(){${handler}}).call(loadedImage)`,ctx);assert.deepEqual(classes,['image-loaded']);
+ const css=fs.readFileSync(path.join(root,'frontend/css/app.css'),'utf8');assert(css.includes('.cell:has(img):not(.image-loaded){background:#E1E4E8}'));assert(css.includes('.cell.image-loaded img{opacity:1}'));
+});

@@ -209,13 +209,13 @@ test('默认按钮文字和开关变化后就地更新最终文字，保留版�
   vm.runInContext('setF("cta","新的默认")',ctx);assert.equal(label.textContent,'专属文字');
 });
 test('配置顶栏合并为任务名和草稿状态，移除步骤条与面包屑',()=>{
-  const ctx=context();Object.assign(ctx.S,{view:'form',draftStatus:'草稿已保存'});
+  const ctx=context();Object.assign(ctx.S,{view:'form',draftId:'saved',draftStatus:'草稿已保存'});
   let html=vm.runInContext('viewHead()',ctx);
-  assert(html.includes('pick-head config-head'));assert(html.includes('>新任务</h1>'));
+  assert(html.includes('pick-head config-head'));assert(html.includes('>未命名草稿</h1>'));
   assert(html.includes('id="draft-status" role="status">草稿已保存</span>'));
   for(const old of ['class="crumb"','class="steps"','配置生成','挑选保存','保存草稿'])assert(!html.includes(old));
   ctx.S.cur='task';ctx.S.tasks=[{id:'task',name:'实际任务名',pkg:'APP',rounds:[]}];
-  assert(vm.runInContext('viewHead()',ctx).includes('>实际任务名</h1>'));
+  ctx.S.draft.t1='草稿里的新标题';assert(vm.runInContext('viewHead()',ctx).includes('>草稿里的新标题</h1>'));
 });
 test('图片模型显示短名而保留原提交值',()=>{
   const ctx=context();
@@ -235,4 +235,26 @@ test('单图主副标题与双图三图每句输入框都有与可见标签一�
    assert(html.includes('<label class="copy-field" for="f-'+key+'"><span>'+label+'</span>'));
   }
  }
+});
+
+test('旧任务跨渠道配置保留版位并按渠道分组，选择单渠道后清除其他版位',()=>{
+ const ctx=context();ctx.legacy={...ctx.S.draft,pids:placements.filter(p=>p.image_form==='单图').slice(0,7).map(p=>p.id),t1:'旧标题',t2:'旧副标题'};delete ctx.legacy.channel;
+ vm.runInContext('loadDraft(legacy)',ctx);
+ const channels=[...new Set(ctx.legacy.pids.map(id=>placements.find(p=>p.id===id).category))];assert(channels.length>1);
+ assert.deepEqual(Array.from(ctx.S.draft.channel),channels);assert.equal(vm.runInContext('formIssue(S.draft)',ctx),null);
+ let html=vm.runInContext('viewForm()',ctx);assert(html.includes('沿用原任务'));assert(html.includes('channel-placement-group'));
+ for(const channel of channels)assert(html.includes('aria-checked="true" class="active" onclick="setChannel(\''+channel+'\')"'));
+ const available=placements.filter(p=>channels.includes(p.category)&&p.image_form==='单图');
+ for(const p of available)assert(html.includes('data-pid="'+p.id+'"'));
+ assert(html.includes('共 21 张'));assert(!/id="go"[^>]*disabled/.test(html));
+ const added=available.find(p=>!ctx.S.draft.pids.includes(p.id));if(added){vm.runInContext(`togP('${added.id}')`,ctx);assert(ctx.S.draft.pids.includes(added.id))}
+ vm.runInContext(`setChannel('${channels[0]}')`,ctx);assert.equal(ctx.S.draft.channel,channels[0]);assert(ctx.S.draft.pids.every(id=>placements.find(p=>p.id===id).category===channels[0]));
+ html=vm.runInContext('viewForm()',ctx);assert(!html.includes('沿用原任务'));
+});
+test('旧任务单渠道推断保持不变，空白配置显示先选渠道及未命名草稿',()=>{
+ const ctx=context();vm.runInContext('loadDraft({image_form:"单图",pids:[PLACEMENTS.find(p=>p.category==="应用商店"&&p.image_count===1).id]})',ctx);assert.equal(ctx.S.draft.channel,'应用商店');
+ vm.runInContext('loadDraft({...defParams(),channel:"",pids:[]});S.view="form";S.draftId=null;S.draftStatus="草稿已保存"',ctx);
+ let html=vm.runInContext('viewForm()',ctx);assert(html.includes('先选渠道'));
+ html=vm.runInContext('viewHead()',ctx);assert(html.includes('未命名草稿'));assert(!html.includes('草稿已保存'));
+ ctx.S.draft.t1='填写后的标题';assert(vm.runInContext('viewHead()',ctx).includes('填写后的标题'));
 });

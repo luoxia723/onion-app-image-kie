@@ -23,7 +23,7 @@ async function persistDraft(){
   await refreshDraftList();
   return value;
 }
-function updateDraftList(){const e=document.querySelector('#draft-list');if(e)e.innerHTML=draftListHtml()}
+function updateDraftList(){const e=document.querySelector('#draft-list');if(e)e.innerHTML=draftListHtml();const title=document.querySelector('#title');if(title&&S.view==='form')title.textContent=tName({draft:S.draft})}
 async function refreshDraftList(){
   const q=S.q||'',value=await request('/drafts');
   if(q!==(S.q||''))return;S.drafts=value.drafts||[];S.draftSearching=false;updateDraftList();
@@ -32,7 +32,7 @@ function showMoreDrafts(){S.draftLimit=(S.draftLimit||20)+20;updateDraftList()}
 function draftListHtml(){
   if(S.draftSearching)return '<li class="tnone">正在搜索草稿…</li>';
   const drafts=(S.drafts||[]).filter(d=>JSON.stringify(d.draft).toLowerCase().includes((S.q||'').toLowerCase())),shown=drafts.slice(0,S.draftLimit||20);
-  return drafts.length?`<li class="gh fixed"><span>草稿</span><span>${drafts.length}</span></li>`+shown.map(d=>`<li class="trow"><button class="task ${S.draftId===d.id?'on':''}" onclick="openDraft('${d.id}')"><span class="noimg draft-icon">✎</span><div><div class="t1">${esc(d.name)}</div><div class="t2">${esc(d.draft.channel?[d.draft.channel,d.draft.image_form].filter(Boolean).join(' · '):'待填写')}</div></div></button><button class="more" aria-label="删除草稿" onmousedown="event.preventDefault()" onclick="removeDraft('${d.id}')">×</button></li>`).join('')+(shown.length<drafts.length?`<li><button class="lnk draft-more" onclick="showMoreDrafts()">加载更多草稿（还有 ${drafts.length-shown.length} 份）</button></li>`:''):'';
+  return drafts.length?`<li class="gh fixed"><span>草稿</span><span>${drafts.length}</span></li>`+shown.map(d=>`<li class="trow"><button class="task ${S.draftId===d.id?'on':''}" onclick="openDraft('${d.id}')"><span class="noimg draft-icon">✎</span><div><div class="t1">${esc(tName(d.id===S.draftId?{draft:S.draft}:d))}</div><div class="t2">${esc(d.draft.channel?[Array.isArray(d.draft.channel)?'多渠道':d.draft.channel,d.draft.image_form].filter(Boolean).join(' · '):'待填写')}</div></div></button><button class="more" aria-label="删除草稿" onmousedown="event.preventDefault()" onclick="removeDraft('${d.id}')">×</button></li>`).join('')+(shown.length<drafts.length?`<li><button class="lnk draft-more" onclick="showMoreDrafts()">加载更多草稿（还有 ${drafts.length-shown.length} 份）</button></li>`:''):'';
 }
 async function openDraft(id){
   const epoch=beginNavigation();if(epoch===null)return;try{
@@ -43,6 +43,7 @@ async function openDraft(id){
   if(value.editing_task_id){try{task=await request('/tasks/'+value.editing_task_id)}catch(e){if(e.status!==404)throw e;value.editing_task_id=null;missingTask=true}}
   if(epoch!==viewEpoch)return;
   S.loadingDraft=true;
+  if(value.editing_task_id&&!value.draft.channel)delete value.draft.channel;
   if(task){installTask(task);S.cur=task.id;const index=T().rounds.findIndex(r=>r.id===value.editing_round);if(index>=0)T().ri=index}else S.cur=null;
   loadDraft(value.draft);S.formDrafts=value.form_drafts||{};S.draftId=id;S.draftRevision=value.revision;
   S.draftSequence=value.editor_id===DRAFT_EDITOR?value.sequence:0;S.editing=value.editing_task_id||null;S.view='form';S.tried=false;
@@ -52,7 +53,9 @@ async function openDraft(id){
 async function removeDraft(id){
   if(S.submitting)return toast('正在提交配置，请稍候');
   if(S.draftId===id)clearTimeout(draftTimer);
-  await request('/drafts/'+id,'DELETE',{});await refreshDraftList();
+  const value=await request('/drafts/'+id),snapshot=S.draftId===id?{...value,...draftPayload()}:value;
+  await request('/drafts/'+id,'DELETE',{});S.undo={draft:snapshot,cur:S.draftId===id};await refreshDraftList();
+  clearTimeout(window._undoT);window._undoT=setTimeout(()=>{S.undo=null;render()},5000);
   if(S.draftId===id){S.draftId=null;S.cur=null;S.editing=null;loadDraft(defParams(imageFormOf(S.draft)));S.formDrafts={};S.view='form';showDraftStatus('')}save(false);render();
 }
 async function newDraft(params=null,editing=null){

@@ -56,3 +56,22 @@ test('草稿列表可以展开到第51份，摘要无需携带全部资料',()=>
  assert(!run('draftListHtml()').includes('草稿50'));
  run('showMoreDrafts();showMoreDrafts()');assert(run('draftListHtml()').includes('草稿50'));
 });
+
+test('跨渠道旧配置提交时移除channel字段，保留全部所选版位',async()=>{
+ const calls=[];const {run}=setup(async(url,method,body)=>{calls.push({url,method,body});if(url==='/tasks')return{id:'new',rounds:[{slots:[],params:body.params}]};return{drafts:[]}});
+ run('CFG={planningKey:true,simulation:true};S.draft.channel=["应用商店","信息流"];S.draft.pids=["huawei","weibo"];persistDraft=async()=>{}');await run('startGen()');
+ const submitted=calls.find(c=>c.url==='/tasks');assert(!Object.hasOwn(submitted.body.params,'channel'));assert.deepEqual(Array.from(submitted.body.params.pids),['huawei','weibo']);
+});
+test('任务直接删除并能撤销，无浏览器确认，任务摘要同步移除',async()=>{
+ const calls=[];const {ctx,run}=setup(async(url,method)=>{calls.push({url,method});return{id:'task',rounds:[{}],summary:{id:'task',name:'任务'}}});
+ ctx.confirm=()=>{throw Error('不应调用confirm')};ctx.setTimeout=()=>1;ctx.clearTimeout=()=>{};
+ run('S.cur="task";S.tasks=[{id:"task",rounds:[{}]}];S.summaries=[{id:"task"}]');await run('delTask("task")');
+ assert.equal(run('S.tasks.length'),0);assert.equal(run('S.summaries.length'),0);assert.equal(run('S.undo.id'),'task');assert.equal(calls[0].method,'DELETE');
+ await run('undoDel()');assert.equal(run('S.cur'),'task');assert.equal(run('S.view'),'pick');assert.equal(run('S.undo'),null);assert.equal(calls[1].url,'/tasks/task/restore');
+});
+test('打开任务期间主区域用骨架，失败或较旧请求结束不残留加载状态',async()=>{
+ let reject;const {run}=setup(()=>new Promise((resolve,fail)=>reject=fail));run('persistDraft=async()=>{};persistPromptDraft=async()=>{}');
+ const pending=run('openTask("loading")');await new Promise(setImmediate);
+ assert.equal(run('S.openingTask'),'loading');assert(run('viewPick()').includes('pick-skeleton'));assert(!run('viewHead()').includes('正在打开，请稍候'));
+ reject(Error('offline'));await assert.rejects(pending);assert.equal(run('S.openingTask'),null);
+});
