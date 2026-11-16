@@ -17,7 +17,12 @@ ASPECT_RATIOS = {
 
 
 GPT_IMAGE_2 = "gpt-image-2-image-to-image"
-MODELS = {MODEL: "GPT Image 2.5 Sunburst", GPT_IMAGE_2: "GPT Image 2"}
+GPT_IMAGE_26_FLARE = "gpt-image-2-6/flare-image-to-image"
+MODELS = {
+    MODEL: "GPT Image 2.5 Sunburst",
+    GPT_IMAGE_2: "GPT Image 2",
+    GPT_IMAGE_26_FLARE: "GPT Image 2.6 Flare",
+}
 
 
 def normalize_model(value=None):
@@ -28,7 +33,7 @@ def normalize_model(value=None):
 
 
 def aspect_ratios(model=MODEL):
-    if normalize_model(model)==GPT_IMAGE_2:
+    if normalize_model(model) in (GPT_IMAGE_2, GPT_IMAGE_26_FLARE):
         labels=("1:1","3:2","2:3","4:3","3:4","5:4","4:5","16:9","9:16","2:1","1:2","3:1","1:3","21:9","9:21")
         return {k:int(k.split(":")[0])/int(k.split(":")[1]) for k in labels}
     return ASPECT_RATIOS
@@ -77,11 +82,11 @@ def geometry_report(width: int, height: int, aspect_ratio: str | None = None, mo
         "aspect_ratio": ratio,
         "resolution": RESOLUTION,
         **report,
-        "adaptation_mode": "blue_frame" if needs_review else "cover",
+        "adaptation_mode": "natural_canvas" if needs_review else "cover",
         "adaptation_note": (
             "比例一致，生成后按交付像素缩放"
             if axis == "无" else
-            f"常规适配预计裁切 {fraction:.2f}%；使用白底蓝框生成，OpenCV去框后拉伸至目标尺寸，生成后请确认效果"
+            f"原生画幅与目标比例差 {fraction:.2f}%；生成完整自然画布，将文字和主视觉留在安全区，再按固定窗口裁成精确尺寸"
             if needs_review else
             f"预计裁切{axis}合计 {fraction:.2f}%；文字和 Logo 需留在保留区域"
         ),

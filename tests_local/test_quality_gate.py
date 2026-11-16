@@ -9,22 +9,26 @@ from PIL import Image
 from local_app.config import UserError
 from local_app.engine import digest
 from local_app.server import Handler
-from tests_local.test_frame_preview import fixture_slot
 
 
 def fitted_image(tmp_path):
-    e,t,r,s=fixture_slot(tmp_path)
-    out=Path(s['output']);Image.new('RGB',(941,1672),'white').save(out)
-    s.update(e.materialize_image(s,{'source':str(out),'frame_status':'failed'},out))
-    e.mutate(t['id'],'adopt',{'set':1,'adopted':True})
-    e.mutate(t['id'],'fit-image',{'image_id':s['id']})
+    from local_app.config import Settings
+    from local_app.engine import Engine
+    from local_app.planning import STYLES,BY_ID,compile_plans
+    from tests_local.fakes import FixturePlanner
+    settings=Settings(tmp_path/'state',tmp_path/'fake.env');settings.update({'simulation':True,'output_dir':str(tmp_path)})
+    e=Engine(settings,start=False,planner=FixturePlanner())
+    p=BY_ID['ximalaya-current-single-720x1559']
+    pr=dict(channel='信息流',image_form='单图',pids=[p['id']],sets=1,t1='完整标题',t2='完整副标题',cta='点击下载',ip='none',font='none',style=STYLES[0]['name'])
+    t=e.task(e.create(pr,'natural-quality-fixture')['id']);r=t['rounds'][0];compile_plans(r,FixturePlanner().plan(r,lambda _:None));s=r['slots'][0]
+    out=Path(s['output']);Image.new('RGB',(720,1559),'white').save(out)
+    s.update(e.materialize_image(s,{'source':str(out)},out,p));e.persist(t);e.mutate(t['id'],'adopt',{'set':1,'adopted':True})
     return e,t,r,s
-
 
 def test_visual_notes_do_not_block_technically_valid_export(tmp_path):
     e,t,r,s=fitted_image(tmp_path)
     try:
-        assert s['reason_code']=='frame_review' and e.public(t)['delivery']['can_export']
+        assert s['natural_processing']['visual_review_required'] and e.public(t)['delivery']['can_export']
         assert 'review_required' not in e.public(t)['rounds'][0]['slots'][0]
         pkg=e.package(t['id'],0);assert Path(pkg['path']).exists()
         server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.engine=e
@@ -50,10 +54,10 @@ def test_objective_file_failures_block_export_even_when_all_selected(tmp_path,fa
     finally:e.close()
 
 
-def test_failed_frame_cannot_be_approved_by_legacy_visual_metadata(tmp_path):
+def test_failed_delivery_cannot_be_approved_by_visual_metadata(tmp_path):
     e,t,r,s=fitted_image(tmp_path)
     try:
-        s['delivery_eligible']=False;s['frame_status']='failed'
+        s['delivery_eligible']=False
         s['quality_review']={'image_version':s['att'],'image_sha256':s['sha256'],'checks':dict(copy=True,brand=True,completeness=True,quality=True)}
         assert not e.public(t)['delivery']['can_export']
         with pytest.raises(UserError):e.package(t['id'],0)

@@ -8,7 +8,7 @@
 
 每张都有学习者：有IP时用选定IP，无IP时默认用原创初中生，面容、体态、服饰与初中阶段的少年感一致；用户明确指定其他年龄或人群时按指定执行。此项是APP业务合同，通用Skill中的主体自由度不覆盖它。IP保留识别特征与原服装核心配色、轮廓，少量时代或风格配饰在同套连续；人物参与当前短句的学习处境，场景与装饰强化这个瞬间。
 
-以下原合同继续由各自模块负责：[固定项](visual-invariants.md)、[七类视觉约束与参考用途](prompt-rules.md)、[KIE合同](provider-contract.md)、[渠道与比例处理](model-size-compatibility.md)。Logo原版组合和位置、独立字体体系、已配置CTA按钮、确认文案与功能事实继续进入实际Prompt；2.5/1K、引用依赖、蓝框阈值、费用、恢复和交付由原代码流程执行。
+以下原合同继续由各自模块负责：[固定项](visual-invariants.md)、[七类视觉约束与参考用途](prompt-rules.md)、[KIE合同](provider-contract.md)、[渠道与比例处理](model-size-compatibility.md)。Logo原版组合和位置、独立字体体系、已配置CTA按钮、确认文案与功能事实继续进入实际Prompt；2.5/1K、引用依赖、自然画布安全区、费用、恢复和交付由原代码流程执行。
 
 ## 直接复用现有计划结构
 

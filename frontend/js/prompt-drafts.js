@@ -11,13 +11,13 @@ async function persistPromptDraft(){
 async function discardPromptDraft(){
  clearTimeout(promptTimer);await promptWrite.catch(()=>{});const d=S.promptDraft,s=curPvSlot();if(!s)return;
  await request('/tasks/'+S.cur+'/prompt-drafts/'+s.id,'DELETE',{att:s.att,editor_id:DRAFT_EDITOR,sequence:(d?.sequence||0)+1});
- S.promptDraft=null;promptStatus('显示当前图片的实际提示词');render();
+ S.promptDraft=null;S.pvEditing=false;promptStatus('显示当前图片的实际提示词');render();
 }
 async function openPv(id,att=null){
  const token=++previewEpoch,tid=S.cur,epoch=viewEpoch;
  const current=()=>token===previewEpoch&&tid===S.cur&&epoch===viewEpoch;
  await persistPromptDraft();if(!current())return;if(!S.pv)window._pvFrom=trapRef(document.activeElement)||`[data-slot="${id}"]`;
- S.pv=id;S.previewStale=false;S.pvOriginal=false;S.pvDetails=null;S.promptDraft=null;S.pvCompare=false;render();
+ S.pv=id;S.pvPanel='prompt';S.pvEditing=false;S.previewStale=false;S.pvOriginal=false;S.pvDetails=null;S.promptDraft=null;S.pvCompare=false;render();
  try{
   const s=await request('/tasks/'+tid+'/image-details/'+id+'?editor='+encodeURIComponent(DRAFT_EDITOR)+(att?'&v='+att:''));
   if(!current()||S.pv!==id)return;
@@ -29,13 +29,17 @@ async function openPv(id,att=null){
 }
 function pvChk(){const s=curPvSlot();if(!s||s.is_historical)return;const previous=S.promptDraft;
  S.promptDraft={id:s.id,att:s.att,value:$('#pvPrompt').value,sequence:previous?.sequence||0,dirty:true};schedulePromptDraft();const b=$('#pvReset');if(b)b.style.display='';
+ const banner=$('.prompt-draft-banner');if(banner)banner.hidden=false;
+ const redo=$('#pvredo');if(redo&&typeof imageRetry==='function'){const retry=imageRetry(R(),s);if(!retry.query&&!retry.blocked)redo.textContent='用编辑稿'+retry.label}
 }
+
 function pvResetP(){const s=curPvSlot();if(!s||s.is_historical)return;$('#pvPrompt').value=s.orig;pvChk()}
 async function closePv(){previewEpoch++;await persistPromptDraft();S.pv=null;S.pvDetails=null;S.promptDraft=null;S.pvCompare=false;render();document.querySelector(window._pvFrom||'#main')?.focus({preventScroll:true})}
 async function pvRedo(){
- const s=curPvSlot();if(!s||s.is_historical)return;const retry=imageRetry(R(),s);
+ const s=curPvSlot();if(!s||s.is_historical)return;if(R()?.generation_disabled||s.generation_disabled)return toast('此制作流程已停用，请按新规则重新制作');const retry=imageRetry(R(),s);
  if(retry.blocked)return openPv(retry.head.id);
  if(retry.query){await resumeImage(s.id);return closePv()}
+ if(s.production_mode==='local_resize'){await action('regenerate',{image_id:s.id,expected_att:s.att});return closePv()}
  await persistPromptDraft();await action('regenerate',{image_id:s.id,expected_att:s.att,prompt:$('#pvPrompt').value});S.promptDraft=null;await closePv();
 }
 function comparePrevious(){S.pvCompare=!S.pvCompare;render()}

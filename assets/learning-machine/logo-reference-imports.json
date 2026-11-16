@@ -1,0 +1,80 @@
+{
+  "source": "用户既有样图；仅复制原始字节，不生图、不修改",
+  "imports": [
+    {
+      "placement_id": "learning-dsl-banner-830x250",
+      "sample_file": "读书郎-02.png",
+      "registered_path": "assets/learning-machine/samples/learning-dsl-banner-830x250.png",
+      "sha256": "95cf9742ea9910d6923713355fc85596553312855c389f366c84596de5fb2847",
+      "sample_size": [
+        830,
+        250
+      ],
+      "target_size": [
+        830,
+        250
+      ],
+      "reference_only": true
+    },
+    {
+      "placement_id": "learning-dsl-banner-1200x350",
+      "sample_file": "读书郎-06.png",
+      "registered_path": "assets/learning-machine/samples/learning-dsl-banner-1200x350.png",
+      "sha256": "5f0d32080fb831385a44e044f8e10a959fa4d53b0c87611e691d1c36e7229112",
+      "sample_size": [
+        1200,
+        350
+      ],
+      "target_size": [
+        1200,
+        350
+      ],
+      "reference_only": true
+    },
+    {
+      "placement_id": "learning-youxuepai-masked-840x404",
+      "sample_file": "优学派-04.png",
+      "registered_path": "assets/learning-machine/samples/learning-youxuepai-masked-840x404.png",
+      "sha256": "5040c5b2392a7c9037af0201487e8e21d5f4787e424aad69ce7639315a5f7216",
+      "sample_size": [
+        840,
+        404
+      ],
+      "target_size": [
+        840,
+        404
+      ],
+      "reference_only": true
+    },
+    {
+      "placement_id": "learning-youxuepai-double-840x404",
+      "sample_file": "优学派-03.png",
+      "registered_path": "assets/learning-machine/samples/learning-youxuepai-double-840x404.png",
+      "sha256": "60f0dbc98908dfa61fe609e2b47c4c64ede4545ff42c5ef87e604ab2af7ae887",
+      "sample_size": [
+        840,
+        404
+      ],
+      "target_size": [
+        840,
+        404
+      ],
+      "reference_only": true
+    },
+    {
+      "placement_id": "learning-zuoyebang-1223x471",
+      "sample_file": "作业帮-01.png",
+      "registered_path": "assets/learning-machine/samples/learning-zuoyebang-1223x471.png",
+      "sha256": "43adff695e98507bac0dddfd49d97a3515e05c8d3def2a1a6611f6429b6299ca",
+      "sample_size": [
+        1224,
+        471
+      ],
+      "target_size": [
+        1223,
+        471
+      ],
+      "reference_only": true
+    }
+  ]
+}

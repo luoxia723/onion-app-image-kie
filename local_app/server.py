@@ -80,9 +80,88 @@ class Handler(BaseHTTPRequestHandler):
         method=self.command
         body=self.body() if method in ('POST','PUT','PATCH','DELETE') else {}
         settings=self.engine.settings
+        if path in ('/api/workbench/items','/api/workbench/packages') and method=='GET':
+            from . import workspace
+            try:limit=int(get('limit','20'))
+            except ValueError:raise UserError('分页数量不正确') from None
+            options=dict(q=get('q'),kind=get('kind'),cursor=get('cursor'),limit=limit)
+            if path.endswith('/items'):options['state']=get('state')
+            return self.json((workspace.items if path.endswith('/items') else workspace.packages)(self.engine,self.learning_runtime(),**options))
+        workspace_package=re.fullmatch(r'/api/workbench/packages/(task|run)/([a-f0-9]{32})/([a-f0-9]{32})(?:/images/([0-9]{1,5}))?',path)
+        if workspace_package and method=='GET':
+            from . import workspace
+            source,sid,pid,index=workspace_package.groups()
+            if index is None:return self.json(workspace.package_details(self.engine,self.learning_runtime(),source,sid,pid))
+            data,mime=workspace.package_image(self.engine,self.learning_runtime(),source,sid,pid,int(index))
+            self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)))
+            self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(data);return
         if path=='/api/health' and method=='GET': return self.json({'ok':True,'simulation':not settings.real})
         if path=='/api/bootstrap' and method=='GET':
             value=bootstrap();value['form_defaults']=self.engine.document('form_defaults');value['planner']=self.engine.planner.status();product=self.engine.product();value['product']={**product,'configured':bool(product['text'])};return self.json(value)
+        if path=='/api/learning-machine/config' and method=='GET':
+            from .learning_setup import public_config
+            return self.json(public_config(self.engine))
+        if path=='/api/logo-templates' and method in ('GET','PUT'):
+            from . import logo_templates
+            return self.json(logo_templates.public_config(self.engine) if method=='GET' else logo_templates.save_templates(self.engine,body))
+        if path=='/api/learning-machine/logo-templates' and method=='PUT':
+            from .learning_setup import save_logo_templates
+            return self.json(save_logo_templates(self.engine,body))
+        if path=='/api/learning-machine/preview' and method=='POST':
+            from .learning_setup import save_and_preview
+            return self.json(save_and_preview(self.engine,body.get('params')))
+        if path=='/api/master-canvases' and method=='POST':
+            return self.json(self.learning_runtime().create_shared_canvas(
+                {k:v for k,v in body.items() if k!='idempotency_key'},body.get('idempotency_key')))
+        if path=='/api/learning-machine/runs':
+            runtime=self.learning_runtime()
+            if method=='GET':return self.json({'runs':runtime.list()})
+            if method=='POST':return self.json(runtime.create(body.get('params'),mode=body.get('mode','simulation'),idempotency_key=body.get('idempotency_key')))
+        learning_run=re.fullmatch(r'/api/learning-machine/runs/([a-f0-9]{32})(?:/(.*))?',path)
+        if learning_run:
+            runtime=self.learning_runtime();rid,action=learning_run.groups()
+            if method=='GET' and not action:
+                revision=get('revision')
+                if revision and not re.fullmatch(r'[0-9]{1,20}',revision):raise UserError('任务修订号不正确')
+                return self.json(runtime.get(rid,revision=int(revision) if revision else None))
+            if method=='POST' and action=='baseline':return self.json(runtime.generate_baseline(rid,idempotency_key=body.get('idempotency_key'),resume=body.get('resume',False)))
+            if method=='POST' and action=='confirm':return self.json(runtime.confirm_baseline(rid,body.get('baseline_version')))
+            if method=='POST' and action=='expand':return self.json(runtime.expand_suite(rid,idempotency_key=body.get('idempotency_key')))
+            if method=='POST' and action=='from-baseline':
+                return self.json(runtime.create_from_confirmed_baseline(rid,idempotency_key=body.get('idempotency_key'),pids=body.get('pids')))
+            if method=='POST' and action=='refresh-logos':
+                return self.json(runtime.refresh_logos(rid,body.get('idempotency_key'),body.get('placement_ids')))
+            if method=='POST' and action=='repair-backgrounds':
+                return self.json(runtime.repair_backgrounds(rid,body.get('idempotency_key'),body.get('output_ids'),force_ai=body.get('force_ai',False)))
+            canvas_retry=re.fullmatch(r'masters/([^/]+)/regenerate',action or '')
+            if method=='POST' and canvas_retry:
+                return self.json(runtime.regenerate_canvas_master(rid,unquote(canvas_retry.group(1)),body.get('idempotency_key'),body.get('expected_version')))
+            redraw=re.fullmatch(r'outputs/([^/]+)/regenerate',action or '')
+            if method=='POST' and redraw:return self.json(runtime.regenerate_output(rid,unquote(redraw.group(1)),idempotency_key=body.get('idempotency_key'),resume=body.get('resume',False),expected_version=body.get('expected_version')))
+            if method=='POST' and action=='package':return self.json(runtime.package(rid,logo_asset_id=body.get('logo_asset_id')))
+            if method=='POST' and action=='open-folder':
+                with self.engine.lock:folder=Path(runtime._run(rid)['directory'])/'packages'
+                folder.mkdir(parents=True,exist_ok=True)
+                if sys.platform=='darwin':subprocess.Popen(['open',str(folder)])
+                elif os.name=='nt':os.startfile(folder)
+                else:subprocess.Popen(['xdg-open',str(folder)])
+                return self.json({'ok':True})
+            picture=re.fullmatch(r'images/(baseline|master|output|source)/([^/]+)',action or '')
+            if method=='GET' and picture:
+                version=get('version')
+                if version and not re.fullmatch(r'[1-9]\d*',version):raise UserError('图片版本不正确')
+                return self.file(runtime.image(rid,picture.group(1),unquote(picture.group(2)),int(version) if version else None))
+            package=re.fullmatch(r'packages/([a-f0-9]{32})',action or '')
+            if method=='GET' and package:
+                return self.file(runtime.package_file(rid,package.group(1)),download='学习机图包-'+rid[:8]+'.zip')
+        learning_logo_asset=re.fullmatch(r'/api/learning-machine/logo-assets/([a-zA-Z0-9._-]+)',path)
+        if learning_logo_asset and method=='GET':
+            from .learning_logo import asset_path
+            return self.file(asset_path(learning_logo_asset.group(1)))
+        learning_sample=re.fullmatch(r'/api/learning-machine/samples/([a-z0-9-]+)',path)
+        if learning_sample and method=='GET':
+            from .learning_logo import sample_path
+            return self.file(sample_path(learning_sample.group(1)))
         if path=='/api/product':
             if method=='GET': return self.json(self.engine.product())
             if method=='PUT': return self.json(self.engine.save_product(body.get('text','')))
@@ -147,11 +226,32 @@ class Handler(BaseHTTPRequestHandler):
             uploaded=next((settings.state_dir/'uploads'/(rid+suffix) for suffix in ('.png','.jpg','.webp') if (settings.state_dir/'uploads'/(rid+suffix)).is_file()),None)
             if uploaded is None: raise UserError('参考图不存在',404)
             return self.json(ApiScenePlanner(settings).reference_points(uploaded,body.get('purpose')))
+        if path=='/api/learning-source/copy' and method=='POST':
+            from .learning_setup import generation_unavailable
+            generation_unavailable()
+        if path=='/api/learning-source/plan' and method=='POST':
+            from .learning_setup import generation_unavailable
+            generation_unavailable()
+        sample_match=re.fullmatch('/api/learning-samples/([a-z0-9-]+)',path)
+        if sample_match and method=='GET':
+            from .learning_delivery import require_confirmed_sample
+            placement=BY_ID.get(sample_match.group(1))
+            if not placement or placement['category']!='学习机':raise UserError('样图不存在',404)
+            return self.file(require_confirmed_sample(placement))
+        uploaded_match=re.fullmatch('/api/uploads/([a-f0-9]{64})',path)
+        if uploaded_match and method=='GET':
+            from . import learning_source
+            pr={'learning_mode':'upload','learning_source':{'id':uploaded_match.group(1)}}
+            learning_source.registered(pr,settings)
+            return self.file(pr['learning_source']['path'])
         if path=='/api/uploads' and method=='POST':
             note=str(body.get('note','')).strip()
             from .planning import REFERENCE_PURPOSES
             purpose=body.get('purpose')
-            if not isinstance(purpose,str) or purpose not in REFERENCE_PURPOSES or purpose=='legacy':raise UserError('请选择参考图用途')
+            if purpose=='uploaded_master':
+                from .learning_setup import generation_unavailable
+                generation_unavailable()
+            if not isinstance(purpose,str) or purpose not in (*REFERENCE_PURPOSES,'uploaded_master') or purpose=='legacy':raise UserError('请选择参考图用途')
             if len(note)>200: raise UserError('参考图说明最多 200 字')
             try:
                 data=base64.b64decode(body.get('data',''),validate=True)
@@ -166,9 +266,16 @@ class Handler(BaseHTTPRequestHandler):
             dest=settings.state_dir/'uploads'/(sha+suffix)
             dest.parent.mkdir(exist_ok=True)
             dest.write_bytes(data)
-            return self.json(dict(id=sha,path=str(dest),name=Path(str(body.get('name','参考图片'))).name,note=note,purpose=purpose))
+            result=dict(id=sha,path=str(dest),name=Path(str(body.get('name','参考图片'))).name,note=note,purpose=purpose)
+            if purpose=='uploaded_master':
+                from . import learning_source
+                pr={'learning_mode':'upload','learning_source':result};learning_source.registered(pr,settings);result.update(pr['learning_source'])
+            return self.json(result)
         if path.startswith('/api/assets/') and method=='GET':
             aid=path.rsplit('/',1)[-1]
+            if aid in ('learning.logo.black','learning.logo.white-app','logo.onion.standard.001','logo.onion.app.001'):
+                from .brand_logo import asset_path
+                return self.file(asset_path(aid))
             a=next((a for a in ASSETS if a['asset_id']==aid),None)
             if not a: raise UserError('素材不存在',404)
             return self.file(ROOT/a['path'])
@@ -195,10 +302,10 @@ class Handler(BaseHTTPRequestHandler):
                 if kind=='image-details' and method=='GET':return self.json(self.engine.image_details(tid,sid,int(get('v')) if get('v') else None,get('editor')))
                 if kind=='prompt-drafts' and method in ('PUT','DELETE'):return self.json(self.engine.save_prompt_draft(tid,sid,body,discard=method=='DELETE'))
             if action=='rounds' and method=='POST': return self.json(self.engine.create(body.get('params'),body.get('idempotency_key'),tid,draft_id=body.get('draft_id')))
-            if action in ('stop','adopt','adopt-bulk','retry-planning','add-variant','repair-set','reprocess-frame','fit-image','regenerate','resume','restore','duplicate','rebrief-round','pause','continue','archive','unarchive') and method=='POST': return self.json(self.engine.mutate(tid,action,body))
-            if action=='package-preview' and method=='GET': return self.json(self.engine.package_preview(tid,int(get('round','0')),get('ready_only')=='1'))
+            if action in ('stop','adopt','adopt-bulk','retry-planning','add-variant','repair-set','regenerate','resume','restore','duplicate','rebrief-round','pause','continue','archive','unarchive') and method=='POST': return self.json(self.engine.mutate(tid,action,body))
+            if action=='package-preview' and method=='GET': return self.json(self.engine.package_preview(tid,int(get('round','0')),get('ready_only')=='1',logo_asset_id=get('logo_asset_id') or None))
             if action=='packages' and method=='POST':
-                p=self.engine.package(tid,body.get('round',0),body.get('ready_only',False))
+                p=self.engine.package(tid,body.get('round',0),body.get('ready_only',False),logo_asset_id=body.get('logo_asset_id'))
                 return self.json({'package_id':p['id'],'version':f"v{p['v']:03d}",'download_url':f"/api/tasks/{tid}/packages/{p['id']}",'filename':p['zip']})
             if action and action.startswith('packages/') and method=='GET':
                 with self.engine.lock:
@@ -231,9 +338,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.file(file_path)
         if method=='GET' and not path.startswith('/api/'):
             name='index.html' if path=='/' else path.lstrip('/')
-            allowed={'index.html','css/app.css','js/views.js','js/drafts.js','js/prompt-drafts.js','js/maintenance.js','js/app.js'}
+            allowed={'index.html','css/app.css','js/views.js','js/learning-machine.js','js/learning-runs.js','js/master-canvases.js','js/drafts.js','js/prompt-drafts.js','js/maintenance.js','js/workspace.js','js/production.js','js/app.js'}
             if name in allowed: return self.file(ROOT/'frontend'/name)
         raise UserError('文件不存在',404)
+
+    def learning_runtime(self):
+        from .learning_runtime import LearningRuntime
+        with self.engine.lock:
+            runtime=getattr(self.engine,'learning_runtime',None)
+            if runtime is None:
+                runtime=LearningRuntime(self.engine);self.engine.learning_runtime=runtime
+            return runtime
 
     def dispatch(self):
         try: self.handle_api()

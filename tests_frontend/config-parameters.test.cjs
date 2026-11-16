@@ -5,7 +5,7 @@ function setup(request){
   const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,setTimeout,clearTimeout,btoa,
     document:{addEventListener(){},getElementById(){return {focus(){}}},querySelector(){return {scrollTop:0,disabled:false,classList:{toggle(){}}}},querySelectorAll(){return []}},
     window:{addEventListener(){}},history:{replaceState(){}},mockRequest:request,placements});
-  for(const file of ['views','drafts','app']){
+  for(const file of ['views','drafts','workspace','production','app']){
     let source=fs.readFileSync(path.join(root,'frontend/js/'+file+'.js'),'utf8');
     if(file==='app')source=source.replace('\nboot();','\n');
     vm.runInContext(source,ctx);

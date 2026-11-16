@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BASE = 'https://api.kie.ai'
 sys.path.insert(0,str(ROOT/'scripts'))
-from kie_model import MODEL as DEFAULT_IMAGE_MODEL, MODELS as IMAGE_MODELS
+from kie_model import GPT_IMAGE_26_FLARE as DEFAULT_IMAGE_MODEL, MODELS as IMAGE_MODELS
 DEFAULT_UPLOAD = 'https://kieai.redpandaai.co'
 DEFAULT_PLANNING_BASE = 'https://ops-ai-gateway.yc345.tv/v1'
 DEFAULT_PLANNING_MODEL = 'gpt-6.1-terra'

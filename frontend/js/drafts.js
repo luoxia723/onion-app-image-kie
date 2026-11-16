@@ -4,11 +4,11 @@ let draftTimer=null;
 function draftId(){return crypto.randomUUID().replaceAll('-','')}
 function draftPayload(){return{draft:structuredClone(S.draft),form_drafts:structuredClone(S.formDrafts||{}),editing_task_id:S.editing||null,
   editing_round:S.editing?R()?.id:null,revision:S.draftRevision||0,editor_id:DRAFT_EDITOR,sequence:++S.draftSequence}}
-function showDraftStatus(text,error=false){S.draftStatus=text;const e=document.querySelector('#draft-status');if(e){e.textContent=text;e.classList.toggle('errtx',error)}}
+function showDraftStatus(text,error=false){S.draftStatus=text;const retry=document.querySelector('#draft-retry');if(retry)retry.hidden=!error;const e=document.querySelector('#draft-status');if(e){e.textContent=text;e.classList.toggle('errtx',error)}}
 function scheduleDraftSave(){
   if(S.view!=='form'||S.loadingDraft)return;
   clearTimeout(draftTimer);
-  const defaults={...defParams(imageFormOf(S.draft)),product_facts:S.product?.text||'',facts_version:S.product?.revision||0};
+  const defaults={...defParams(imageFormOf(S.draft)),product_facts:'',facts_version:0};
   if(!S.draftId&&Object.entries(S.draft).every(([key,value])=>JSON.stringify(value)===JSON.stringify(defaults[key]))&&!Object.values(S.formDrafts||{}).some(pr=>['t1','t2','s1','s2','s3'].some(key=>pr[key]?.trim())))return;
   if(!S.draftId){S.draftId=draftId();S.draftRevision=0;S.draftSequence=0;save(false)}
   showDraftStatus('正在保存');
@@ -64,9 +64,10 @@ async function newDraft(params=null,editing=null){
   if(!params){
     const empty=(S.drafts||[]).find(d=>!d.editing_task_id&&![d.draft,...Object.values(d.form_drafts||{})].some(pr=>pr.channel||['t1','t2','s1','s2','s3'].some(key=>pr[key]?.trim())));
     if(empty)return openDraft(empty.id);
-    const b=await request('/bootstrap');if(epoch!==viewEpoch)return;S.product=b.product;FORM_DEFAULTS=b.form_defaults||{};params={...defParams(imageFormOf(S.draft)),product_facts:b.product.text||'',facts_version:b.product.revision||0};
+    const b=await request('/bootstrap');if(epoch!==viewEpoch)return;S.product=b.product;FORM_DEFAULTS=b.form_defaults||{};params={...defParams(imageFormOf(S.draft)),product_facts:'',facts_version:0};
   }
   S.cur=editing?.taskId||null;S.editing=S.cur;S.view='form';S.draftId=null;S.submitKey=null;S.submitFingerprint=null;S.draftRevision=0;S.draftSequence=0;
+  if(!editing&&params.channel==='学习机'){params=structuredClone(params);delete params.learning_seed;delete params.learning_visual_config}
   loadDraft(params);S.formDrafts={};S.tried=false;S.tab='all';S.pf='all';
   showDraftStatus('');save();render();await persistDraft();if(epoch===viewEpoch)document.querySelector('#main').scrollTop=0;
   }finally{finishNavigation(epoch)}

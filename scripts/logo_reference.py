@@ -51,6 +51,8 @@ LOGO_BACKGROUND_CONFLICTS = (
 def logo_position(config: dict[str, Any]) -> str:
     placements = config.get("placements") or []
     placement = placements[0] if placements else {}
+    if placement.get("category")=="学习机" and placement.get("logo_position"):
+        return placement["logo_position"]
     platform = str(placement.get("platform") or config.get("platform") or "").strip().casefold()
     width = placement.get("target_width") or config.get("target_width")
     height = placement.get("target_height") or config.get("target_height")
@@ -63,7 +65,7 @@ def logo_position(config: dict[str, Any]) -> str:
 
 
 def logo_prompt_rule(label: str = "参考图1", position: str = "左上角") -> str:
-    if position not in {"左上角", "上方居中"}:
+    if position not in {"左上角", "上方居中", "顶部角标右侧"}:
         raise ValueError("unsupported Logo position")
     return LOGO_PROMPT_TEMPLATE.replace("左上角", position).format(label=str(label).strip() or "参考图1")
 
@@ -200,7 +202,7 @@ def validate_logo_prompt_rule(prompt: str, reference_items: list[dict[str, Any]]
     for item in logo_reference_items(reference_items):
         label = str(item.get("label") or "参考图1")
         required = logo_prompt_rule(label)
-        if not any(has_logo_rule(prompt, label, position) for position in ("左上角", "上方居中")):
+        if not any(has_logo_rule(prompt, label, position) for position in ("左上角", "上方居中", "顶部角标右侧")):
             raise ValueError(f"prompt 缺少 {label} 的 Logo 保真约束：{required}")
         conflict = next((value for value in LOGO_BACKGROUND_CONFLICTS if value in prompt), None)
         if conflict:
@@ -265,7 +267,6 @@ def validate_manifest_logo(manifest: dict[str, Any], config: dict[str, Any]) -> 
             raise ValueError(f"{job_id} 新任务须使用完整图形与全部标准字的Logo保真约束")
         if not has_logo_rule(prompt, "参考图1", position):
             raise ValueError(f"{job_id} Logo 必须放在{position}")
-        other_position = "左上角" if position == "上方居中" else "上方居中"
-        if has_logo_rule(prompt, "参考图1", other_position):
+        if any(has_logo_rule(prompt,"参考图1",other) for other in ("左上角","上方居中","顶部角标右侧") if other!=position):
             raise ValueError(f"{job_id} Logo 位置指令冲突")
     return selection

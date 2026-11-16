@@ -1,0 +1,28 @@
+[
+  {
+    "path": "assets/learning-machine/dushulang-alpha.png",
+    "sha256": "a1cb9a5aad421f086699d7d3df14c61714e0a8198f333619c99a89255d01c587",
+    "alpha_sha256": "c14b6dc72c92b1c51cf64b9c73cbd3a081ece59c5f1b6091e0d0831a64e6d38d",
+    "source_zip": "读书郎.zip",
+    "source_image": "Φ»╗Σ╣ªΘâÄ/Φ»╗Σ╣ªΘâÄ-484x580-20261021-1542.png",
+    "source_image_sha256": "c8932b7a55495f23af96f2df573eea6f25d570fdcc3e045375e6e8b0b4b990d9",
+    "operation": "extract alpha channel"
+  },
+  {
+    "path": "assets/learning-machine/dushulang-badge.png",
+    "sha256": "05d13f6de32063deb4ac557911266a7ba2731dc185ccc033d3263a6246dd44e7",
+    "source_zip": "读书郎.zip",
+    "source_image": "Φ»╗Σ╣ªΘâÄ/Φ»╗Σ╣ªΘâÄ-484x580-20261021-1542.png",
+    "source_image_sha256": "c8932b7a55495f23af96f2df573eea6f25d570fdcc3e045375e6e8b0b4b990d9",
+    "operation": "crop top-left 96x50"
+  },
+  {
+    "path": "assets/learning-machine/ruishi-alpha.png",
+    "sha256": "350630df485ece7e91c8c4f7038afe1fdc59ed3e3afde157083c472a0cd2c0e2",
+    "alpha_sha256": "c3fba441f0451dbc52ae48ee423b63fe93b71286a80826548220d521633a04a8",
+    "source_zip": "睿视.zip",
+    "source_image": "τ¥┐Φºå/τ¥┐Φºå-580x320-σ£åΦºÆ-20261021-1542.png",
+    "source_image_sha256": "e2919045fbaa835d49cf013e27fc54b997bceec6cbd880fbe69022ac039f4965",
+    "operation": "extract alpha channel"
+  }
+]

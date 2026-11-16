@@ -124,11 +124,11 @@ def test_points_and_note_reach_planner_roles_style_and_prompt(tmp_path,purpose,p
     r=make_round(pr,'reference-points',tmp_path,1,True,defer_planning=True)
     expected='；'.join(part for part in ('、'.join(points),note) if part)
     job=plan_input(r)['jobs'][0]
-    assert job['reference_notes']==[expected] and job['references'][0]['note']==expected
+    assert job['reference_notes']==[expected] and any(ref['purpose']==purpose and ref['note']==expected for ref in job['references'])
     role=next(ref['role'] for ref in r['slots'][0]['refs'] if ref.get('purpose')==purpose)
     assert role==REFERENCE_PURPOSES[purpose]+('：'+expected if expected.strip() else '')
     if purpose=='style':
-        assert r['set_metadata']['1']['style']['description']=='沿用参考风格图的配色、笔触、材质和光影'+('；'+expected.strip() if expected.strip() else '')
+        assert next(iter(r['set_metadata'].values()))['style']['description']=='沿用参考风格图的配色、笔触、材质和光影'+('；'+expected.strip() if expected.strip() else '')
     compile_plans(r,FixturePlanner().plan(r,lambda result:None))
     prompt=r['slots'][0]['prompt']
     if expected.strip(): assert expected.strip() in prompt

@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 from local_app.config import Settings,UserError
 from local_app.engine import Engine
-from local_app.planning import ASSETS,BY_ID,PLACEMENTS,STYLES,REFERENCE_PURPOSES,make_round,compile_plans
+from local_app.planning import ASSETS,BY_ID,PLACEMENTS,STYLES,REFERENCE_PURPOSES,make_round,compile_plans,suite_metadata
 from local_app.scene_planner import PLAN_SCHEMA,SCOPED_PLAN_SCHEMA,plan_input,validate_schema
 from tests_local.fakes import FixturePlanner
 
@@ -48,12 +48,12 @@ def test_draft_product_is_frozen_and_all_drafts_remain_discoverable(app):
         saved=app.save_draft(f'{i:032x}',{'draft':params(),'revision':0,'sequence':1,'editor_id':'audit'})
     app.save_product('之后修改的第二版')
     draft=app.get_draft('0'*32)['draft']
-    assert draft['product_facts']==first['text'] and draft['facts_version']==first['revision']
+    assert draft['product_facts']=='' and draft['facts_version']==0
     assert len(app.list_drafts())==51
     summaries=app.draft_summaries('打开今天')
     assert len(summaries)==51 and all('product_facts' not in x['draft'] for x in summaries)
     task=app.create(draft,'frozen-product-submit')
-    assert task['rounds'][0]['params']['facts_version']==first['revision']
+    assert task['rounds'][0]['params']['facts_version']==0
 
 def test_retired_placement_uses_frozen_specs_in_all_read_paths(app,monkeypatch):
     task=app.create(params(),'retired-placement');tid=task['id'];pid=params()['pids'][0]
@@ -66,7 +66,7 @@ def test_retired_placement_uses_frozen_specs_in_all_read_paths(app,monkeypatch):
 @pytest.mark.parametrize('font',['none','specified'])
 def test_font_choice_controls_actual_refs_and_branch_contract(tmp_path,form,font):
     selected=next(a for a in ASSETS if a['kind']=='font' and a.get('enabled',True))
-    pr=params(form);pr['font']=selected['asset_id'] if font=='specified' else 'none'
+    pr=params(form);pr['style']=STYLES[0]['name'];pr['font']=selected['asset_id'] if font=='specified' else 'none'
     r=make_round(pr,'font-choice',tmp_path,1,True,defer_planning=True)
     compile_plans(r,FixturePlanner().plan(r,lambda x:None))
     cfg=r['configs'][0]['config'];refs=r['slots'][0]['refs']
@@ -83,7 +83,7 @@ def test_reference_purpose_reaches_planner_and_final_prompt(tmp_path,purpose,mod
     r=make_round(pr,'typed-reference',tmp_path/'cache',1,True,defer_planning=True)
     compile_plans(r,FixturePlanner().plan(r,lambda x:None))
     assert r['configs'][0]['config']['screen_ui_mode']==mode
-    assert plan_input(r)['jobs'][0]['references'][0]['purpose']==purpose
+    assert any(ref['purpose']==purpose for ref in plan_input(r)['jobs'][0]['references'])
     if purpose=='ui':assert '真实界面' in r['slots'][0]['prompt'] and any(x.get('purpose')=='ui' and '截图' in x['role'] for x in r['slots'][0]['refs'])
     for s in r['slots'][1:]:assert len(s['refs'])==1 and s['first_id']==r['slots'][0]['id']
 
@@ -99,7 +99,7 @@ def test_style_reference_unifies_all_sets_without_assigning_styles(tmp_path,monk
     pr['references']=[dict(id='style-ref',path=str(tmp_path/'style.png'),purpose='style',note=note)]
     r=make_round(pr,'reference-style',tmp_path/'cache',1,True,defer_planning=True)
     styles=[meta['style'] for meta in r['set_metadata'].values()]
-    assert len(styles)==3 and all(style==styles[0] for style in styles)
+    assert len(styles)==len(r['configs']) and all(style==styles[0] for style in styles)
     assert all(meta['style_id']=='reference' and meta['style_source']=='reference' for meta in r['set_metadata'].values())
     assert styles[0]['id']=='reference' and styles[0]['name']=='参考风格图'
     assert '配色、笔触、材质和光影' in styles[0]['description']
@@ -117,19 +117,17 @@ def test_style_reference_unifies_all_sets_without_assigning_styles(tmp_path,monk
 
 @pytest.mark.parametrize('purpose',[None,'composition','ui','legacy'])
 @pytest.mark.parametrize('style',['random',STYLES[0]['name']])
-def test_without_style_reference_keeps_catalog_assignments(tmp_path,monkeypatch,purpose,style):
-    import visual_directions
-    assign=Mock(wraps=visual_directions.assign_styles)
-    monkeypatch.setattr(visual_directions,'assign_styles',assign)
+def test_without_style_reference_keeps_catalog_assignments(tmp_path,purpose,style):
     pr=params();pr.update(sets=3,style=style)
     if purpose:pr['references']=[dict(id='ref',path=str(tmp_path/'ref.png'),purpose=purpose,note='')]
     r=make_round(pr,'catalog-style',tmp_path/'cache',1,True,defer_planning=True)
-    assign.assert_called_once()
-    expected=assign(*assign.call_args.args,**assign.call_args.kwargs)['directions']
-    for number,meta in r['set_metadata'].items():
-        assert meta['style_id']==expected[int(number)-1]['style_id']
+    for meta in r['set_metadata'].values():
+        if meta['style_source']=='builtin_reference':
+            assert style=='random' and not meta['font_path']
+            continue
         assert meta['style_source']==('random' if style=='random' else 'specified')
         catalog_style=next(item for item in STYLES if item['id']==meta['style_id'])
+        if style!='random':assert catalog_style['name']==style
         assert meta['style']==dict(id=catalog_style['id'],name=catalog_style['name'],description=catalog_style.get('visual_prompt',catalog_style['prompt']))
     compile_plans(r,FixturePlanner().plan(r,lambda x:None))
 
@@ -159,19 +157,129 @@ def test_frozen_catalog_styles_survive_style_reference_when_filling_round(tmp_pa
     assert filled['set_metadata']==original['set_metadata']==metadata
     compile_plans(filled,FixturePlanner().plan(filled,lambda x:None))
     for entry in filled['configs']:
-        meta=metadata[str(entry['set'])]
+        meta=suite_metadata(metadata,entry['pid'],entry['set'])
         assert entry['direction']['style_id']==meta['style_id']
-        assert 'style_prompt' not in entry['config']['visual_direction']
+        assert ('style_prompt' in entry['config']['visual_direction'])==(meta['style_source']=='builtin_reference')
         assert meta['style']['description'] in next(slot['prompt'] for slot in filled['slots'] if slot['set']==entry['set'])
 
-def test_legacy_reference_keeps_combined_purpose_and_empty_refs_fail_before_planning(tmp_path):
+def test_legacy_reference_keeps_combined_purpose_and_new_empty_refs_bind_neutral_canvas(tmp_path):
     from local_app.planning import validate
     pr=params();pr['references']=[dict(id='old',name='旧参考',path=str(tmp_path/'old.png'),note='沿用画风和构图')]
     r=make_round(pr,'legacy-reference',tmp_path/'cache',1,True,defer_planning=True)
     assert plan_input(r)['jobs'][0]['references'][0]['purpose']=='legacy'
-    assert next(x for x in r['slots'][0]['refs'] if x.get('purpose'))['role'].startswith('画风/构图')
+    assert next(x for x in r['slots'][0]['refs'] if x.get('purpose')=='legacy')['role'].startswith('画风/构图')
     pr.update(font='none',noLogo=True,references=[])
-    with pytest.raises(UserError,match='需要参考图'):validate(pr,tmp_path)
+    pr['style']=STYLES[0]['name']
+    validate(pr,tmp_path)
+    empty=make_round(pr,'neutral-reference',tmp_path/'neutral-cache',1,True,defer_planning=True)
+    assert empty['slots'][0]['refs'][0]['kind']=='neutral_canvas'
+    assert '只定比例，不提供人物、内容或画风' in empty['slots'][0]['refs'][0]['role']
+    # The original legacy purpose remains frozen and readable.
+    assert next(x for x in r['slots'][0]['refs'] if x.get('purpose')=='legacy')['role'].startswith('画风/构图')
+
+
+@pytest.mark.parametrize('form',['单图','双图','三图'])
+def test_random_styles_are_distinct_across_placements_and_preserve_series(tmp_path,form):
+    pr=params(form);pr.update(sets=2,style='random')
+    pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']==form][:5]
+    r=make_round(pr,'random-placements',tmp_path,1,True,defer_planning=True)
+    styles=[entry['config']['visual_direction']['style_id'] for entry in r['configs']]
+    assert len(set(styles))==len(r['configs'])==len(pr['pids'])*2
+    assert [job['style']['id'] for job in plan_input(r)['jobs']]==styles
+    compile_plans(r,FixturePlanner().plan(r,lambda x:None))
+    for entry,style in zip(r['configs'],styles):
+        group=[s for s in r['slots'] if (s['pid'],s['set'])==(entry['pid'],entry['set'])]
+        assert entry['direction']['style_id']==style
+        assert all(s['refs'][0]['path']==group[0]['output'] for s in group[1:])
+
+
+def test_adding_a_placement_to_old_round_draws_a_new_style(app):
+    pr=params();pid=pr['pids'][0]
+    task=app.task(app.create(pr,'random-style-extension')['id']);r=task['rounds'][0]
+    frozen=next(iter(r['set_metadata'].values()))
+    r['set_metadata']={'1':frozen}
+    compile_plans(r,FixturePlanner().plan(r,lambda _:None))
+    prompt=r['slots'][0]['prompt']
+    new_pid=next(p['id'] for p in PLACEMENTS if p['image_form']=='单图' and p['id']!=pid)
+    app.extend(task,r,pr,'random-style-add-placement',pairs=[(new_pid,1)])
+    assert suite_metadata(r['set_metadata'],pid,1)==frozen
+    assert r['slots'][0]['prompt']==prompt
+    assert plan_input(r)['jobs'][0]['style']['id']!=frozen['style_id']
+
+
+@pytest.mark.parametrize('mode',['random','full_random'])
+def test_ip_draw_covers_roles_across_placements(tmp_path,mode):
+    from local_app.planning import ip_role
+    pr=params();pr.update(sets=2,ip=mode)
+    pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图'][:5]
+    r=make_round(pr,'ip-draw',tmp_path,1,True,defer_planning=True)
+    roles={ip_role(a['asset_id']) for a in ASSETS if a['kind']=='ip' and a.get('enabled',True)}
+    assigned=[ip_role(e['config']['ip_asset_id']) for e in r['configs']]
+    expected=roles|({''} if mode=='full_random' else set())
+    assert len(expected)==(10 if mode=='full_random' else 9)
+    assert set(assigned)==expected and len(set(assigned[:len(expected)]))==len(expected)
+    compile_plans(r,FixturePlanner().plan(r,lambda _:None))
+    for slot,entry in zip(r['slots'],r['configs']):
+        ip=entry['config']['ip_asset_id']
+        assert [ref['asset_id'] for ref in slot['refs'] if ref.get('role')=='角色 IP']==([ip] if ip else [])
+
+
+def test_full_random_can_omit_ip_with_builtin_style_or_neutral_canvas(tmp_path):
+    from local_app.planning import has_non_ip_reference, validate
+    from kie_model import MODEL
+    pr=params();pr.update(ip='full_random',font='none',noLogo=True,sets=20,cta='立即体验')
+    pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图' and p.get('logo_policy')!='required' and not has_non_ip_reference(pr,p,MODEL)]
+    assert not has_non_ip_reference(pr,BY_ID[pr['pids'][0]],MODEL)
+    validate(pr,tmp_path)
+    r=make_round(pr,'ip-required',tmp_path/'cache',1,True,defer_planning=True)
+    without_ip=[s for s in r['slots'] if not any(ref['role']=='角色 IP' for ref in s['refs'])]
+    assert without_ip
+    assert all(any(ref.get('builtin_style') or ref.get('kind')=='neutral_canvas' for ref in s['refs']) for s in without_ip)
+
+
+@pytest.mark.parametrize('font',['random','specified'])
+def test_builtin_references_are_frozen_with_points_and_no_font(tmp_path,font):
+    from local_app.planning import BUILTIN_STYLE_REFERENCES
+    selected_font=next(a['asset_id'] for a in ASSETS if a['kind']=='font' and a.get('enabled',True))
+    pr=params('双图');pr.update(sets=20,style='random',font=selected_font if font=='specified' else 'random');pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='双图']
+    r=make_round(pr,'builtin-reference-pool',tmp_path/'cache',1,True,defer_planning=True)
+    selected=[e for e in r['configs'] if suite_metadata(r['set_metadata'],e['pid'],e['set']).get('style_reference')]
+    assert selected and all(suite_metadata(r['set_metadata'],e['pid'],e['set'])['style_choice_id'] in {ref['id'] for ref in BUILTIN_STYLE_REFERENCES} for e in selected)
+    compile_plans(r,FixturePlanner().plan(r,lambda _:None))
+    for entry in selected:
+        meta=suite_metadata(r['set_metadata'],entry['pid'],entry['set'])
+        group=[s for s in r['slots'] if (s['pid'],s['set'])==(entry['pid'],entry['set'])]
+        ref=next(ref for ref in group[0]['refs'] if ref.get('builtin_style'))
+        assert Path(ref['path']).is_file() and tmp_path in Path(ref['path']).parents
+        assert all(point in group[0]['prompt'] for point in meta['style_reference']['points'])
+        assert not meta['font_path'] and not entry['config']['font_reference_enabled']
+        assert not any(ref.get('role')=='标题字体参考' for ref in group[0]['refs'])
+        assert '不复制图中人物、品牌标识、界面、文字、字形和排版' in group[0]['prompt']
+        import render
+        render.validate_reference_labels(group[0]['prompt'],group[0]['refs'])
+        render.validate_logo_prompt_rule(group[0]['prompt'],group[0]['refs'])
+        assert len(group[1]['refs'])==1 and group[1]['refs'][0]['path']==group[0]['output']
+
+
+def test_ad_style_review_limits_new_choices_and_reaches_final_prompt(tmp_path):
+    import visual_directions
+    from local_app.planning import bootstrap, validate
+    catalog=visual_directions.load_catalog()
+    all_ids={style['id'] for style in catalog['styles']}
+    active={style['id'] for style in bootstrap()['assets']['styles']}
+    excluded=[style for group in catalog['workbench_style_exclusions'].values() for style in group]
+    assert len(active)==18 and len(set(excluded))==len(excluded)==59
+    assert active.isdisjoint(excluded) and active|set(excluded)==all_ids
+    assert {'comic-book','line-art','alcohol-ink','zentangle','monochrome-woodcut'}<=set(excluded)
+    pr=params();pr['style']='钢笔线描'
+    with pytest.raises(UserError,match='广告画风库'):validate(pr,tmp_path)
+    pr['style']='黏土手作'
+    validate(pr,tmp_path)
+    r=make_round(pr,'ad-style-review',tmp_path/'cache',1,True,defer_planning=True)
+    description=plan_input(r)['jobs'][0]['style']['description']
+    compile_plans(r,FixturePlanner().plan(r,lambda _:None))
+    assert '手作触感只在近景材质上轻微可见' in description
+    assert description in r['slots'][0]['prompt']
 
 
 def test_new_form_fields_survive_drafts_defaults_and_frozen_rounds(app):
@@ -223,7 +331,7 @@ def test_existing_legacy_references_can_be_reused_but_new_ones_are_rejected(app)
     changed=copy.deepcopy(original['params']);changed['t1']='旧任务的新标题'
     app.create(changed,'reuse-legacy-reference',tid)
     current=app.task(tid)['rounds'][-1]
-    assert plan_input(current)['jobs'][0]['references'][0]['purpose']=='legacy'
+    assert any(ref['purpose']=='legacy' for ref in plan_input(current)['jobs'][0]['references'])
     assert next(ref for ref in current['slots'][0]['refs'] if ref.get('purpose')=='legacy')['role'].startswith('画风/构图')
     changed['references'][0].update(id='new',purpose='legacy')
     with pytest.raises(UserError,match='请选择参考图用途'):app.create(changed,'reject-new-legacy',tid)

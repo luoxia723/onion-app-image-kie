@@ -11,7 +11,7 @@ function setup(){
   document:{addEventListener(name,fn){(listeners[name]??=[]).push(fn)},querySelector(){return null}},window:{addEventListener(){}},
   setTimeout(callback,delay){timers.set(++timerId,{callback,delay});return timerId},clearTimeout(id){timers.delete(id)},calls,
  });
- for(const name of ['views','app']){
+ for(const name of ['views','workspace','production','app']){
   const source=fs.readFileSync(path.join(__dirname,'../frontend/js/'+name+'.js'),'utf8');
   vm.runInContext(name==='app'?source.replace('\nboot();','\n'):source,ctx);
  }
@@ -40,11 +40,11 @@ test('单套勾选、取消、预览勾选和批量勾选都不切换版位',asy
 
 test('下一版位按钮沿目录顺序切换，包括生成中的版位，到最后禁用',()=>{
  const {run}=setup();run('R().slots[1].state="generating"');
- let html=run('viewPick()');assert(!html.includes('auto-next'));assert(!html.includes('勾完自动跳到下一版位'));
+ let html=run('viewSelectionFooter()');assert(!html.includes('auto-next'));assert(!html.includes('勾完自动跳到下一版位'));
  assert.match(html,/id="next-placement"[^>]*onclick="setPickPlacement\('second'\)"/);
  run(html.match(/id="next-placement"[^>]*onclick="([^"]+)"/)[1]);assert.equal(run('S.pickPid'),'second');
- html=run('viewPick()');run(html.match(/id="next-placement"[^>]*onclick="([^"]+)"/)[1]);
- assert.equal(run('S.pickPid'),'third');assert.match(run('viewPick()'),/id="next-placement"[^>]*disabled/);
+ html=run('viewSelectionFooter()');run(html.match(/id="next-placement"[^>]*onclick="([^"]+)"/)[1]);
+ assert.equal(run('S.pickPid'),'third');assert.match(run('viewSelectionFooter()'),/id="next-placement"[^>]*disabled/);
 });
 
 test('方向键上下切换版位，到边界保持原位',()=>{
@@ -79,6 +79,15 @@ test('生成失败补齐和保存只提交原有接口参数',async()=>{
  context.run('request=capture;R().delivery={incomplete_sets:1};refresh=async()=>{}');
  await context.run('dlAll(true)');
  assert(requests[0][0].endsWith('&ready_only=1'));assert.equal(requests[1][2].ready_only,true);
+});
+test('普通图包导出只在能力允许和用户明确选择时传Logo版本，不触发生图',async()=>{
+ const {ctx,run}=setup(),requests=[];ctx.capture=(...args)=>{requests.push(args);return Promise.resolve({filename:'variant.zip'})};
+ run('request=capture;refresh=async()=>{};R().delivery={incomplete_sets:0,ready_sets:1,can_export:true,has_changes:false,matching_version:"v001"};R().logo_export_capability={editable:true,asset_ids:["learning.logo.black","learning.logo.white-app"]}');
+ run('setOrdinaryExportLogo("learning.logo.white-app")');assert(run('viewSelectionFooter()').includes('id="save-selected"'));
+ await run('dlAll(false)');assert.equal(requests[1][2].logo_asset_id,'learning.logo.white-app');assert(requests.every(args=>args[0].includes('package')));
+ requests.length=0;run('R().logo_export_capability={editable:false,reason:"旧图片已将Logo画入内容，不能直接替换"}');
+ assert.equal(run('ordinaryLogoExportValue(R())'),'');assert(run('viewSelectionFooter()').includes('旧图片已将Logo画入内容，不能直接替换'));assert.match(run('viewSelectionFooter()'),/id="ordinary-export-logo"[^>]*disabled/);
+ await run('dlAll(false)');assert(!Object.hasOwn(requests[1][2],'logo_asset_id'));
 });
 
 test('轮询后可定位原来的套图复选框和版位目录焦点',()=>{

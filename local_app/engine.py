@@ -23,7 +23,8 @@ from .maintenance import MaintenanceMixin
 from .safety import require_space,valid_task
 from .instance import InstanceLock
 from .scene_planner import ApiScenePlanner, PlanningStopped
-from .planning import BY_ID, ASSETS, make_round, validate, normalize_form, copy_signature, requested_pairs, compile_plans
+from .planning import BY_ID, ASSETS, make_round, validate, normalize_form, copy_signature, requested_pairs, compile_plans, suite_metadata
+from . import learning_workflow, learning_source
 sys.path.insert(0,str(ROOT/'scripts'))
 import positive_prompt
 import render
@@ -75,8 +76,11 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
         self.db.commit()
         self.running=set()
         self.closed=threading.Event()
-        self.pool=ThreadPoolExecutor(max_workers=20)
         self.throttle=20
+        self.image_backoff_until=0
+        from .work_dispatch import FairImagePool
+        self.pool=FairImagePool(max_workers=20,limit_provider=lambda:0 if not self.closed.is_set() and time.monotonic()<self.image_backoff_until else min(self.throttle,self.settings.concurrency),max_pending=512)
+        self.processing_slots=threading.BoundedSemaphore(4)
         self.next_submit=0
         self.audit_path=self.settings.state_dir/'submissions.jsonl'
         self.summary_cache={}
@@ -89,6 +93,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
         self.maintenance_active=False
         self.last_scheduler_error=None
         self.last_rate_limit=0
+        self.last_rate_limit_cut=None
         self.next_throttle_recovery=0
         self.recover_recycle()
         self.recover()
@@ -113,7 +118,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
 
     def recover_task(self,t):
         for pkg in t.get('pkgs',[]):
-            if pkg.get('fingerprint_schema')!=2 and Path(pkg['path']).is_file():
+            if pkg.get('fingerprint_schema') not in (2,3) and Path(pkg['path']).is_file():
                 try:
                     with zipfile.ZipFile(pkg['path']) as archive:
                         manifest=json.loads(archive.read('交付清单.json'))
@@ -122,6 +127,12 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                 except (OSError,ValueError,KeyError,zipfile.BadZipFile): pass
         t.pop('exporting',None)
         for r in t['rounds']:
+            if any(s.get('frame') for s in r['slots']):
+                r['generation_disabled']=True
+                if r.get('planning_status') in ('queued','running'):r['planning_status']='stopped'
+                for slot in r['slots']:
+                    if slot['state'] in ACTIVE:
+                        slot.update(state='stopped',reason_code='protocol_retired',msg='此制作流程已停用，请重新提交配置制作');slot.pop('resume',None)
             r.setdefault('created_at',None)
             r.setdefault('stop_marker',str(Path(r['slots'][0]['output']).parent/'STOP'))
             r.setdefault('planning_status','done')
@@ -141,7 +152,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     try:state=json.loads(state_path.read_text()) if state_path.exists() else {}
                     except (OSError,ValueError):
                         s.update(state='failed',reason_code='receipt_corrupt',msg='生成回执损坏，已保留文件，请先恢复备份');continue
-                    if r['simulation'] or state.get('task_id'):
+                    if r['simulation'] or s.get('production_mode')=='local_resize' or state.get('task_id'):
                         s['state']='queued'
                         s['resume']=bool(state.get('task_id'))
                     else: s.update(state='failed',reason_code='unknown',msg='状态不明，请恢复查询')
@@ -168,18 +179,28 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
             if row: return self.public(self.task(row[0]))
             for t in self.tasks.values():
                 if idem in t.get('submission_keys',[]): return self.public(t)
+            from .learning_setup import is_learning_request, generation_unavailable
+            if is_learning_request(pr): generation_unavailable()
             if isinstance(pr,dict):
                 pr=json.loads(json.dumps(pr))
+                from .natural_canvas import PROTOCOL
+                pr['canvas_protocol']=PROTOCOL
                 pr=self.freeze_product(pr,self.document('draft:'+draft_id).get('draft') if draft_id else None)
                 pr.setdefault('image_model',self.settings.image_model)
             existing_references=[ref for rr in self.task(tid)['rounds'] for ref in rr['params'].get('references',[])] if tid else []
+            existing_sources=[rr['params'].get('learning_source') for rr in self.task(tid)['rounds']] if tid else []
+            learning_source.registered(pr,self.settings,existing_sources)
             direction=validate(pr,self.settings.output,existing_references=existing_references)
             pr=normalize_form(pr)
             if self.settings.real and not self.settings.key: raise UserError('请先在设置中填写 KIE Key')
             if tid:
                 t=self.task(tid)
                 current=t['rounds'][t['ri']]
-                if copy_signature({**current['params'],'image_model':current.get('image_model',DEFAULT_IMAGE_MODEL)})==copy_signature(pr) and current['simulation']==(not self.settings.real):
+                # Removed placements retain their history; their overrides cannot change retained content.
+                previous={**current['params'],'image_model':current.get('image_model',DEFAULT_IMAGE_MODEL)}
+                previous['cta_overrides']={pid:value for pid,value in previous.get('cta_overrides',{}).items() if pid in pr['pids']}
+                if (not current.get('generation_disabled') and not any(s.get('frame') for s in current['slots'])
+                        and copy_signature(previous)==copy_signature(pr) and current['simulation']==(not self.settings.real)):
                     return self.extend(t,current,pr,idem,draft_id=draft_id)
             else:
                 now=datetime.now(timezone(timedelta(hours=8)))
@@ -200,13 +221,15 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                 dest.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copy2(path,dest)
                 ref['path']=str(dest)
-            try: r=make_round(pr,t['id'],cache,self.settings.concurrency,not self.settings.real,defer_planning=True)
+            from .logo_templates import snapshot as logo_template_snapshot
+            try: r=make_round(pr,t['id'],cache,self.settings.concurrency,not self.settings.real,defer_planning=True,brand_logo_templates=logo_template_snapshot(self))
             except UserError:
                 shutil.rmtree(cache,ignore_errors=True)
                 raise
             except Exception:
                 shutil.rmtree(cache,ignore_errors=True)
                 raise UserError('提示词未通过校验，请检查文案和参考素材')
+            pr=r['params']
             if tid:
                 for previous in t['rounds']:
                     if previous.get('planning_status') in ('queued','running') or any(s['state']=='queued' for s in previous['slots']):
@@ -250,7 +273,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
 
     def remember_form(self,pr):
         saved=self.document('form_defaults')
-        saved[pr['image_form']]={k:pr[k] for k in ('channel','pids','sets','ip','style','font','noLogo','cta','cta_enabled','cta_overrides','references') if k in pr}
+        saved[pr['image_form']]={k:pr[k] for k in ('channel','pids','sets','ip','style','font','noLogo','logo_asset_id','cta','cta_enabled','cta_overrides','references') if k in pr}
         self.put_document('form_defaults',saved)
 
     def extend(self,t,r,pr,idem,*,draft_id=None,pairs=None):
@@ -262,13 +285,22 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
             if r.get('planning_status') in ('queued','running'):
                 raise UserError('正在规划新增画面，请等规划结束后再补充')
             cache=Path(r['stop_marker']).parent
+            assignments={selection_key(pid,n):suite_metadata(r['set_metadata'],pid,n) for pid,n in existing}
             part=make_round(r['params'],t['id'],cache,r['concurrency'],r['simulation'],defer_planning=True,
-                            assignments=r['set_metadata'],pairs=extra,round_id=r['id'],placements_override={**BY_ID,**self.placement_rules(t,r)})
+                            assignments=assignments,pairs=extra,round_id=r['id'],placements_override={**BY_ID,**self.placement_rules(t,r)},brand_logo_templates=r.get('brand_logo_templates'))
             offset=len(r['configs'])
             for slot in part['slots']: slot['config_idx']+=offset
+            if learning_source.uploaded(r['params']):
+                for slot in part['slots']:slot['plan_ready']=False
             r['slots'].extend(part['slots']);r['configs'].extend(part['configs'])
             r['set_metadata']=part['set_metadata'];r['planning_targets']=part['planning_targets']
-            r.update(planning_status='queued',planning_error='',stopped=False)
+            learning_workflow.bind(r,[s['id'] for s in part['slots']])
+            if r.get('learning_workflow_version'):
+                # New targets of an existing scheme use its saved plan. A new
+                # scheme still goes through the planner exactly once.
+                work={**r,'planning_targets':[]}
+                compile_plans(work,{'plans':[]})
+            r.update(planning_status='queued' if r['planning_targets'] else 'done',planning_error='',stopped=False)
             Path(r['stop_marker']).unlink(missing_ok=True)
             for pid,n in extra:
                 if pid not in r['params']['pids']: r['params']['pids'].append(pid)
@@ -286,6 +318,11 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
             with self.lock:
                 chunk=list(r['planning_targets'][:3])
                 snapshot=json.loads(json.dumps(r));snapshot['planning_targets']=chunk
+            from .learning_setup import is_learning_request, generation_unavailable
+            if is_learning_request(snapshot['params']):generation_unavailable()
+            from .learning_delivery import require_confirmed_sample
+            for entry in snapshot['configs']:
+                if entry['pid']+'::'+str(entry['set']) in chunk:require_confirmed_sample(entry['config']['placements'][0])
             result=self.planner.plan(snapshot,lambda value:compile_plans(snapshot,value,apply=False),self.closed)
             with self.lock:
                 if not r['stopped'] and not self.closed.is_set():
@@ -319,28 +356,36 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
             r.pop('set_metadata_private',None)
             r.pop('skill_rules_path',None)
             r['delivery']=self.delivery_state(t,source)
+            r['placement_rules']=self.placement_rules(t,source)
+            from .brand_logo import capability as logo_capability, switchable as logo_switchable
+            selected=[s for s in source['slots'] if source.get('sel',{}).get(selection_key(s['pid'],s['set']))]
+            r['logo_export_capability']=logo_capability(selected or source['slots'])
+            r['logo_export_switchable']=r['logo_export_capability']['editable']
+            originals={s['id']:s for s in source['slots']}
             for s in r['slots']:
-                r['placement_rules']=self.placement_rules(t,source)
-                original=next(x for x in source['slots'] if x['id']==s['id'])
+                original=originals[s['id']]
+                s['logo_switchable']=logo_switchable(original)
+                s.pop('brand_logo_layer',None);s.pop('logo_base',None);s.pop('natural_canvas_plan',None)
                 if self.definitely_unsent(original):s.update(reason_code='not_submitted',msg='生图请求未发出，可重试本张')
                 s['query_required']=self.query_required(s)
                 s['set_id']=selection_key(s['pid'],s['set'])
-                s['has_frame']=bool((s.get('frame') or {}).get('enabled'))
                 s.pop('output',None)
-                s.pop('frame',None)
+                for removed in ('frame','frame_processing','frame_status'):s.pop(removed,None)
                 s.pop('job_path',None)
                 s.pop('versions',None)
                 s['original_image_url']=f"/api/tasks/{t['id']}/images/{s['id']}?v={s['att']}&raw=1" if s['state']=='done' else None
                 s['preview_kind']='raw' if s.get('delivery_eligible') is False else 'processed'
                 s['image_url']=(s['original_image_url'] if s['preview_kind']=='raw' else f"/api/tasks/{t['id']}/images/{s['id']}?v={s['att']}") if s['state']=='done' else None
-                if s['preview_kind']=='raw':
-                    s.update(reason_code='frame_failed',msg='自动去框失败，当前显示完整原图，暂不合格')
+                if s['preview_kind']=='raw':s.update(msg='当前原图未通过交付规格，请重新制作')
                 s['reference_images']=[{'label':ref.get('label','参考图'+str(i+1)),'name':ref.get('role','参考图'),'type':ref.get('role','参考图'),'upload_status':s.get('up',{}).get(str(i),'ok'),
                     'thumbnail_url':f"/api/tasks/{t['id']}/references/{s['id']}/{i}"} for i,ref in enumerate(s['refs'])]
                 s.pop('refs',None)
             done=sum(s['state']=='done' for s in r['slots'])
             r['completed_count']=done
             r['generation']={'completed':done,'total':len(r['slots']),'planning':r.get('planning_status','done'),'stopped':r['stopped']}
+            if source.get('learning_workflow_version'):
+                local=sum(s.get('production_mode')=='local_resize' for s in r['slots'])
+                r['generation'].update(model_tasks=len(r['slots'])-local,local_outputs=local)
             r['status']='stopped' if r['stopped'] else 'generating' if any(s['state'] in ACTIVE for s in r['slots']) else 'done'
             missing=[{'placement_id':pid,'name':self.placement(t,source,{'pid':pid})['platform']+' '+self.placement(t,source,{'pid':pid})['name'],'reason':'尚未采纳完整套图'} for pid in r['params']['pids'] if not any(r['sel'].get(selection_key(pid,n)) and all(s['state']=='done' and r['adopted_versions'].get(selection_key(pid,n),{}).get(s['id'])==s['att'] for s in r['slots'] if s['pid']==pid and s['set']==n) for n in range(1,r['params']['sets']+1))]
             r['pending_placements']=missing
@@ -376,7 +421,6 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
         return t['rounds'][index]
 
     def mutate(self,tid,action,data):
-        if action in ('reprocess-frame','fit-image'):return self.process_frame(tid,action,data)
         with self.lock:
             if self.maintenance_active:raise UserError('正在进行本机数据维护，请稍后操作')
             t=self.task(tid,deleted=action=='restore')
@@ -405,9 +449,19 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     target=uploads/(digest(source)+source.suffix.lower())
                     if source.resolve()!=target.resolve(): shutil.copy2(source,target)
                     ref['path']=str(target)
+                if learning_source.uploaded(params):
+                    source=learning_source.check(params['learning_source'])
+                    target=uploads/(params['learning_source']['id']+source.suffix.lower())
+                    if source.resolve()!=target.resolve():shutil.copy2(source,target)
+                    params['learning_source']['path']=str(target)
                 return {'params':params}
             else:
                 r=self.round(t,data.get('round',t['ri']))
+                if r.get('generation_disabled') or any(s.get('frame') for s in r['slots']):
+                    if action in ('continue','retry-planning','add-variant','repair-set','regenerate','resume','rebrief-round'):raise UserError('此制作流程已停用，请重新提交配置制作',409)
+                from .learning_setup import is_learning_request, generation_unavailable
+                if is_learning_request(r['params']) and action in ('continue','rebrief-round','retry-planning','add-variant','repair-set','regenerate'):
+                    generation_unavailable()
                 if action in ('pause','continue'):
                     if r.get('stopped'): raise UserError('本轮已停止，请明确选择需要重出的图片')
                     r['paused']=action=='pause'
@@ -437,6 +491,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     for s in r['slots']:
                         if not s.get('plan_ready',True): s.update(state='queued',reason_code=None,msg='')
                 elif action=='add-variant':
+                    if learning_source.uploaded(r['params']):raise UserError('图片扩展任务每个版位生成 1 张，请在原图上重出或复制为新任务')
                     if r.get('planning_source')!='codex_skill': raise UserError('历史模拟任务请复制为新任务，使用原 Skill 重新规划')
                     pid=data.get('placement_id')
                     if pid not in r['params']['pids']: raise UserError('渠道版位不存在')
@@ -447,12 +502,9 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     pid=data.get('placement_id');n=data.get('set')
                     group=[s for s in r['slots'] if s['pid']==pid and s['set']==n]
                     if not group: raise UserError('套图不存在')
-                    crop_pending=[s for s in group if s['state']=='done' and not s.get('delivery_eligible',True)]
-                    for s in crop_pending:
-                        self.mutate(tid,'reprocess-frame',{'round':data.get('round',t['ri']),'image_id':s['id']})
                     head=next(s for s in group if s['idx']==1)
                     targets=[head] if head['state'] in ('failed','stopped') else [s for s in group if s['state'] in ('failed','blocked_first_failed','stopped')]
-                    if not targets and not crop_pending: raise UserError('这套图片无需补齐')
+                    if not targets: raise UserError('这套图片无需补齐；未通过规格的图片请重新制作')
                     for s in targets: self.mutate(tid,'resume' if self.query_required(s) else 'regenerate',{'round':data.get('round',t['ri']),'image_id':s['id']})
                 elif action in ('adopt','adopt-bulk'):
                     choices=[data] if action=='adopt' else data.get('sets')
@@ -486,24 +538,34 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                         if not state.get('task_id'): raise UserError('未取得任务号，不能自动重提，请核对供应商记录')
                         s.update(state='queued',resume=True,reason_code=None,msg='')
                         if s['idx']==1:
-                            for child in r['slots']:
-                                if child['first_id']==s['id'] and child['state']=='blocked_first_failed':
+                            for child in learning_workflow.descendants(r,s):
+                                if child is not s and child['state']=='blocked_first_failed':
                                     child.update(state='queued',reason_code=None,msg='')
                     else:
                         if r.get('planning_source')!='codex_skill': raise UserError('历史模拟任务请复制为新任务，使用原 Skill 重新规划')
                         if s.get('reason_code')=='planning_failed': raise UserError('请先重试画面规划')
                         if s['state']=='blocked_first_failed': raise UserError('请先处理图 1；后续图不能替代图 1 发起重出')
-                        group=[x for x in r['slots'] if x['set']==s['set'] and x['pid']==s['pid']] if s['idx']==1 else [s]
+                        group=learning_workflow.descendants(r,s)
                         if any(x['state'] in ACTIVE or x.get('local_processing') for x in group): raise UserError('图片仍在生成，请等待结束')
                         if any(self.query_required(x) for x in group): raise UserError('这套存在状态未确定的图片，请先恢复查询，不能重复提交')
-                        if s['idx']>1 and next(x for x in r['slots'] if x['id']==s['first_id'])['state']!='done':
+                        if any(x['state']!='done' or not x.get('delivery_eligible',True) for x in learning_workflow.dependencies(r,s)):
                             raise UserError('请先处理图 1，再重出本张')
+                        from .learning_delivery import require_confirmed_sample
+                        require_confirmed_sample(self.placement(t,r,s))
                         prompt=data.get('prompt',s['prompt'])
+                        local=s.get('production_mode')=='local_resize'
+                        if local and 'prompt' in data:raise UserError('本机缩放不使用提示词，请修改母版后重新适配')
                         manual='prompt' in data or s.get('prompt_origin')=='manual'
                         from poster_prompt import validate_text
                         try:
                             validate_text(prompt)
-                            if not manual:
+                            if s.get('brand_logo_layer'):
+                                from .brand_logo import validate_prompt as validate_brand_prompt
+                                validate_brand_prompt(prompt,s['brand_logo_layer'])
+                            if s.get('natural_canvas_plan'):
+                                from .natural_canvas import validate_prompt as validate_canvas_prompt
+                                validate_canvas_prompt(prompt,s['natural_canvas_plan'])
+                            if not manual and not local:
                                 plan=r['configs'][s['config_idx']]
                                 cfg=plan['config']
                                 if cfg.get('prompt_layout')!='poster_sections_v1': positive_prompt.validate_paragraph(prompt)
@@ -515,11 +577,11 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                         except (ValueError,TypeError) as exc:
                             raise UserError(str(exc) if manual else '系统提示词校验未通过，请检查文案和参考素材')
                         if s.get('reason_code')=='prompt_rejected' and prompt==s['prompt']: raise UserError('请修改提示词后再生成')
-                        r['sel'].pop(selection_key(s['pid'],s['set']),None)
-                        r['adopted_versions'].pop(selection_key(s['pid'],s['set']),None)
                         for x in group:
-                            x['versions'].append(json.loads(json.dumps({k:x.get(k) for k in ('att','prompt','output','jpeg','sha256','raw_sha256','state','refs','frame_status','frame_processing','reason_code','quality_review','prompt_origin','head_version','pinned')})))
-                            if x is s: x.update(prompt=prompt,prompt_origin='manual' if manual else 'system')
+                            r['sel'].pop(selection_key(x['pid'],x['set']),None)
+                            r['adopted_versions'].pop(selection_key(x['pid'],x['set']),None)
+                            x['versions'].append(json.loads(json.dumps({k:x.get(k) for k in ('att','prompt','output','jpeg','sha256','raw_sha256','state','refs','reason_code','quality_review','prompt_origin','head_version','pinned','source_versions','brand_logo_layer','logo_base','delivery_logo_asset_id','natural_canvas_plan','natural_processing')})))
+                            if x is s: x.update(prompt=prompt,prompt_origin='local' if local else 'manual' if manual else 'system')
                             x['att']+=1
                             x.update(state='queued',reason_code=None,msg='',up={})
                             x.pop('resume',None);x.pop('pinned',None)
@@ -561,10 +623,28 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
 
     def generate(self,t,r,s,key):
         try:
+            if self.closed.is_set():
+                with self.lock:s.update(state='queued',stage='queued')
+                return
+            if r.get('generation_disabled') or s.get('frame'):raise UserError('此制作流程已停用，请重新提交配置制作',409)
+            from .learning_setup import is_learning_request, generation_unavailable
+            if is_learning_request(r['params']) and not s.get('resume'):
+                generation_unavailable()
+            from .learning_delivery import require_confirmed_sample
+            if not s.get('resume'):require_confirmed_sample(self.placement(t,r,s))
             head=next((x for x in r['slots'] if x['id']==s['first_id']),s)
             if s['idx']>1 and (not Path(head['output']).exists() or digest(head['output'])!=head.get('raw_sha256')):
                 raise UserError('图 1 校验失败，请重新生成图 1')
             out=Path(s['output'])
+            if s.get('production_mode'):
+                with self.lock:
+                    if not s.get('resume'):learning_workflow.freeze_sources(r,s)
+                    self.persist(t)
+                if s['production_mode']=='local_resize':
+                    result=learning_workflow.resize_local(r,s,self.placement(t,r,s))
+                    updates=self.materialize_image(s,result,out,self.placement(t,r,s))
+                    with self.lock:s.update(updates)
+                    return
             job=out.with_suffix('.job.json')
             atomic(job,dict(slot=s,placement=self.placement(t,r,s),params=r['params'],simulation=r['simulation'],base=self.settings.base,upload=self.settings.upload,image_model=r.get('image_model',DEFAULT_IMAGE_MODEL),query_only=s.pop('resume',False),stop_marker=r['stop_marker'],upload_cache=str(self.settings.state_dir/'reference-upload-cache.json')))
             env={**os.environ,'KIE_API_KEY':self.settings.key}
@@ -582,9 +662,7 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                     with self.audit_path.open('a',encoding='utf-8') as f: f.write(json.dumps({'at':time.time(),'task':t['id'],'image':s['id'],'task_ids':s['provider_task_ids']})+'\n')
             if not result['ok'] and result.get('reason')=='rate_limited':
                 with self.lock:
-                    self.throttle=max(1,min(self.throttle,self.settings.concurrency)//2)
-                    self.last_rate_limit=time.time();self.next_throttle_recovery=time.time()+30
-                    self.next_submit=time.time()+5
+                    self.note_rate_limit()
                     s.update(state='queued',reason_code=None,msg='')
             elif not result['ok'] and result.get('reason')=='busy':
                 with self.lock:s.update(state='queued',retry_after=time.time()+3,resume=bool(state.get('task_id')),msg='等待已有执行器完成')
@@ -608,26 +686,52 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
                 self.persist(t)
 
     def materialize_image(self,s,result,out,placement=None):
-        source=Path(result['source']);target=out.with_suffix('.jpg');p=placement or BY_ID[s['pid']]
-        failed=result.get('frame_status')=='failed'
-        kb=p['max_file_size_kb']-(1/1024 if p.get('file_size_operator')=='lt' else 0)
+        with self.processing_slots:
+            return self._materialize_image(s,result,out,placement)
+
+    def note_rate_limit(self):
+        """One burst reduces shared admission once, then holds new work briefly."""
+        with self.lock:
+            now=time.time()
+            stamp=time.monotonic()
+            if self.last_rate_limit_cut is None or stamp-self.last_rate_limit_cut>=5:
+                self.throttle=max(1,min(self.throttle,self.settings.concurrency)//2);self.last_rate_limit_cut=stamp
+            self.last_rate_limit=now;self.next_throttle_recovery=now+30
+            self.next_submit=max(self.next_submit,now+5)
+            self.image_backoff_until=max(self.image_backoff_until,stamp+5)
+
+    def _materialize_image(self,s,result,out,placement=None):
+        p=placement or BY_ID[s['pid']]
+        if s.get('natural_canvas_plan'):
+            from .natural_canvas import crop
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix='.natural-canvas-',dir=Path(out).parent) as folder:
+                processed=crop(result['source'],Path(folder)/'exact.png',s['natural_canvas_plan'],p)
+                output=self._encode_delivery(s,{**result,'source':processed['path']},out,p)
+            output['natural_processing']={k:v for k,v in processed.items() if k not in ('path','source')}
+            return output
+        return self._encode_delivery(s,result,out,p)
+
+    def _encode_delivery(self,s,result,out,placement):
+        source=Path(result['source']);p=placement or BY_ID[s['pid']];png=p.get('output_format')=='PNG';target=out.with_suffix('.delivery.png' if png else '.jpg')
+
+        kb=(p.get('max_file_size_kb') or 200)-(1/1024 if p.get('file_size_operator')=='lt' else 0)
+        encoding={}
+        layer=s.get('brand_logo_layer');logo_metadata={}
         try:
-            # A failed guide detector must never cover-crop a raw image and present it as a finished candidate.
-            compress(str(source),str(target),kb,*(() if failed else (p['target_width'],p['target_height'])))
-        except ValueError: raise UserError('图片超过渠道大小限制，请重新生成')
-        record=result.get('frame_processing') or {}
-        review=bool(result.get('frame_review'))
-        message=('自动去框失败，当前显示完整原图，暂不合格' if failed else
-                 '已整图适配，保留全部内容；请确认画面比例' if result.get('frame_status')=='full_image_fit' else
-                 '已去框并调整画面比例，请确认人物和文字效果' if review and record.get('review_reason')=='aspect_change' else
-                 '已去框，框内另有裁切，请确认画面完整' if review else '')
+            if layer:
+                from .brand_logo import prepare_base,render_delivery
+                base=prepare_base(source,out.with_suffix('.logo-base.png'),p)
+                applied=render_delivery(base['path'],target,p,layer)
+                encoding=applied['encoding']
+                logo_metadata=dict(logo_base=base,delivery_logo_asset_id=applied['asset_id'])
+            elif png:
+                from .learning_delivery import save_png
+                encoding=save_png(source,target,p)
+            else:compress(str(source),str(target),kb,p['target_width'],p['target_height'])
+        except ValueError as exc: raise UserError(str(exc) if png else '图片超过渠道大小限制，请重新生成')
         return dict(state='done',raw_sha256=digest(out),sha256=digest(target),jpeg=str(target),
-                    delivery_eligible=not failed,frame_status=result.get('frame_status'),frame_processing=record,
-                    reason_code='frame_failed' if failed else 'frame_review' if review else None,msg=message)
-
-
-
-
+                    delivery_eligible=True,delivery_encoding=encoding,reason_code=None,msg='',**logo_metadata)
 
     def cleanup(self,immediate=False):
         with self.lock:
@@ -651,61 +755,16 @@ class Engine(StateMixin, SchedulerMixin, WorkbenchMixin, DeliveryMixin, Maintena
     def storage(self):
         roots={Path(t['output_dir'])/'.cache'/t['id'] for t in self.tasks.values()}
         roots.add(self.settings.state_dir/'uploads')
+        roots.add(self.settings.output/'.cache'/'learning-runs')
         used=sum(p.stat().st_size for root in roots if root.exists() for p in root.rglob('*') if p.is_file())
         return dict(used_bytes=used)
 
     def close(self):
         self.closed.set()
+        runtime=getattr(self,'learning_runtime',None)
+        if runtime:runtime.close()
         if hasattr(self,'scheduler'): self.scheduler.join(timeout=2)
         self.planning_pool.shutdown(wait=True)
         self.pool.shutdown(wait=True)
         self.db.close()
         self.instance_lock.close()
-
-    def process_frame(self,tid,action,data):
-        with self.lock:
-            if self.maintenance_active:raise UserError('正在进行本机数据维护，请稍后处理图片')
-            t=self.task(tid);r=self.round(t,data.get('round',t['ri']));_,live=self.find_image(t,data.get('image_id'))
-            if live not in r['slots'] or live['state']!='done' or not (live.get('frame') or {}).get('enabled'):
-                raise UserError('这张图片没有可处理的蓝框原图')
-            if live.get('local_processing'):raise UserError('图片正在本机处理，请稍候')
-            s=copy.deepcopy(live);expected=s['att'];live['local_processing']=True;self.persist(t)
-        try:
-            fitting=action=='fit-image'
-            if fitting:
-                import cv2
-                image=cv2.imread(s['output'])
-                if image is None: raise UserError('原图无法读取')
-                p=self.placement(t,r,s);h,w=image.shape[:2]
-                folder=Path(s['output']).parent/'整图适配';folder.mkdir(exist_ok=True)
-                candidate=folder/(Path(s['output']).stem+'-fit.png')
-                resized=cv2.resize(image,(p['target_width'],p['target_height']),interpolation=cv2.INTER_AREA)
-                if not cv2.imwrite(str(candidate),resized): raise UserError('整图适配结果无法保存')
-                aspect=abs((w/h)/(p['target_width']/p['target_height'])-1)*100
-                record=dict(method='full_image_fit',source_size=[w,h],crop_xyxy=[0,0,w,h],
-                            output_size=[p['target_width'],p['target_height']],candidate_filepath=str(candidate),
-                            needs_crop_review=aspect>=4,review_reason='aspect_change',aspect_change_percent=round(aspect,4))
-            else:
-                from blue_frame import process_candidate
-                try: record=process_candidate(s['output'],s['frame']['frame_layout_path'])
-                except (ValueError,OSError): raise UserError('无法可靠识别完整蓝框，已保留原图；可选择整图适配，未提交生图')
-            previous={k:s.get(k) for k in ('att','prompt','output','jpeg','sha256','raw_sha256','state','refs','frame_status','frame_processing','reason_code','quality_review','prompt_origin','head_version','pinned')}
-            new_att=s['att']+1
-            out=Path(s['output']).with_name(s['id']+f'-v{new_att}.png')
-            shutil.copy2(s['output'],out)
-            receipt=render.task_state_path(Path(s['output']))
-            if receipt.exists(): shutil.copy2(receipt,render.task_state_path(out))
-            result=dict(source=record['candidate_filepath'],frame_status='full_image_fit' if fitting else 'processed',frame_processing=record,frame_review=record['needs_crop_review'])
-            updates=self.materialize_image(s,result,out,self.placement(t,r,s))
-            with self.lock:
-                if live['att']!=expected:raise UserError('图片版本已变化，请重新处理',409)
-                live['versions'].append(previous)
-                live.pop('pinned',None)
-                live.update(updates,att=new_att,output=str(out),version_reason='local_full_image_fit' if fitting else 'local_frame_processing')
-                selection=selection_key(live['pid'],live['set'])
-                if fitting and r['sel'].get(selection):r['adopted_versions'].setdefault(selection,{})[live['id']]=new_att
-                else:r['sel'].pop(selection,None);r['adopted_versions'].pop(selection,None)
-                t['downloaded']=False
-        finally:
-            with self.lock:live['local_processing']=False;self.persist(t)
-        return self.public(t)

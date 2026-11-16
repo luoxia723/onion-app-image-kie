@@ -60,7 +60,12 @@ def test_prompt_drafts_are_persistent_and_isolated_by_editor_and_version(engine)
     assert s['prompt']!='自由改词\n标题A'
     e.save_prompt_draft(tid,sid,{'editor_id':'window-one','sequence':0,'text':'旧保存'})
     assert e.get_prompt_draft(tid,sid,s['att'],'window-one')['text']=='自由改词\n标题A'
-    old=s['att'];e.mutate(tid,'regenerate',{'image_id':sid,'expected_att':old,'prompt':'人工自由提示词'})
+    from local_app.brand_logo import prompt_rule
+    manual='人工自由提示词\n'+prompt_rule(s['brand_logo_layer'])
+    from local_app.natural_canvas import prompt_rule as canvas_rule
+    manual+='\n'+canvas_rule(s['natural_canvas_plan'])
+    old=s['att'];e.mutate(tid,'regenerate',{'image_id':sid,'expected_att':old,'prompt':manual})
+    assert s['prompt']==manual
     wait_done(e,tid)
     with pytest.raises(UserError,match='另一窗口'):e.mutate(tid,'regenerate',{'image_id':sid,'expected_att':old,'prompt':'旧界面修改'})
     assert e.image_details(tid,sid,att=old,editor='window-one')['edit_draft']['text']=='自由改词\n标题A'

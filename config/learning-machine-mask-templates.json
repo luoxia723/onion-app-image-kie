@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "read_only": true,
+  "basis": "用户确认有遮罩版使用底部淡灰渐变。现有840×404遮罩样图是右侧平色遮挡，未提供可抽取的底部alpha；以下为视觉初始参数，不是官方精确数值。",
+  "mask_presets": [
+    {
+      "id": "learning.bottom-gray.v1",
+      "label": "底部淡灰渐变（初始效果）",
+      "height_fraction": 0.28,
+      "max_opacity": 0.42,
+      "color": "#000000",
+      "curve": "linear",
+      "parameter_basis": "visual_initial"
+    }
+  ],
+  "placements": {
+    "learning-youxuepai-masked-840x404": {
+      "enabled": true,
+      "preset_id": "learning.bottom-gray.v1",
+      "target_width": 840,
+      "target_height": 404
+    }
+  },
+  "alpha_sampling": "start_y=H*(1-height_fraction); end_y=H-1; alpha(y)=floor(255*max_opacity*clamp((y-start_y)/(end_y-start_y),0,1)+0.5)",
+  "postprocess_order": ["exact_target_size", "bottom_gray_mask", "logo", "other_fixed_alpha"]
+}

@@ -32,6 +32,8 @@ class MaintenanceMixin:
     def maintenance(self):
         with self.maintenance_lock:
             with self.lock:
+                runtime=getattr(self,'learning_runtime',None)
+                if runtime and runtime.is_active():raise UserError('请等待学习机制作结束后再维护数据')
                 if self.running or self.planning_running or any(t.get('exporting') or any(s.get('local_processing') for r in t['rounds'] for s in r['slots']) for t in self.tasks.values()):raise UserError('请等待正在执行的任务结束后再维护数据')
                 self.maintenance_active=True
             try:yield
@@ -40,15 +42,22 @@ class MaintenanceMixin:
     def placement_rules(self,t,r):
         rules=copy.deepcopy(r.get('placement_rules',{}))
         for e in r.get('configs',[]):
-            for p in e.get('config',{}).get('placements',[]):rules.setdefault(e['pid'],copy.deepcopy(p))
+            if e['pid'] not in rules:
+                for p in e.get('config',{}).get('placements',[]):rules.setdefault(e['pid'],copy.deepcopy(p))
         from .planning import BY_ID
         for pid in r['params']['pids']:
             if pid not in rules and pid in BY_ID:rules[pid]=copy.deepcopy(BY_ID[pid])
         return rules
 
     def placement(self,t,r,s):
-        try:return self.placement_rules(t,r)[s['pid']]
-        except KeyError:raise UserError('该历史版位缺少规格快照，请恢复备份中的配置') from None
+        pid=s['pid'];p=r.get('placement_rules',{}).get(pid)
+        if p is None:
+            p=next((p for e in r.get('configs',[]) if e['pid']==pid for p in e.get('config',{}).get('placements',[])),None)
+        if p is None:
+            from .planning import BY_ID
+            p=BY_ID.get(pid) if pid in r['params']['pids'] else None
+        if p is None:raise UserError('该历史版位缺少规格快照，请恢复备份中的配置')
+        return copy.deepcopy(p)
 
     def package_rules(self,t,pkg):
         rules={}
@@ -68,7 +77,8 @@ class MaintenanceMixin:
             tasks=copy.deepcopy([t for t in self.tasks.values() if not t.get('deleted_at')])
         owners={};protected=set();candidates=[];assigned=set()
         def paths(v):
-            return {str(Path(x).resolve()) for x in (v.get('output'),v.get('jpeg'),(v.get('frame_processing') or {}).get('candidate_filepath')) if x}
+            return {str(Path(x).resolve()) for x in (v.get('output'),v.get('jpeg'),
+                                                    (v.get('logo_base') or {}).get('path')) if x}
         for t in tasks:
             used={(i['id'],i['att']) for p in t['pkgs'] for i in p['images']}
             selected={(sid,att) for versions in (r['adopted_versions'] for r in t['rounds']) for vv in versions.values() for sid,att in vv.items()}
@@ -81,9 +91,10 @@ class MaintenanceMixin:
         while changed:
             changed=False
             refs={str((Path(x['path']) if Path(x['path']).is_absolute() else ROOT/x['path']).resolve()) for k in protected for x in owners[k][0].get('refs',[])}
+            refs.update(str(Path(x['path']).resolve()) for k in protected for x in (owners[k][0].get('source_versions') or {}).values())
             files={p for k in protected for p in owners[k][1]}
             for k,(v,pp) in owners.items():
-                if k not in protected and (v.get('output') and str(Path(v['output']).resolve()) in refs or pp&files):protected.add(k);changed=True
+                if k not in protected and (pp&refs or pp&files):protected.add(k);changed=True
         for k,(v,pp) in owners.items():
             if k in protected or v.get('files_cleared'):continue
             allowed=[]
@@ -169,7 +180,13 @@ class MaintenanceMixin:
                 tasks=copy.deepcopy([t for t in self.tasks.values() if not t.get('deleted_at')]);documents=[dict(name=n,body=b) for n,b in self.db.execute('SELECT name,body FROM documents') if not n.startswith('closed-draft:')]
                 quarantined=[list(x) for x in self.db.execute('SELECT id,body,reason,created_at FROM quarantined_tasks')]
             files={};missing=[]
-            roots=[ROOT/'assets',self.settings.state_dir/'uploads',*[Path(t['output_dir']) for t in tasks]]
+            roots=[ROOT/'assets',self.settings.state_dir/'uploads',self.settings.output,*[Path(t['output_dir']) for t in tasks]]
+            for document in documents:
+                if not document['name'].startswith('learning-run:'):continue
+                run=json.loads(document['body']);directory=Path(run.get('directory',''))
+                if (directory.name==run.get('id') and directory.parent.name=='learning-runs'
+                        and directory.parent.parent.name=='.cache'):
+                    roots.append(directory.parent.parent.parent)
             def walk(v):
                 if isinstance(v,dict):
                     for key,x in v.items():
@@ -179,7 +196,12 @@ class MaintenanceMixin:
                 elif isinstance(v,str) and len(v)<2000:
                     try:
                         p=Path(v);p=p if p.is_absolute() else ROOT/p
-                        if not p.name.startswith('.env') and p.suffix.lower() not in ('.key','.pem') and p.is_file() and any(r.resolve() in p.resolve().parents for r in roots):files[v]=p.resolve()
+                        if not p.name.startswith('.env') and p.suffix.lower() not in ('.key','.pem') and any(r.resolve() in p.resolve().parents for r in roots):
+                            if p.is_file():files[v]=p.resolve()
+                            if p.suffix.lower()=='.png':
+                                import render
+                                receipt=render.task_state_path(p)
+                                if receipt.is_file():files[str(receipt)]=receipt.resolve()
                     except (OSError,ValueError):pass
             walk(tasks)
             for d in documents:
@@ -195,6 +217,9 @@ class MaintenanceMixin:
                             if not v.get('files_cleared') and v['state']=='done':
                                 for key in ('output','jpeg'):
                                     if v.get(key) and not Path(v[key]).is_file():missing.append(v[key])
+                                logo_paths=[(v.get('logo_base') or {}).get('path')]
+                                logo_paths.extend(a.get('path') for a in (v.get('brand_logo_layer') or {}).get('assets',{}).values())
+                                missing.extend(p for p in logo_paths if p and not Path(p).is_file())
             indexed={str(Path(p['path']).resolve()) for t in tasks for p in t['pkgs']}
             standalone=[]
             work=self.settings.output/'工作区'/'产物'
@@ -257,6 +282,35 @@ class MaintenanceMixin:
             require_space(self.settings.output,sum(f['bytes'] for f in m['files']))
             folder=self.settings.output/'.restored'/uuid.uuid4().hex;folder.mkdir(parents=True)
             mapping={f['path']:str(folder/(str(i)+'-'+f['sha256']+Path(f['path']).suffix)) for i,f in enumerate(m['files'])}
+            # Include future outputs: queued images have no file in the archive yet.
+            for task in m['tasks']:
+                for round_ in task['rounds']:
+                    destination=folder/task['id']/round_['id']
+                    destination.mkdir(parents=True,exist_ok=True)
+                    for slot in round_['slots']:
+                        for version in [slot,*slot['versions']]:
+                            for field,suffix in (('output','.png'),('jpeg','.delivery.png' if Path(version.get('jpeg') or '').suffix.lower()=='.png' else '.jpg')):
+                                if version.get(field):
+                                    mapping[version[field]]=str(destination/(slot['id']+f"-v{version['att']}"+suffix))
+            # Learning runs live in documents rather than the legacy tasks
+            # table. Keep pending PNG receipts adjacent even if no PNG exists.
+            import render
+            for document in m['documents']:
+                if not document['name'].startswith('learning-run:'):continue
+                value=json.loads(document['body'])
+                def learning_outputs(item):
+                    if isinstance(item,dict):
+                        raw=item.get('raw_path')
+                        if isinstance(raw,str) and raw:
+                            if raw not in mapping:
+                                destination=folder/'learning-pending'/value['id'];destination.mkdir(parents=True,exist_ok=True)
+                                mapping[raw]=str(destination/(hashlib.sha256(raw.encode()).hexdigest()+'.png'))
+                            receipt=str(render.task_state_path(Path(raw)))
+                            if receipt in mapping:mapping[receipt]=str(render.task_state_path(Path(mapping[raw])))
+                        for child in item.values():learning_outputs(child)
+                    elif isinstance(item,list):
+                        for child in item:learning_outputs(child)
+                learning_outputs(value)
             try:
                 with zipfile.ZipFile(path) as z:
                     for f in m['files']:
@@ -303,11 +357,17 @@ class MaintenanceMixin:
                         for row in m.get('quarantined',[]):
                             if row[0] not in self.tasks:self.db.execute('INSERT OR IGNORE INTO quarantined_tasks VALUES(?,?,?,?)',tuple(row))
                         for d in m['documents']:
-                            cursor=self.db.execute('INSERT OR IGNORE INTO documents VALUES(?,?)',(d['name'],json.dumps(rewrite(json.loads(d['body']),mapping),ensure_ascii=False)));docs_restored+=cursor.rowcount
+                            value=rewrite(json.loads(d['body']),mapping)
+                            if d['name'].startswith('learning-run:') and d['name'] not in existing_documents:
+                                from .learning_runtime_support import prepare_restored_run
+                                value=prepare_restored_run(self,value)
+                            cursor=self.db.execute('INSERT OR IGNORE INTO documents VALUES(?,?)',(d['name'],json.dumps(value,ensure_ascii=False)));docs_restored+=cursor.rowcount
                         self.db.execute('INSERT OR IGNORE INTO documents VALUES(?,?)',('restored_backup:'+token,json.dumps({'files':[mapping[p] for p in m.get('standalone',[])],'at':time.time()})))
                         self.db.commit()
                     except Exception:self.db.rollback();raise
                     for t in imports:self.tasks[t['id']]=t
+                    runtime=getattr(self,'learning_runtime',None)
+                    if runtime:runtime.reload()
                 return dict(restored=len(restored),documents_restored=docs_restored,skipped=len(m['tasks'])-len(restored),path=str(folder))
             except Exception:
                 # Keep any files already indexed by a completed task import.

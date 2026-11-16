@@ -2,9 +2,9 @@ name: Workbench portability
 on:
   workflow_dispatch:
   push:
-    paths: ['bootstrap.py', 'run.py', 'requirements.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tests_local/**', 'tests/**', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
   pull_request:
-    paths: ['bootstrap.py', 'run.py', 'requirements.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tests_local/**', 'tests/**', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
 permissions:
   contents: read
 jobs:
@@ -23,7 +23,26 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python bootstrap.py --install-only
+      - name: Check minimal runtime entry point
+        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'run.py','--help'])"
       - name: Install test runner in isolated environment
-        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pip','install','pytest'])"
+        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pip','install','-r','requirements-dev.txt'])"
       - name: Offline portability and image processing checks
-        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pytest','tests_local/test_portable_startup.py','tests/test_blue_frame.py','tests_local/test_kie_transport.py','-q'])"
+        run: python -c "import os,subprocess; p='.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python'; subprocess.check_call([p,'-m','pytest','tests_local/test_portable_startup.py','tests_local/test_natural_canvas.py','tests_local/test_kie_transport.py','tests_local/test_learning_executor.py','-m','','-q'])"
+  regression:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python bootstrap.py --install-only
+      - name: Check source distribution excludes credentials and local data
+        run: .venv/bin/python scripts/build_workbench_bundle.py --check
+      - name: Install test dependencies
+        run: .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: All offline behavior, history, transport and frontend checks
+        run: .venv/bin/python scripts/check_workbench.py --suite all

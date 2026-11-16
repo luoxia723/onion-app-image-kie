@@ -8,7 +8,6 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
-import blue_frame
 import logo_reference
 import positive_prompt as positive
 import visual_directions as visual
@@ -77,16 +76,16 @@ def test_ip_inherits_identity_and_concept_period_details():
     assert '\n' not in d['base_prompt_rule'] and '不得' not in d['base_prompt_rule']
 
 
+@pytest.mark.history
 def test_both_new_and_frozen_asset_rules_are_accepted():
     for position in ['左上角', '上方居中']:
         old = logo_reference.LEGACY_LOGO_PROMPT_TEMPLATE.replace('左上角', position).format(label='参考图1')
         assert logo_reference.has_logo_rule(old, '参考图1', position)
         assert logo_reference.has_logo_rule(logo_reference.logo_prompt_rule(position=position), '参考图1', position)
-    for rule in [blue_frame.prompt_rule, blue_frame.legacy_prompt_rule]:
-        assert blue_frame.has_prompt_rule(rule('参考图3'), '参考图3')
-        assert not blue_frame.has_prompt_rule(rule('参考图3'), '参考图1')
 
 
+
+@pytest.mark.history
 def test_format_is_fingerprinted_without_changing_historical_config():
     cfg = configuration(); old = copy.deepcopy(cfg); old.pop('prompt_format')
     assert visual.config_fingerprint(cfg) != visual.config_fingerprint(old)
@@ -94,6 +93,7 @@ def test_format_is_fingerprinted_without_changing_historical_config():
     with pytest.raises(ValueError): positive.enabled({'prompt_format': 'unknown'})
 
 
+@pytest.mark.history
 @pytest.mark.parametrize('count', [2, 3])
 def test_asset_roles_and_complete_ad_reference_are_explicit(count):
     cfg = configuration(count); cfg['font_reference_enabled'] = True
@@ -138,6 +138,7 @@ def test_new_learner_story_keeps_a_student_in_no_ip_prompts_and_records_the_pain
     with pytest.raises(ValueError, match='learner_story'): visual.plan_directions(cfg)
 
 
+@pytest.mark.history
 def test_missing_new_story_fails_without_changing_frozen_legacy_configs():
     cfg = configuration(); cfg['learner_story_required'] = True
     with pytest.raises(ValueError, match='learner_story'): visual.plan_directions(cfg)
@@ -145,6 +146,7 @@ def test_missing_new_story_fails_without_changing_frozen_legacy_configs():
     assert visual.plan_directions(cfg)['directions'][0]['subject_mode'] == 'approved_action_without_ip'
 
 
+@pytest.mark.history
 def test_logo_prompt_keeps_the_complete_mark_wordmark_and_original_geometry():
     rule = logo_reference.logo_prompt_rule()
     for key in ['参考图1', '品牌图形', '洋葱学园', '全部标准字', '同一完整组合', '原版颜色', '图文比例', '轮廓', '眼睛', '角标', '整体等比缩放']:
@@ -154,6 +156,7 @@ def test_logo_prompt_keeps_the_complete_mark_wordmark_and_original_geometry():
     assert logo_reference.has_logo_rule(previous, '参考图1', '左上角')
 
 
+@pytest.mark.history
 def test_contract_version_is_optional_for_frozen_prompts_and_part_of_new_fingerprints():
     cfg = configuration()
     before = visual.config_fingerprint(cfg)
@@ -165,6 +168,7 @@ def test_contract_version_is_optional_for_frozen_prompts_and_part_of_new_fingerp
     with pytest.raises(ValueError, match='unsupported'): positive.validate_visual_contract(cfg, '旧任务原提示词', [])
 
 
+@pytest.mark.history
 def test_source_logo_background_rule_remains_resumable_for_the_previous_version():
     cfg = configuration(); cfg['learner_story_required'] = True
     previous = logo_reference.PREVIOUS_COMPLETE_LOGO_TEMPLATE.format(label='参考图1')

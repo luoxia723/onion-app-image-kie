@@ -7,6 +7,7 @@ class FixturePlanner:
             if entry['pid']+'::'+str(entry['set']) not in r['planning_targets']: continue
             cfg=entry['config'];copy=cfg['copy_refs'][0];count=cfg['placements'][0]['image_count']
             texts=[copy.get('mainTitle','')] if count==1 else [copy.get('short'+str(i),'') for i in range(1,count+1)]
+            if 'learning_modules' in cfg and not texts[0]:texts[0]=cfg.get('learning_copy',{}).get('feature_label') or '学习场景'
             concept={'name':'测试画面-'+str(entry['set']),'style_id':cfg['visual_direction']['style_id'],
                 'prompt':'测试学习者围绕“'+texts[0]+'”翻开对应学习资料，侧面镜头能看见人物与纸面。',
                 'slot_actions':['学习者在当前画面呈现“'+text+'”，双手和资料保持清楚接触。' for text in texts],

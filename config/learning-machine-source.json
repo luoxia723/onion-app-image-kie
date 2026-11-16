@@ -1,0 +1,164 @@
+{
+  "source": "https://guanghe.feishu.cn/wiki/OPOMwZi9xiQUt9kwkI6c3JRDnPe?sheet=Q4nx5W",
+  "sheet": "学习机",
+  "revision": 243,
+  "actual_range": "A1:T208",
+  "has_more": false,
+  "rows": [
+    {
+      "sheet_row": 3,
+      "platform_group": "百度",
+      "type": "png",
+      "size_description": "512*512 1200*400 ",
+      "file_limit": "",
+      "notes": "有按钮",
+      "asset": "百度.zip"
+    },
+    {
+      "sheet_row": 4,
+      "platform_group": "步步高",
+      "type": "png",
+      "size_description": "216*260 300*360 400*480",
+      "file_limit": "",
+      "notes": "无按钮，无logo",
+      "asset": "步步高.zip"
+    },
+    {
+      "sheet_row": 5,
+      "platform_group": "步步高",
+      "type": "png",
+      "size_description": "530*236 984*438 988*350 988*460 1080*528  1280*362 2368*670",
+      "file_limit": "",
+      "notes": "有按钮，有logo",
+      "asset": ""
+    },
+    {
+      "sheet_row": 6,
+      "platform_group": "步步高",
+      "type": "png",
+      "size_description": "1280*362",
+      "file_limit": "",
+      "notes": "有按钮，无logo",
+      "asset": ""
+    },
+    {
+      "sheet_row": 7,
+      "platform_group": "读书郎",
+      "type": "png",
+      "size_description": "830*250，1200*350，图片为矩形，左上角含角标",
+      "file_limit": "<200k",
+      "notes": "有logo，无按钮",
+      "asset": "读书郎.zip"
+    },
+    {
+      "sheet_row": 8,
+      "platform_group": "读书郎",
+      "type": "png",
+      "size_description": "484*580，角标96*50，圆角44px，左上角含角标",
+      "file_limit": "<100k",
+      "notes": "有logo，无按钮",
+      "asset": ""
+    },
+    {
+      "sheet_row": 9,
+      "platform_group": "读书郎",
+      "type": "png",
+      "size_description": "卡片资源 484*580 、封面 500*312 、二级页面 1280*348",
+      "file_limit": "<100k",
+      "notes": "有logo，无按钮",
+      "asset": ""
+    },
+    {
+      "sheet_row": 10,
+      "platform_group": "读书郎",
+      "type": "png",
+      "size_description": "830×250px，图片为矩形，左上角含角标",
+      "file_limit": "<200k",
+      "notes": "有logo，无按钮",
+      "asset": ""
+    },
+    {
+      "sheet_row": 11,
+      "platform_group": "科大讯飞",
+      "type": "png",
+      "size_description": "1005*564 1626*684",
+      "file_limit": "<300k",
+      "notes": "有logo，有按钮",
+      "asset": "科大讯飞.zip"
+    },
+    {
+      "sheet_row": 12,
+      "platform_group": "睿视",
+      "type": "png",
+      "size_description": "580*320 ",
+      "file_limit": "",
+      "notes": "平滑圆角：32px 、直角",
+      "asset": "睿视.zip"
+    },
+    {
+      "sheet_row": 13,
+      "platform_group": "希沃",
+      "type": "png",
+      "size_description": "1400*520",
+      "file_limit": "",
+      "notes": "无logo，无按钮",
+      "asset": "希沃.zip"
+    },
+    {
+      "sheet_row": 14,
+      "platform_group": "小猿",
+      "type": "png",
+      "size_description": "660*306、1372*480、2880*1020",
+      "file_limit": "",
+      "notes": "有logo",
+      "asset": "小猿.zip"
+    },
+    {
+      "sheet_row": 15,
+      "platform_group": "学而思",
+      "type": "png",
+      "size_description": "1854x720  1050x498 1125x885 720x342",
+      "file_limit": "",
+      "notes": "要logo，无按钮",
+      "asset": "学而思.zip"
+    },
+    {
+      "sheet_row": 16,
+      "platform_group": "优学派",
+      "type": "png",
+      "size_description": "400×480、840×404（有遮罩）、840×404（无遮罩）",
+      "file_limit": "",
+      "notes": "无按钮，无logo",
+      "asset": "优学派.zip"
+    },
+    {
+      "sheet_row": 17,
+      "platform_group": "优学派",
+      "type": "",
+      "size_description": "840*404（两张）、1400×640、1400×340、1536×1708、2000×800、2560×1228",
+      "file_limit": "",
+      "notes": "无按钮，有logo",
+      "asset": ""
+    },
+    {
+      "sheet_row": 18,
+      "platform_group": "作业帮",
+      "type": "png",
+      "size_description": "446*446 632*354 1224*408 1223*471",
+      "file_limit": "",
+      "notes": "有按钮，有logo",
+      "asset": "作业帮.zip"
+    }
+  ],
+  "merged_cells": [
+    "A4:A6",
+    "A1:T1",
+    "B16:B17",
+    "A16:A17",
+    "A7:A10",
+    "F4:F6",
+    "F7:F10",
+    "F16:F17"
+  ],
+  "format_inheritance": "第17行PNG来自B16:B17合并单元格"
+}

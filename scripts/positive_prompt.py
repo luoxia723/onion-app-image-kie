@@ -92,7 +92,7 @@ def approved_copy(source, slot, count):
     return [source.get("mainTitle") or source.get("short1") or "", source.get("subtitle") or ""]
 
 
-def compose(config, direction, slot=1, references=(), frame_label=None):
+def compose(config, direction, slot=1, references=()):
     """Return one positive paragraph using a frozen plan and actual ref labels.
 
     No model call, auto-truncation or negative-word filtering occurs here.
@@ -102,9 +102,8 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
         raise ValueError("compose requires the new prompt_format")
     if config.get("prompt_layout") == "poster_sections_v1":
         from poster_prompt import compose as compose_poster
-        return compose_poster(config,direction,slot,references,frame_label)
+        return compose_poster(config,direction,slot,references)
     from logo_reference import logo_position, logo_prompt_rule
-    from blue_frame import prompt_rule
     from cta_rules import prompt_rule as cta_rule
 
     count = int(config["placements"][0].get("image_count") or {"双图": 2, "三图": 3}.get(config.get("image_form"), 1))
@@ -144,8 +143,9 @@ def compose(config, direction, slot=1, references=(), frame_label=None):
     elif config.get("font_reference_enabled", True):
         parts.append(inherited_font_rule())
     parts.extend([readability_rule(), CONTENT_RULE])
-    if frame_label:
-        parts.append(prompt_rule(frame_label))
+    if config.get('brand_logo_layer'):
+        from local_app.brand_logo import prompt_rule as brand_rule
+        parts.append(brand_rule(config['brand_logo_layer']))
     prompt = paragraph(*parts)
     validate_paragraph(prompt)
     validate_visual_contract(config, prompt, references, slot, texts[0])

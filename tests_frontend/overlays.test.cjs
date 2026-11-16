@@ -10,7 +10,7 @@ function setup(){
  const document={activeElement:null,body:{},addEventListener(type,callback){(listeners[type]??=[]).push(callback)},
   querySelector(selector){return nodes.get(selector)||null}};
  ctx=vm.createContext({document,window:{addEventListener(){}},setTimeout,clearTimeout,TextEncoder,DRAFT_EDITOR:'editor',calls});
- for(const name of ['views','prompt-drafts','app']){
+ for(const name of ['views','prompt-drafts','workspace','production','app']){
   let source=fs.readFileSync(path.join(__dirname,'../frontend/js/'+name+'.js'),'utf8');
   if(name==='app')source=source.replace('\nboot();','\n');
   vm.runInContext(source,ctx);
@@ -47,6 +47,12 @@ function setup(){
  }
  return{ctx,run,calls,nodes,key,html:()=>run('viewPv()')};
 }
+test('新图层图片旁显示固定无Logo规则但不改写提示词，旧图片编辑保持原状',()=>{
+ const {run}=setup();run('S.pvDetails.logo_fixed_rule="固定：不绘Logo <品牌>";S.pvDetails.prompt="用户逐字编辑的原文\\n第二行"');
+ let html=run('viewPv()');assert(html.includes('Logo固定规则'));assert(html.includes('固定：不绘Logo &lt;品牌&gt;'));assert(html.includes('导出时选择'));
+ const text=html.match(/<textarea[^>]*id="pvPrompt"[^>]*>([\s\S]*?)<\/textarea>/)[1];assert.equal(text,'用户逐字编辑的原文\n第二行');assert(!text.includes('固定：'));
+ run('delete S.pvDetails.logo_fixed_rule');html=run('viewPv()');assert(!html.includes('class="fixed-logo-rule"'));assert(html.includes('用户逐字编辑的原文'));
+});
 
 test('预览在同一版位内按套号和图号前后切换，首尾禁用且计数同步',async()=>{
  const {run,nodes,html}=setup();
@@ -94,23 +100,22 @@ test('切图先保存提示词草稿，保存失败则保留当前图片与编�
  assert.equal(run('S.pv'),'second');assert.equal(run('S.promptDraft.value'),'未保存内容');
 });
 
-test('高级默认收起，主操作与去框在前，保留所有编辑、参考和版本动作',()=>{
+test('实际提示词默认可读，编辑稿和自然画布处理记录分开',()=>{
  const {run,html}=setup();
- run('S.pvDetails.reason_code="frame_failed";S.pvDetails.preview_kind="raw";S.pvDetails.has_frame=true');
- const markup=html(),advanced=markup.indexOf('<details class="pv-advanced"');
- assert.doesNotMatch(markup,/<details class="pv-advanced" open/);
- for(const id of ['pvwhy','pvcrop','pvfit','pvsel','pvredo','pvRetryScope'])assert(markup.indexOf('id="'+id+'"')<advanced);
- for(const id of ['pvPrompt','pvReset','pvRefs','imageVersion','prompt-draft-status'])assert(markup.indexOf('id="'+id+'"')>advanced);
- assert.match(markup,/需去框/);assert.match(markup,/onclick="reprocessFrame\('first'\)"/);assert.match(markup,/onclick="fitImage\('first'\)"/);
- assert.match(markup,/onclick="comparePrevious\(\)"/);assert.match(markup,/onclick="pinImageVersion\(\)"/);
- assert(!markup.includes('可自由修改'));assert(!markup.includes('仅调整尺寸'));
- run('S.pvAdvanced=true');assert.match(html(),/<details class="pv-advanced" open/);
+ run('S.pvDetails.delivery_eligible=false;S.pvDetails.preview_kind="raw"');
+ let markup=html();
+ for(const id of ['pvwhy','pvsel','pvredo','pvRetryScope','pvActualPrompt','pvPrompt','pvReset','pvRefs','imageVersion','prompt-draft-status'])assert(markup.includes('id="'+id+'"'),id);
+ assert(markup.includes('实际提示词'));assert(markup.includes('处理记录'));assert(markup.includes('参考素材'));
+ assert.match(markup,/<div class="prompt-editor" hidden/);
+ assert.match(markup,/未通过交付规格/);
+ run('document.getElementById=()=>null;editOrdinaryPreviewPrompt()');markup=html();assert(!markup.match(/<div class="prompt-editor" hidden/));
+ run('S.promptDraft={id:"first",value:"编辑后的草稿"}');markup=html();assert.match(markup,/id="pvActualPrompt"[^>]*>实际提示词/);assert.match(markup,/>编辑后的草稿<\/textarea>/);
 });
 
 test('历史版本保持只读与禁用重出，已清理版本显示状态并禁用保留',()=>{
  const {run,html}=setup();run('S.pvDetails.is_historical=true;S.pvDetails.files_cleared=true');
  const markup=html();
- assert.match(markup,/历史版本只读/);assert.match(markup,/id="pvPrompt" readonly/);
+ assert.match(markup,/历史版本只读/);assert.match(markup,/id="pvPrompt"[^>]*readonly/);
  assert.match(markup,/id="pvsel"[^>]*disabled/);assert.match(markup,/id="pvredo"[^>]*disabled/);
  assert.match(markup,/文件已清理/);assert.match(markup,/<button disabled onclick="pinImageVersion\(\)"/);
 });
@@ -127,29 +132,31 @@ test('选套成功、取消与失败后同步真实选择状态并保留复选�
  await run('toggleSel(1,true,"xm")');assert(!classes.has('checked'));assert.equal(attrs['aria-pressed'],'false');
 });
 
-test('成品与原图切换在对比后仍可用，图片版本、提示词草稿和高级展开状态保留',()=>{
+test('成品与原图切换在对比后仍可用，版本和编辑草稿保持分离',()=>{
  const {run,html}=setup();
- run('S.pvAdvanced=true;S.promptDraft={id:"first",value:"编辑中"};comparePrevious()');
+ run('S.pvEditing=true;S.promptDraft={id:"first",value:"编辑中"};comparePrevious()');
  assert.match(html(),/class="compare-images"/);
  run('togglePvOriginal()');
- assert.match(html(),/id="pvImg"[^>]*src="first-raw.png"/);assert.match(html(),/id="pvsource"[^>]*>查看成品/);
- assert.match(html(),/<details class="pv-advanced" open/);assert.match(html(),/>编辑中<\/textarea>/);
+ assert.match(html(),/id="pvImg"[^>]*src="first-raw.png"/);assert.match(html(),/id="pvsource"[^>]*aria-pressed="true"/);
+ assert(!html().match(/<div class="prompt-editor" hidden/));assert.match(html(),/>编辑中<\/textarea>/);
  run('togglePvOriginal()');assert.match(html(),/id="pvImg"[^>]*src="first.png"/);
  assert.match(html(),/id="imageVersion" onchange="openPv\('first',\+this.value\)"/);
 });
 
 test('设置保留字段、Key占位、连接和保存动作，删除分组说明段落',()=>{
- const {run}=setup();run('CFG.kie=true;CFG.planningKey=true');const html=run('viewCfg()');
- for(const id of ['cfgdlg','planmodel','plankey','plantest','planst','planbase','cfgimagemodel','kiekey','kietest','kiest','cfgimagemode','adv','kbase','kup','product-facts','stor','cfgpath','cfgsave'])assert(html.includes('id="'+id+'"'),id);
+ const {run}=setup();run('CFG.kie=true;CFG.planningKey=true');const html=run('viewWorkspaceSettings()');
+ for(const id of ['planmodel','plankey','plantest','planst','planbase','cfgimagemodel','kiekey','kietest','kiest','cfgimagemode','kbase','kup','stor','cfgpath','cfgsave'])assert(html.includes('id="'+id+'"'),id);
+ assert(!html.includes('id="product-facts"'));
  assert.equal((html.match(/已配置，留空保留/g)||[]).length,2);assert(!html.includes('class="ro"'));
  for(const action of ['testPlanning()','testConn()','imageKeyEntered()','chooseFolder()','saveCfg()'])assert(html.includes('onclick="'+action+'"')||html.includes('oninput="'+action+'"'));
 });
 
-test('侧栏品牌不放模拟标签，设置旁仅模拟模式显示灰色提示',()=>{
+test('固定功能导航不混放任务列表或全局模拟标签，模式属于当前任务',()=>{
  const {run}=setup();run('S.tasks=[];S.pv=null');
- let html=run('viewSide()');assert(!html.includes('模拟模式'));assert(!html.split('id="newbtn"')[0].includes('模拟预览'));
- assert.match(html,/<div class="side-settings"><button[^>]*id="cfgbtn"[^>]*>⚙ 设置<\/button><span class="simulation-note">模拟预览<\/span>/);
- run('CFG.simulation=false');assert(!run('viewSide()').includes('模拟预览'));
+ const markup=run('viewSide()');
+ for(const label of ['制作任务','Logo模板','交付记录','模型与设置','数据维护'])assert(markup.includes(label));
+ assert(!markup.includes('draft-list'));assert(!markup.includes('模拟预览'));assert(markup.includes('LOCAL'));
+ run('CFG.simulation=false');assert.equal(run('viewSide()'),markup);
 });
 
 test('队列合并等待依赖，暂停显示短词，空闲或未读取时无文字',()=>{
@@ -168,8 +175,8 @@ test('队列阻塞与维护仍显示原提示，并优先于任务计数',()=>{
  run('S.queue.blocked_reason="请先配置 Key"');assert.equal(run('queueText()'),'请先配置 Key');
 });
 
-test('自动去框只显示灰色检查提示，去框失败保留琥珀提示和处理按钮',()=>{
- const {run,html}=setup();run('S.pvDetails.reason_code="frame_review";S.pvDetails.preview_kind="raw";S.pvDetails.has_frame=true');
- let content=html();assert(content.includes('已自动去框，请看一下人物和文字'));assert(!content.includes('需去框'));assert(!content.includes('frame-review'));assert(!content.includes('id="pvcrop"'));assert(!content.includes('id="pvfit"'));
- run('S.pvDetails.reason_code="frame_failed"');content=html();assert(content.includes('需去框'));assert(content.includes('frame-review'));assert(content.includes('id="pvcrop"'));assert(content.includes('id="pvfit"'));
+test('自然画布处理记录与未合格原图明确区分',()=>{
+ const {run,html}=setup();run('S.pvDetails.natural_processing={method:"natural_canvas_exact_crop"};S.pvDetails.preview_kind="processed"');
+ let content=html();assert(content.includes('已按固定安全区从完整自然画布裁成目标尺寸'));
+ run('S.pvDetails.delivery_eligible=false;S.pvDetails.preview_kind="raw"');content=html();assert(content.includes('当前图片未通过交付规格'));
 });

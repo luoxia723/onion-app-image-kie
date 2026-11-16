@@ -6,14 +6,21 @@ from urllib.parse import urlsplit
 import pytest
 from PIL import Image
 from local_app.kie_client import generate
-from kie_model import MODEL,GPT_IMAGE_2
+from kie_model import MODEL,GPT_IMAGE_2,GPT_IMAGE_26_FLARE
 import render
+
+pytestmark=pytest.mark.transport
 
 
 @pytest.mark.parametrize('expired',[False,True])
-@pytest.mark.parametrize('model',[MODEL,GPT_IMAGE_2])
-def test_upload_create_poll_download_and_resume_without_new_task(tmp_path,model,expired):
-    png=io.BytesIO();Image.new('RGB',(80,45),'white').save(png,'PNG');image=png.getvalue()
+@pytest.mark.parametrize('model',[MODEL,GPT_IMAGE_2,GPT_IMAGE_26_FLARE])
+@pytest.mark.parametrize('natural',[False,True])
+def test_upload_create_poll_download_and_resume_without_new_task(tmp_path,model,expired,natural):
+    from local_app import natural_canvas
+    placement={'id':'transport-natural','image_form':'单图','target_width':1200 if natural else 960,'target_height':480 if natural else 540}
+    canvas=natural_canvas.plan(placement,model) if natural else None
+    native_size=canvas['group']['guide_size'] if natural else (80,45)
+    png=io.BytesIO();Image.new('RGB',native_size,'white').save(png,'PNG');image=png.getvalue()
     requests=[];payloads=[]
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*a):pass
@@ -40,8 +47,11 @@ def test_upload_create_poll_download_and_resume_without_new_task(tmp_path,model,
     ref=tmp_path/'reference.png';ref.write_bytes(image);output=tmp_path/'result.png'
     job={'slot':{'idx':1,'refs':[{'label':'参考图1','path':str(ref),'role':'参考素材'}],
                  'prompt':'主标题："真实调用链"\n自由编辑','prompt_origin':'manual','output':str(output)},
-         'placement':{'target_width':960,'target_height':540},'base':base,'upload':base,'image_model':model,
+         'placement':placement,'base':base,'upload':base,'image_model':model,
          'upload_cache':str(tmp_path/'cache.json'),'stop_marker':str(tmp_path/'STOP'),'query_only':False}
+    if natural:
+        job['slot']['natural_canvas_plan']=canvas
+        job['slot']['prompt']+='\n'+natural_canvas.prompt_rule(canvas)
     stages=[]
     try:
         result=generate(job,'fake-local-key',[],stages.append)
@@ -50,10 +60,17 @@ def test_upload_create_poll_download_and_resume_without_new_task(tmp_path,model,
         assert payloads[0]['model']==model and payloads[0]['input']['resolution']=='1K'
         assert payloads[0]['input']['prompt']==job['slot']['prompt']
         assert payloads[0]['input']['input_urls']==[base+'/reference.png']
-        assert ('background' in payloads[0]['input'])==(model==MODEL)
+        if natural:
+            assert payloads[0]['input']['aspect_ratio']==canvas['group']['aspect_ratio']
+            assert '蓝框' not in payloads[0]['input']['prompt']
+            cropped=tmp_path/'exact.png';natural_canvas.crop(output,cropped,canvas,placement)
+            with Image.open(cropped) as exact:assert exact.size==(1200,480)
+        assert ('background' in payloads[0]['input'])==(model!=GPT_IMAGE_2)
+        if model == GPT_IMAGE_26_FLARE:
+            assert 'output_format' not in payloads[0]['input']
         assert {'uploading','submitting','generating','downloading','processing'}<=set(stages)
         # A lost local download resumes the existing receipt; it cannot create again.
-        output.unlink();job['query_only']=True;result=generate(job,'fake-local-key',[],stages.append)
+        output.unlink();job['query_only']=True;job['placement']['category']='学习机';result=generate(job,'fake-local-key',[],stages.append)
         assert result['state']['task_id']=='one-paid-task' and output.read_bytes()==image
         assert requests.count('/api/v1/jobs/createTask')==1
     finally:server.shutdown();server.server_close()

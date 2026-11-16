@@ -1,0 +1,234 @@
+{
+  "version": 2,
+  "status": "offline_prompt_preview_only",
+  "baseline": {
+    "aspect_ratio": "16:9",
+    "advertising_text": false,
+    "logo": false,
+    "cta": false,
+    "requires_user_confirmation": true
+  },
+  "text_defaults": {},
+  "text_default_note": "当前不使用功能名，也不使用精选附加文案；用户只需输入一句正文，CTA单独统一填写。",
+  "reuse_policy": {
+    "same_group_one_master": true,
+    "logo_is_postprocessing": true,
+    "rounded_corners_are_postprocessing": true,
+    "mask_is_postprocessing": true,
+    "badge_is_postprocessing": true,
+    "double_840_may_reuse_identical_artwork": true,
+    "baseline_is_reference_for_every_master": true,
+    "single_regeneration_scope": "only_requested_output",
+    "safe_area_scope": "all_group_placements",
+    "baseline_reuse_for_pure_same_ratio": true
+  },
+  "groups": [
+    {
+      "id": "A1",
+      "content_mode": "pure",
+      "content_label": "纯画面",
+      "aspect_ratio": "4:5",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-bbg-cover-216x260",
+        "learning-bbg-cover-300x360",
+        "learning-bbg-cover-400x480"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "B1",
+      "content_mode": "pure",
+      "content_label": "纯画面",
+      "aspect_ratio": "16:9",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-ruishi-rounded-580x320",
+        "learning-ruishi-rect-580x320"
+      ],
+      "reuse_baseline": true
+    },
+    {
+      "id": "C1",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "4:5",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-dsl-resource-484x580",
+        "learning-youxuepai-cover-400x480",
+        "learning-dsl-rounded-card-484x580"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "C2",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "5:4",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-xueersi-1125x885"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "C3",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "2:1",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-xueersi-720x342",
+        "learning-xiaoyuan-660x306",
+        "learning-xueersi-1050x498",
+        "learning-youxuepai-masked-840x404",
+        "learning-youxuepai-unmasked-840x404",
+        "learning-youxuepai-double-840x404",
+        "learning-youxuepai-logo-2560x1228"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D1",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "1:1",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-baidu-512x512",
+        "learning-zuoyebang-446x446"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D2",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "16:9",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-iflytek-1005x564",
+        "learning-zuoyebang-632x354"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D3",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "2:1",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-bbg-logo-banner-988x460",
+        "learning-bbg-logo-banner-1080x528"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D4",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "21:9",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-bbg-logo-banner-530x236",
+        "learning-bbg-logo-banner-984x438",
+        "learning-iflytek-1626x684"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D5",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "3:1",
+      "layout": "普通横幅",
+      "placement_ids": [
+        "learning-baidu-1200x400",
+        "learning-bbg-logo-banner-988x350"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "D6",
+      "content_mode": "copy_cta",
+      "content_label": "正文＋CTA",
+      "aspect_ratio": "3:1",
+      "layout": "超宽安全区",
+      "placement_ids": [
+        "learning-bbg-logo-banner-1280x362",
+        "learning-bbg-logo-banner-2368x670",
+        "learning-bbg-no-logo-banner-1280x362"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "E2",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "1:1",
+      "layout": "轻竖图",
+      "placement_ids": [
+        "learning-youxuepai-logo-1536x1708"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "E3",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "3:2",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-dsl-resource-500x312"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "E5",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "21:9",
+      "layout": "普通",
+      "placement_ids": [
+        "learning-xueersi-1854x720",
+        "learning-youxuepai-logo-1400x640",
+        "learning-youxuepai-logo-2000x800",
+        "learning-zuoyebang-1223x471"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "E6",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "3:1",
+      "layout": "普通横幅",
+      "placement_ids": [
+        "learning-seewo-1400x520",
+        "learning-xiaoyuan-1372x480",
+        "learning-xiaoyuan-2880x1020",
+        "learning-zuoyebang-1224x408"
+      ],
+      "reuse_baseline": false
+    },
+    {
+      "id": "E7",
+      "content_mode": "copy",
+      "content_label": "正文、无CTA",
+      "aspect_ratio": "3:1",
+      "layout": "超宽安全区",
+      "placement_ids": [
+        "learning-dsl-banner-830x250",
+        "learning-dsl-banner-1200x350",
+        "learning-dsl-resource-1280x348",
+        "learning-youxuepai-logo-1400x340"
+      ],
+      "reuse_baseline": false
+    }
+  ],
+  "deferred_work": [
+    "精选角标及其附加文案，后续单独配置"
+  ]
+}

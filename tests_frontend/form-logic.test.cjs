@@ -4,11 +4,13 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const placements = JSON.parse(fs.readFileSync(path.join(root,'config/channel-placement-rules.json'))).placements;
+const {currentCatalog}=require('./helpers/workbench.cjs');
+const catalog=currentCatalog();
+const placements=catalog.filter(p=>p.enabled!==false);
 function context(form='单图') {
   const ctx = vm.createContext({
     document:{addEventListener(){},querySelector(){return null},querySelectorAll(){return []}},
-    PLACEMENTS:placements, STYLES:[], IPS:[],
+    PLACEMENTS:structuredClone(placements),UNAVAILABLE_PLACEMENTS:catalog.filter(p=>p.enabled===false), STYLES:[], IPS:[], ASSETS:{logos:[{id:'logo.onion.standard.001',label:'洋葱学园'},{id:'logo.onion.app.001',label:'洋葱学园+APP'}]},
     DEF_CTA:'立即体验', SETS_MIN:1, SETS_MAX:20,
     S:{draft:{channel:'应用商店',cta_enabled:true,cta_overrides:{},image_form:form,pids:[],t1:'',t2:'',s1:'',s2:'',s3:'',cta:'立即体验',sets:3,ip:'random',style:'random'},formDrafts:{},tried:false},
     save(){}, structuredClone,
@@ -55,12 +57,12 @@ test('切换形式时不保留不兼容的版位',()=>{
 });
 test('画面设定默认收起，定制后显示三个固定上传位和紧凑控件',()=>{
   const ctx=context();let html=vm.runInContext('viewForm()',ctx);
-  assert(html.includes('全部随机'));assert(html.includes('aria-expanded="false"'));assert(!html.includes('id="ips"'));
+  assert(html.includes('随机画风 · 随机角色'));assert(html.includes('aria-expanded="false"'));assert(!html.includes('id="ips"'));
   ctx.S.visualOpen=true;html=vm.runInContext('viewForm()',ctx);
   assert(!/class="[^"]*\bmore\b/.test(html));
   for(const id of ['ips','styleq','nologo','f-feature','f-font','reference-options'])assert(html.includes('id="'+id+'"'),id);
   assert(!html.includes('f-direction'));assert(!html.includes('方向名'));
-  for(const label of ['随机 IP','不用 IP','使用 Logo','不用 Logo','参考风格','参考排版','产品界面'])assert(html.includes(label),label);
+  for(const label of ['随机 IP','全随机（含不用 IP）','不用 IP','黑字标准版','白字APP版','不用 Logo','参考风格','参考排版','产品界面'])assert(html.includes(label),label);
   assert.equal((html.match(/class="reference-slot /g)||[]).length,3);
   assert.equal((html.match(/class="primary"/g)||[]).length,1);
 });
@@ -100,15 +102,18 @@ test('旧草稿缺少非必填配置时补齐结构，不擅自选择渠道',()=
   assert.equal(ctx.S.draft.pids.length,0);assert.equal(ctx.S.draft.font,'random');
   assert(vm.runInContext('viewForm()',ctx).includes('旧草稿标题'));
 });
-test('渠道过滤与形式显隐来自当前规则，学习机显示空态',()=>{
+test('渠道过滤与形式显隐来自当前规则，学习机仅展示唯一整套配置',()=>{
   const ctx=context();ctx.S.draft.channel='信息流';
   let html=vm.runInContext('viewForm()',ctx);
   const ids=[...html.matchAll(/class="placement-row[^"]*"[^>]*data-pid="([^"]+)"/g)].map(m=>m[1]);
   assert.deepEqual(ids.sort(),placements.filter(p=>p.category==='信息流').map(p=>p.id).sort());
   assert(!html.includes('id="image-form"'));assert(html.includes('>喜马拉雅</h4>'));
   vm.runInContext('setChannel("学习机")',ctx);html=vm.runInContext('viewForm()',ctx);
-  assert(html.includes('该渠道暂无版位'));assert(!html.includes('data-pid='));
-  assert(/id="sum" disabled/.test(html));assert(/id="go" disabled/.test(html));
+  const learningIds=[...html.matchAll(/class="placement-row[^"]*"[^>]*data-pid="([^"]+)"/g)].map(m=>m[1]);
+  assert.equal(learningIds.length,44);assert.equal(new Set(learningIds).size,44);
+  assert.equal(vm.runInContext('totalOf(S.draft)',ctx),45);
+  assert(!html.includes('该渠道暂无版位'));assert(html.includes('data-pid='));assert(!html.includes('个版位待确认'));assert(html.includes('生成基准图'));assert(html.includes('确认基准图并扩展整套'));
+  assert(!/id="sum" disabled/.test(html));assert(html.includes('仅预览计划'));
   ctx.PLACEMENTS=[...placements,{id:'new',category:'新渠道',image_count:2}];
   assert(vm.runInContext('channelOptions()',ctx).includes('新渠道'));
   assert.deepEqual([...vm.runInContext('channelForms("新渠道")',ctx)],['双图']);
@@ -179,11 +184,11 @@ test('未选渠道时旧默认版位不进入计数，版位区只保留置灰�
   assert.equal(nodes['#tot'].textContent,'共 0 张');assert.equal(nodes['#sum-formula'].innerHTML,'');
   assert.equal(nodes['#go'].disabled,true);
 });
-test('版位按钮收起时显示最终文字，菜单保留模式名并标记当前项',()=>{
+test('版位按钮继承时显示跟随统一，菜单保留模式名并标记当前项',()=>{
   const ctx=context(),p=placements.find(p=>p.category==='应用商店'&&p.image_form==='单图');
   ctx.placement=p;ctx.S.draft.pids=[p.id];
   let html=vm.runInContext('placementCta(S.draft,placement)',ctx);
-  assert(html.includes('data-cta-label="'+p.id+'">立即体验</span>'));
+  assert(html.includes('data-cta-label="'+p.id+'">跟随统一</span>'));
   assert(html.includes('value="inherit" selected>✓ 跟随统一</option>'));
   ctx.S.draft.cta_enabled=false;
   html=vm.runInContext('placementCta(S.draft,placement)',ctx);
@@ -200,29 +205,32 @@ test('版位按钮收起时显示最终文字，菜单保留模式名并标记�
 });
 test('默认按钮文字和开关变化后就地更新最终文字，保留版位覆盖',()=>{
   const ctx=context(),id=placements[0].id,states=[];
+  ctx.S.draft.pids=[id];
   const label={dataset:{ctaLabel:id},textContent:'',parentElement:{classList:{toggle:(...args)=>states.push(args)}}};
   ctx.document.querySelectorAll=()=>[label];
-  vm.runInContext('setF("cta","开始学习")',ctx);assert.equal(label.textContent,'开始学习');
+  vm.runInContext('setF("cta","开始学习")',ctx);assert.equal(label.textContent,'跟随统一');assert.equal(vm.runInContext('placementCtaText(S.draft,S.draft.pids[0])',ctx),'开始学习');
   vm.runInContext('setF("cta_enabled",false)',ctx);assert.equal(label.textContent,'无按钮');
   assert.deepEqual(states.at(-1),['no-button',true]);
   ctx.S.draft.cta_overrides[id]={mode:'custom',text:'专属文字'};
   vm.runInContext('setF("cta","新的默认")',ctx);assert.equal(label.textContent,'专属文字');
 });
-test('配置顶栏合并为任务名和草稿状态，移除步骤条与面包屑',()=>{
+test('配置页标题与草稿状态分区，导航使用全局外壳',()=>{
   const ctx=context();Object.assign(ctx.S,{view:'form',draftId:'saved',draftStatus:'草稿已保存'});
   let html=vm.runInContext('viewHead()',ctx);
-  assert(html.includes('pick-head config-head'));assert(html.includes('>未命名草稿</h1>'));
+  assert(html.includes('pick-head config-head'));assert(html.includes('>新建任务</h1>'));assert(html.includes('class="page-context" id="title" tabindex="-1">未命名草稿</span>'));
   assert(html.includes('id="draft-status" role="status">草稿已保存</span>'));
-  for(const old of ['class="crumb"','class="steps"','配置生成','挑选保存','保存草稿'])assert(!html.includes(old));
+  assert(!html.includes('class="workbench-phase">配置生成</span>'));
+  for(const old of ['class="crumb"','class="steps"','挑选保存','保存草稿'])assert(!html.includes(old));
   ctx.S.cur='task';ctx.S.tasks=[{id:'task',name:'实际任务名',pkg:'APP',rounds:[]}];
-  ctx.S.draft.t1='草稿里的新标题';assert(vm.runInContext('viewHead()',ctx).includes('>草稿里的新标题</h1>'));
+  ctx.S.draft.t1='草稿里的新标题';assert(vm.runInContext('viewHead()',ctx).includes('>草稿里的新标题</span>'));
 });
 test('图片模型显示短名而保留原提交值',()=>{
   const ctx=context();
-  vm.runInContext('IMAGE_MODEL_OPTIONS=[["gpt-image-2-5-sunburst-image-to-image","后端长名"],["gpt-image-2-image-to-image","另一长名"]]',ctx);
+  vm.runInContext('IMAGE_MODEL_OPTIONS=[["gpt-image-2-5-sunburst-image-to-image","后端长名"],["gpt-image-2-image-to-image","另一长名"],["gpt-image-2-6/flare-image-to-image","GPT Image 2.6 Flare"]]',ctx);
   const html=vm.runInContext('imageModelOptions("gpt-image-2-5-sunburst-image-to-image")',ctx);
   assert(html.includes('value="gpt-image-2-5-sunburst-image-to-image" selected>Sunburst 2.5 · 1K</option>'));
   assert(html.includes('value="gpt-image-2-image-to-image" >GPT Image 2 · 1K</option>'));
+  assert(html.includes('value="gpt-image-2-6/flare-image-to-image" >GPT Image 2.6 Flare · 1K</option>'));
   assert(!html.includes('后端长名'));
 });
 
@@ -257,4 +265,50 @@ test('旧任务单渠道推断保持不变，空白配置显示先选渠道及�
  let html=vm.runInContext('viewForm()',ctx);assert(html.includes('先选渠道'));
  html=vm.runInContext('viewHead()',ctx);assert(html.includes('未命名草稿'));assert(!html.includes('草稿已保存'));
  ctx.S.draft.t1='填写后的标题';assert(vm.runInContext('viewHead()',ctx).includes('填写后的标题'));
+});
+
+test('学习机CTA按版位固定，仅修改共用文案，空值使用默认',()=>{
+ const ctx=context(),forbidden=placements.find(p=>p.category==='学习机'&&p.cta_policy==='forbidden'),required=placements.find(p=>p.category==='学习机'&&p.cta_policy==='required');
+ ctx.placement=forbidden;Object.assign(ctx.S.draft,{channel:'学习机',pids:[forbidden.id],cta:'',t1:'不会的题拍一下'});
+ const html=vm.runInContext('placementCta(S.draft,placement)',ctx);assert(html.includes('无CTA'));assert(!html.includes('<select'));assert.equal(vm.runInContext('placementCtaText(S.draft,placement.id)',ctx),'');
+ ctx.S.draft.pids=[required.id];ctx.S.draft.cta_enabled=false;ctx.S.draft.cta_overrides[required.id]={mode:'none'};
+ assert.equal(vm.runInContext('placementCtaText(S.draft,S.draft.pids[0])',ctx),'点击下载');
+ ctx.S.draft.cta='马上试试';assert.equal(vm.runInContext('placementCtaText(S.draft,S.draft.pids[0])',ctx),'马上试试');
+ assert(!vm.runInContext('viewForm()',ctx).includes('id="cta-enabled"'));
+});
+
+test('学习机只输入一句推广文案，各版位模块不增加额外表单字段',()=>{
+ const ctx=context();Object.assign(ctx.S.draft,{channel:'学习机',pids:['learning-bbg-cover-400x480'],t1:'',t2:''});
+ let html=vm.runInContext('viewForm()',ctx);assert(html.includes('推广文案'));assert(html.includes('id="f-t1"'));assert(!html.includes('id="f-t2"'));assert(!html.includes('id="f-cta"'));
+ assert.equal(vm.runInContext('formIssue(S.draft).field',ctx),'f-t1');
+ ctx.S.draft.t1='这周把数学补起来';ctx.S.draft.pids=['learning-dsl-rounded-card-484x580'];html=vm.runInContext('viewForm()',ctx);
+ for(const id of ['feature_label','t2','extra_heading','extra_description'])assert(!html.includes('id="f-'+id+'"'));
+ assert.equal(vm.runInContext('formIssue(S.draft)',ctx),null);
+});
+
+test('学习机整套计数忽略旧多套配置，不宣称真实模型调用次数',()=>{
+ const ctx=context();Object.assign(ctx.S.draft,{channel:'学习机',pids:placements.filter(p=>p.category==='学习机').map(p=>p.id),sets:3});
+ const count=ctx.S.draft.pids.map(id=>placements.find(p=>p.id===id)).reduce((n,p)=>n+p.image_count,0);
+ assert.equal(vm.runInContext('totalOf(S.draft)',ctx),count);
+ const detail=vm.runInContext('learningProduction(S.draft)',ctx);assert(detail.includes('先生成并查看 1 张基准图'));assert(detail.includes('可先审核计划，再开始模拟或真实制作'));assert(!detail.includes('个模型任务'));
+ const html=vm.runInContext('viewForm()',ctx);assert(!html.includes('id="f-sets"'));assert(html.includes('固定生成一整套'));
+});
+test('普通任务统一选择黑字或白字APP版，兼容旧别名且保留不用Logo限制',()=>{
+ const ctx=context();ctx.S.visualOpen=true;
+ let html=vm.runInContext('viewVisualOptions(S.draft)',ctx);assert(html.includes('value="learning.logo.black"'));assert(html.includes('value="learning.logo.white-app"'));assert(html.includes('黑字标准版'));assert(html.includes('白字APP版'));
+ vm.runInContext('setLogoSelection("logo.onion.app.001")',ctx);assert.equal(ctx.S.draft.logo_asset_id,'learning.logo.white-app');assert.equal(ctx.S.draft.noLogo,false);
+ vm.runInContext('setLogoSelection("learning.logo.black")',ctx);assert.equal(ctx.S.draft.logo_asset_id,'learning.logo.black');
+ const required=placements.find(p=>p.category!=='学习机'&&p.image_form==='单图'&&p.logo_policy==='required');Object.assign(ctx.S.draft,{pids:[required.id],channel:required.category,t1:'已确认正文',t2:'补充说明'});
+ vm.runInContext('setLogoSelection("none")',ctx);assert.equal(ctx.S.draft.noLogo,true);assert.equal(vm.runInContext('formIssue(S.draft).field',ctx),'nologo');
+});
+
+test('学习机跨版位依赖显示首模板等待与重出范围',()=>{
+ // The production helper lives in app.js, while this fixture loads views.js.
+ const ctx=context();ctx.r={slots:[{id:'root',pid:'learning-bbg-logo-banner-984x438',set:1,idx:1,state:'done',production_mode:'first_template',dependency_ids:[]},{id:'child',pid:'learning-bbg-logo-banner-530x236',set:1,idx:1,state:'queued',plan_ready:true,production_mode:'local_resize',dependency_ids:['root'],template_id:'root',parent_id:'root'}]};
+ ctx.blocked=(r,s)=>s.state==='blocked_first_failed';
+ assert.equal(vm.runInContext('imageRetry(r,r.slots[0]).disabled',ctx),true);
+ assert(vm.runInContext('imageRetry(r,r.slots[0]).note',ctx).includes('1 张依赖图片'));
+ ctx.r.slots[0].state='generating';assert.equal(vm.runInContext('waitLabel(r,r.slots[1])',ctx),'等待首模板');
+ ctx.r.slots[0].state='done';assert.equal(vm.runInContext('waitLabel(r,r.slots[1])',ctx),'待本机适配');
+ assert.equal(vm.runInContext('imageRetry(r,r.slots[1]).label',ctx),'重新适配');
 });

@@ -133,11 +133,13 @@ def assign_styles(config, seed=None):
         raise ValueError("no compatible main styles for the saved configuration")
     rng = random.Random(str(seed if seed is not None else config.get("request_id", "")) + ":main-styles")
     selected = balanced(styles, len(copies) * sets, rng)
+    frozen_description = fixed.get("style_description") if fixed.get("style_id") else None
     return {"schema_version": "onion_style_assignments_v1", "request_id": config.get("request_id"),
             "directions": [{"set_id": f"copy-{i // sets + 1:03d}-placement-001-set-{i % sets + 1:02d}",
                             "style_id": style["id"], "style_name": style["name"],
-                            "style_prompt": (style.get("visual_prompt", style["prompt"]) if positive_format(config) else
-                                             style["prompt"] if has_ip else style.get("no_ip_prompt", style["prompt"])),
+                            "style_prompt": (frozen_description or
+                                             (style.get("visual_prompt", style["prompt"]) if positive_format(config) else
+                                              style["prompt"] if has_ip else style.get("no_ip_prompt", style["prompt"]))),
                             "ip_adaptation": style.get("ip_adaptation", "") if has_ip and (not positive_format(config) or config.get("prompt_context_version") == "per_image_v1") else "",
                             "style_source_ids": style.get("source_ids", [])} for i, style in enumerate(selected)]}
 
@@ -191,8 +193,8 @@ def plan_content_concepts(config, seed=None):
         if not isinstance(concept, dict) or any(not isinstance(concept.get(k), str) or not concept[k].strip() for k in ("name", "prompt")):
             raise ValueError("each visual concept needs a name and a complete scene prompt")
         style = assigned[index] if random_batch else None
-        if style is None and fixed.get("style_id") == "reference" and fixed.get("style_prompt"):
-            style = {"style_id": "reference", "style_name": "参考风格图", "style_prompt": fixed["style_prompt"], "style_source_ids": []}
+        if style is None and (fixed.get("style_id") == "reference" or str(fixed.get("style_id","")).startswith("builtin-style-")) and fixed.get("style_prompt"):
+            style = {"style_id": fixed['style_id'], "style_name": fixed.get('style_name','参考风格图'), "style_prompt": fixed["style_prompt"], "style_source_ids": []}
         if style is None and concept.get("style_id"):
             single_style_config = config if fixed.get("style_id") or fixed.get("style_prompt") else {
                 **config, "visual_direction": {**fixed, "style_id": concept["style_id"]}}
@@ -218,8 +220,13 @@ def plan_content_concepts(config, seed=None):
             if not fonts and not concept.get("font_reference_path"):
                 raise ValueError("font reference library is empty")
             font = concept.get("font_reference_path") or str(rng.choice(fonts))
-            if Path(font).resolve() not in {p.resolve() for p in font_references(include_disabled=True)}:
-                raise ValueError("concept font must use an original font reference")
+            originals=font_references(include_disabled=True)
+            if Path(font).resolve() not in {p.resolve() for p in originals}:
+                # Restored snapshots have new paths but must retain exact original bytes.
+                if not Path(font).is_file() or hashlib.sha256(Path(font).read_bytes()).digest() not in {
+                    hashlib.sha256(p.read_bytes()).digest() for p in originals
+                }:
+                    raise ValueError("concept font must use an original font reference")
             font = str(Path(font).resolve())
         copy_index, set_index = index // sets + 1, index % sets + 1
         direction_id = f"visual-{index + 1:03d}"

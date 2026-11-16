@@ -6,6 +6,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 from logo_reference import build_logo_reference, logo_position, logo_prompt_rule, validate_manifest_logo
 
+# Current ordinary images use a frozen code-composited brand layer. These
+# model-drawn Logo rules remain relevant to older saved requests only.
+pytestmark=pytest.mark.history
+
 
 @pytest.mark.parametrize('platform,size,expected',[
     ('喜马拉雅','720x1280','上方居中'),

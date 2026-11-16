@@ -21,8 +21,7 @@ def test_actual_compose_inputs_are_frozen_and_feature_applies_every_image(tmp_pa
     r=round_for_test(tmp_path);result=FixturePlanner().plan(r,lambda x:compile_plans(r,x,apply=False));compile_plans(r,result)
     entry=r['configs'][0]
     for s in r['slots']:
-        label=(s['refs'][-1]['label'] if s['idx']==1 else '参考图1') if s['frame'] else None
-        assert s['orig']==positive_prompt.compose(entry['config'],entry['direction'],s['idx'],s['refs'],label)
+        assert s['orig']==positive_prompt.compose(entry['config'],entry['direction'],s['idx'],s['refs'])
         assert '画面采用柔和的侧光' in s['orig']
     assert r['planning_source']=='codex_skill' and entry['config']['learner_story_required']
 
@@ -68,7 +67,7 @@ def test_api_freezes_original_skill_and_reuses_validated_cache(api,tmp_path,monk
     assert 'test-planning-secret' not in json.dumps(payload)
     assert '不要运行命令' in payload['messages'][0]['content']
     assert '## 用原数学案例' not in rules_text()
-    assert '只表达已确认的学习任务与进度功能' in payload['messages'][1]['content']
+    assert '只表达已确认的学习任务与进度功能' not in payload['messages'][1]['content']
     assert one['_provenance']['provider']=='openai_compatible'
     assert one['_provenance']['usage']=={'prompt_tokens':12,'completion_tokens':34,'total_tokens':46}
     api.settings.update({'planning_model':'explicitly-changed-model'})
@@ -84,8 +83,7 @@ def test_api_instructs_reference_style_and_preserves_style_id(api,tmp_path,monke
     result=FixturePlanner().plan(r,lambda x:None);result.pop('_provenance')
     def request(payload,config,stopped):
         system=payload['messages'][0]['content']
-        assert '分配的style.id为reference时' in system and '本轮所有套按参考风格图及用户说明统一画风' in system
-        assert '不另选画风，也不使用下拉指定的画风' in system
+        assert 'style.id为reference或builtin-style开头时' in system and '本套按所分配的参考风格图及说明设计画风' in system
         job=json.loads(payload['messages'][1]['content'].split('\n',1)[1])['jobs'][0]
         assert job['style']['id']=='reference' and '沿用粉彩质感' in job['style']['description']
         return completion(json.dumps(result,ensure_ascii=False))
@@ -222,7 +220,7 @@ def test_scoped_multi_image_context_and_reference_roles(tmp_path, form):
     assert '第二张试卷' in first and '当前动作标记1' in first
     assert '未来流程标记' not in first and '未来产品动作标记' not in first
     assert '当前第二句' not in first and '当前动作标记2' not in first
-    assert '附带贴纸' in first
+    if r['configs'][0]['config']['font_reference_enabled']:assert '附带贴纸' in first
     for slot in r['slots'][1:]:
         assert len(slot['refs'])==1 and slot['refs'][0]['path']==r['slots'][0]['output']
         assert '当前动作标记'+str(slot['idx']) in slot['prompt']
@@ -239,12 +237,12 @@ def test_scoped_context_requires_separate_common_scene(tmp_path):
 
 def test_multi_image_ip_uses_style_material_adaptation(tmp_path):
     p=next(p for p in PLACEMENTS if p['image_form']=='双图')
-    pr=dict(image_form='双图',pids=[p['id']],sets=1,t1='',t2='',s1='拍题精学',s2='一拍就会',s3='',cta='',ip='ip.xiaochui.junior.standard.001',style='折纸',feature_note='',product_facts='')
+    pr=dict(image_form='双图',pids=[p['id']],sets=1,t1='',t2='',s1='拍题精学',s2='一拍就会',s3='',cta='',ip='ip.xiaochui.junior.standard.001',style='黏土手作',feature_note='',product_facts='')
     r=make_round(pr,'style-test',tmp_path,2,True,defer_planning=True)
     result=FixturePlanner().plan(r,lambda x:None);compile_plans(r,result)
     from art_direction import concise_ip_note
     from visual_directions import load_catalog
-    style=next(s for s in load_catalog()['styles'] if s['id']=='origami')
+    style=next(s for s in load_catalog()['styles'] if s['id']=='craft-clay')
     note=concise_ip_note(style['ip_adaptation'])
     assert note and note in r['slots'][0]['prompt']
     assert note not in r['slots'][1]['prompt']

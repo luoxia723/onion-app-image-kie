@@ -1,6 +1,7 @@
 """One durable queue shared by every browser, with fair task admission."""
 import time
 from pathlib import Path
+from .learning_workflow import dependencies
 
 STAGES={'uploading':'正在上传参考图','generating':'正在生成','downloading':'正在下载','processing':'正在处理尺寸'}
 
@@ -17,11 +18,14 @@ class SchedulerMixin:
                         elif s['state']=='queued':
                             if r.get('paused'): paused+=1
                             elif not r.get('stopped'):
-                                head=next((x for x in r['slots'] if x['id']==s['first_id']),s)
-                                if not s.get('plan_ready',True) or s['idx']>1 and head['state']!='done': waiting+=1
+                                sources=dependencies(r,s)
+                                if not s.get('plan_ready',True) or any(x['state']!='done' or x.get('local_processing') or not x.get('delivery_eligible',True) for x in sources): waiting+=1
                                 else: queued+=1
-            return dict(running=running,queued=queued,waiting=waiting,paused=paused,planning=planning,
-                        limit=min(self.throttle,self.settings.concurrency),blocked_reason=(self.last_scheduler_error or {}).get('message'),maintenance=self.maintenance_active)
+            shared=self.pool.stats() if hasattr(self.pool,'stats') else None
+            return dict(running=shared['running'] if shared else running,
+                        queued=queued+(shared['queued'] if shared else 0),waiting=waiting,paused=paused,planning=planning,
+                        limit=min(self.throttle,self.settings.concurrency),processing_limit=4,planning_limit=1,
+                        blocked_reason='服务限流，暂缓新图片任务' if time.monotonic()<getattr(self,'image_backoff_until',0) else (self.last_scheduler_error or {}).get('message'),maintenance=self.maintenance_active)
 
     def dispatch_tick(self):
         with self.lock:
@@ -41,6 +45,7 @@ class SchedulerMixin:
             for t in tasks:
                 if t.get('deleted_at'): continue
                 for r in t['rounds']:
+                    if r.get('generation_disabled') or any(s.get('frame') for s in r['slots']):continue
                     pkey=(t['id'],r['id'])
                     if not self.planning_running and r.get('planning_status')=='queued' and not r.get('stopped') and not r.get('paused'):
                         r['planning_status']='running';self.last_planned=t['id'];self.planning_running.add(pkey);self.persist(t)
@@ -50,10 +55,10 @@ class SchedulerMixin:
                         if s['state']=='generating': self.sync_provider_ids(t,s)
                         if time.time()<s.get('retry_after',0):continue
                         if s['state']!='queued' or not s.get('plan_ready',True) or r.get('paused') or r.get('stopped'): continue
-                        head=next((x for x in r['slots'] if x['id']==s['first_id']),s)
-                        if s['idx']>1 and head['state'] in ('failed','blocked_first_failed','stopped'):
-                            s.update(state='blocked_first_failed',reason_code='first_failed',msg='图 1 还没完成，请先处理图 1');changed=True;continue
-                        if s['idx']>1 and head['state']!='done': continue
+                        sources=dependencies(r,s)
+                        if any(x['state'] in ('failed','blocked_first_failed','stopped') for x in sources):
+                            s.update(state='blocked_first_failed',reason_code='first_failed',msg='首模板或母版还没完成，请先处理来源图片' if s.get('production_mode') else '图 1 还没完成，请先处理图 1');changed=True;continue
+                        if any(x['state']!='done' or x.get('local_processing') or not x.get('delivery_eligible',True) for x in sources):continue
                         queues.setdefault(t['id'],[]).append((t,r,s))
                     if changed:self.persist(t)
             for jobs in queues.values():jobs.sort(key=lambda x:(x[2]['idx']==1,x[2].get('t0',0)))

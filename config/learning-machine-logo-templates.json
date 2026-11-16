@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "revision": 0,
+  "coordinate_space": "normalized_target_canvas",
+  "logo_presence": "fixed_by_placement",
+  "default_asset_id": "learning.logo.black",
+  "assets": [
+    {
+      "id": "learning.logo.black",
+      "label": "黑字标准版",
+      "path": "assets/logos/learning-logo-black.png",
+      "width": 1798,
+      "height": 402,
+      "sha256": "5a3bb593696378315733e83b0c20e1c9daaf7f4c8e464cf28cf390dd7fb51271",
+      "source_path": "assets/logos/onion-logo-standard-001.png",
+      "source_sha256": "ed742f092505dffc600bcf45f214547379b46df0ccd38e5a78f22ac82bbd1513",
+      "preparation": "原始透明素材去空白边距",
+      "ai_generated": false
+    },
+    {
+      "id": "learning.logo.white-app",
+      "label": "白字 APP 版",
+      "path": "assets/logos/learning-logo-white-app.png",
+      "width": 1412,
+      "height": 396,
+      "sha256": "4c7dd60a0a00ed5d8e4a70d83ba85729d86c8719ae9e1ab782931cef3536409d",
+      "source_path": "assets/logos/onion-logo-app-001.png",
+      "source_sha256": "35ba4b2fc718003244b844373bc3cb89da015d206babc2a36c1fa938fb1fa387",
+      "preparation": "原始深蓝底素材确定性去底；保留彩色IP与APP，不是黑字版同款反色",
+      "ai_generated": false
+    }
+  ],
+  "templates": {
+    "learning-baidu-512x512": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-baidu-1200x400": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-530x236": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-984x438": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-988x350": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-988x460": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-1080x528": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-1280x362": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-bbg-logo-banner-2368x670": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-banner-830x250": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-banner-1200x350": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-rounded-card-484x580": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-resource-484x580": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-resource-500x312": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-dsl-resource-1280x348": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-iflytek-1005x564": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-iflytek-1626x684": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-ruishi-rounded-580x320": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-ruishi-rect-580x320": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xiaoyuan-660x306": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xiaoyuan-1372x480": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xiaoyuan-2880x1020": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xueersi-1854x720": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xueersi-1050x498": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xueersi-1125x885": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-xueersi-720x342": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-double-840x404": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-logo-1400x640": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-logo-1400x340": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.12,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-logo-1536x1708": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-logo-2000x800": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-youxuepai-logo-2560x1228": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-zuoyebang-446x446": {
+      "asset_id": "learning.logo.black",
+      "x": 0.035,
+      "y": 0.02,
+      "width": 0.2,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-zuoyebang-632x354": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-zuoyebang-1224x408": {
+      "asset_id": "learning.logo.black",
+      "x": 0.02,
+      "y": 0.04,
+      "width": 0.1,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    },
+    "learning-zuoyebang-1223x471": {
+      "asset_id": "learning.logo.black",
+      "x": 0.025,
+      "y": 0.035,
+      "width": 0.14,
+      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
+    }
+  },
+  "source_content_version": 2,
+  "white_asset_note": "白版沿用原始白字APP组合，与黑字标准版不同；不冒称同款反色。"
+}

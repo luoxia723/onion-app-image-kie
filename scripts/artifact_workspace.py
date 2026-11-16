@@ -387,7 +387,7 @@ def new_version(args: argparse.Namespace) -> dict[str, Any]:
     contract = load_contract()
     task_root = args.task_root.expanduser().resolve()
     index = load_index(task_root, contract)
-    number = max(int(value[1:]) for value in index["versions"]) + 1
+    number = max(max(int(value[1:]) for value in index["versions"]) + 1, getattr(args, "minimum_version", 1))
     version = f"v{number:03d}"
     result = create_version(
         task_root,

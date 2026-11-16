@@ -3,7 +3,7 @@ from local_app.planning import PLACEMENTS,validate,make_round,compile_plans
 from kie_model import geometry_report
 from logo_reference import logo_position
 
-def test_only_current_table_combinations_are_available():
+def test_original_active_table_combinations_are_preserved():
     expected = {
         ('华为','单图',984,422):200,
         ('vivo','三图',320,211):80,
@@ -25,7 +25,7 @@ def test_only_current_table_combinations_are_available():
         ('CPA','单图',690,360):500,
         ('CPA','单图',1080,1920):800,
     }
-    slots = PLACEMENTS
+    slots = [p for p in PLACEMENTS if p['category']!='学习机']
     actual = {(s['platform'],s['image_form'],s['target_width'],s['target_height']):s['max_file_size_kb'] for s in slots if s['enabled']}
     assert actual == expected
     assert len(slots) == len(expected)
@@ -37,26 +37,41 @@ def test_only_current_table_combinations_are_available():
             assert logo_position({'placements':[slot]})=='上方居中'
 
 
-@pytest.mark.parametrize('no_logo',[True,False])
-def test_required_logo_is_locked_per_placement(tmp_path,no_logo):
+def test_required_logo_requires_user_selection(tmp_path):
     from tests_local.fakes import FixturePlanner
-    required=[p for p in PLACEMENTS if p['logo_policy']=='required']
+    required=[p for p in PLACEMENTS if p['category']!='学习机' and p['logo_policy']=='required' and p['image_form']=='单图']
     optional=next(p for p in PLACEMENTS if p['category']==required[0]['category'] and p['image_form']=='单图' and p['logo_policy']!='required')
     placements=required+[optional]
-    pr=dict(pids=[p['id'] for p in placements],sets=1,t1='主标题',t2='副标题',ip='none',noLogo=no_logo)
+    pr=dict(pids=[p['id'] for p in placements],sets=1,t1='主标题',t2='副标题',ip='none',noLogo=True,cta='立即体验')
+    from local_app.config import UserError
+    with pytest.raises(UserError,match='要求使用 Logo'): validate(pr,tmp_path)
+    pr['noLogo']=False
+    pr['logo_asset_id']='logo.onion.app.001'
     validate(pr,tmp_path)
     r=make_round(pr,'locked-logo',tmp_path,1,True,defer_planning=True)
     compile_plans(r,FixturePlanner().plan(r,lambda result:None))
     for config_idx,entry in enumerate(r['configs']):
-        cfg=entry['config'];expected=not no_logo or cfg['placements'][0]['logo_policy']=='required'
-        assert cfg['logo']==('洋葱学园' if expected else '不用')
+        cfg=entry['config']
+        assert cfg['logo_asset_id']=='' and cfg['logo']=='不用'
+        assert cfg['brand_logo_layer']['enabled'] is True
+        assert cfg['brand_logo_layer']['selected_asset_id']=='learning.logo.white-app'
         slot=next(slot for slot in r['slots'] if slot['config_idx']==config_idx)
-        assert any(ref.get('asset_id','').startswith('logo.') for ref in slot['refs'])==expected
+        assert slot['brand_logo_layer']==cfg['brand_logo_layer']
+        assert not any(ref.get('asset_id','').startswith('logo.') for ref in slot['refs'])
 
 
-def test_required_logo_satisfies_reference_requirement(tmp_path):
-    required=next(p for p in PLACEMENTS if p['logo_policy']=='required')
-    pr=dict(pids=[required['id']],sets=1,t1='主标题',t2='副标题',ip='none',font='none',noLogo=True)
+def test_no_logo_and_forbidden_placements_do_not_send_logo(tmp_path):
+    from tests_local.fakes import FixturePlanner
+    optional=next(p for p in PLACEMENTS if p['logo_policy']=='optional')
+    pr=dict(pids=[optional['id']],sets=1,t1='主标题',t2='副标题',ip='random',noLogo=True)
     validate(pr,tmp_path)
-    r=make_round(pr,'required-logo-only',tmp_path,1,True,defer_planning=True)
-    assert any(ref.get('asset_id','').startswith('logo.') for ref in r['slots'][0]['refs'])
+    r=make_round(pr,'no-logo',tmp_path,1,True,defer_planning=True)
+    compile_plans(r,FixturePlanner().plan(r,lambda result:None))
+    assert r['configs'][0]['config']['logo']=='不用'
+    assert not any(ref.get('asset_id','').startswith('logo.') for ref in r['slots'][0]['refs'])
+    assert '画面不出现品牌 Logo 或品牌标识' in r['slots'][0]['prompt']
+    forbidden={**optional,'logo_policy':'forbidden'}
+    pr['noLogo']=False
+    r=make_round(pr,'forbidden-logo',tmp_path,1,True,defer_planning=True,placements_override={optional['id']:forbidden})
+    assert r['configs'][0]['config']['logo']=='不用'
+    assert not any(ref.get('asset_id','').startswith('logo.') for ref in r['slots'][0]['refs'])

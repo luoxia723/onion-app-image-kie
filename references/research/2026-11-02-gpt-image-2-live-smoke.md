@@ -7,6 +7,6 @@
 - 供应商返回成功，PNG原图下载完成，实际1672×941 RGB。
 - 对请求指纹、原图SHA256进行核验；随后生成960×540 RGB JPEG，并通过版位文件规格检查。
 - 仅提交一次生图任务，timeout_restarts=0，未重提；不修改原任务、图包和默认模型。
-- 结果：/Users/xhh/xh/onion-app-image-kie/.onion-local/model-smoke/gpt-image-2-1k/result.jpg。
+- 结果保存在当时本机的 `.onion-local/model-smoke/`，原图和回执不随源码分发。
 
 结论：GPT Image 2的KIE真实生成、结果查询、下载和本机成品处理链路本次跑通。不是对所有提示词、版位或视觉效果的保证。

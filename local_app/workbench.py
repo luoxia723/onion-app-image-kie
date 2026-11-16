@@ -54,11 +54,12 @@ class WorkbenchMixin:
             if not version:raise UserError('图片版本不存在',404)
             result=copy.deepcopy(version);result.pop('versions',None)
             for key in ('id','pid','set','idx','first_id'):result[key]=s[key]
+            for key in ('production_mode','template_id','parent_id','dependency_ids'):
+                if key in s:result[key]=copy.deepcopy(s[key])
             if version is s:
                 result['query_required']=self.query_required(s)
                 if self.definitely_unsent(s):result.update(reason_code='not_submitted',msg='生图请求未发出，可重试本张')
-            result['has_frame']=bool((s.get('frame') or {}).get('enabled'))
-            result['preview_kind']='raw' if version.get('frame_status')=='failed' else 'processed'
+            result['preview_kind']='raw' if version.get('delivery_eligible') is False else 'processed'
             result['reference_images']=[dict(name=x.get('role','参考图'),label=x['label'],thumbnail_url=f"/api/tasks/{tid}/references/{sid}/{i}?v={version['att']}") for i,x in enumerate(version['refs'])]
             from font_library import disabled_names
             for ref,view in zip(version['refs'],result['reference_images']):view['retired']=Path(ref['path']).name in disabled_names()
@@ -67,9 +68,18 @@ class WorkbenchMixin:
             result['history']=[dict(att=x['att'],state=x['state'],image_url=f"/api/tasks/{tid}/images/{sid}?v={x['att']}" if x.get('jpeg') and x['state']=='done' and not x.get('files_cleared') and Path(x['jpeg']).is_file() else None,files_cleared=x.get('files_cleared',False),pinned=x.get('pinned',False),reason=x.get('version_reason','图片版本')) for x in [*s['versions'],s]]
             result['round_index']=t['rounds'].index(r)
             result['is_historical']=version['att']!=s['att']
+            result['generation_disabled']=bool(r.get('generation_disabled') or any(row.get('frame') for row in r['slots']))
+            from .brand_logo import switchable
+            result['logo_switchable']=switchable(version)
+            if version.get('brand_logo_layer'):
+                from .brand_logo import prompt_rule
+                result['logo_fixed_rule']=prompt_rule(version['brand_logo_layer'])
+            if version.get('natural_canvas_plan'):
+                from .natural_canvas import prompt_rule as canvas_rule
+                result['canvas_fixed_rule']=canvas_rule(version['natural_canvas_plan'])
             result['edit_draft']=self.get_prompt_draft(tid,sid,version['att'],editor)
             result['edit_drafts']=[v for v in self.prompt_drafts(tid,sid,version['att']) if not v.get('discarded')]
-            for key in ('output','jpeg','refs','frame','job_path'):result.pop(key,None)
+            for key in ('output','jpeg','refs','frame','frame_status','frame_processing','job_path','brand_logo_layer','logo_base','natural_canvas_plan'):result.pop(key,None)
             return result
 
     def find_image(self,t,sid):

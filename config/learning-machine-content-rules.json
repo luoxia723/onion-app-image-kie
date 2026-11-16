@@ -1,0 +1,2024 @@
+{
+  "version": 3,
+  "pipeline": "baseline_then_suite",
+  "source": "2026-11-13实际样图复核＋用户最新覆盖：取消全部功能名、暂不加精选和附加文字，底部灰色遮罩用代码处理",
+  "default_cta": "点击下载",
+  "shared_copy": "用户输入一句正文；不显示功能名。CTA由用户统一填写，默认点击下载；精选角标和附加文案留到后续独立配置。",
+  "placements": [
+    {
+      "id": "learning-baidu-512x512",
+      "platform": "百度",
+      "name": "广告图",
+      "target_width": 512,
+      "target_height": 512,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "百度-01.png",
+        "sha256": "6b87588983268c3001655a26e96e64a70c4c5d2bade6114239de5e4d83a48c3b",
+        "sample_size": [
+          512,
+          512
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "1-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-baidu-1200x400",
+      "platform": "百度",
+      "name": "广告图",
+      "target_width": 1200,
+      "target_height": 400,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "百度-02.png",
+        "sha256": "c3180d813907c5c21161cf548020a40411a81e75b1ea290d300aaf4b19a24763",
+        "sample_size": [
+          1200,
+          400
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "1-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-cover-216x260",
+      "platform": "步步高",
+      "name": "封面（无Logo、无按钮）",
+      "target_width": 216,
+      "target_height": 260,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "pure",
+      "category_label": "纯画面",
+      "modules": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-01.png",
+        "sha256": "0d190600f89b2ff5a5e94bdc180cf858dc6a7504a83bfc3a90bef378b66cd6c8",
+        "sample_size": [
+          216,
+          260
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-0",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-cover-300x360",
+      "platform": "步步高",
+      "name": "封面（无Logo、无按钮）",
+      "target_width": 300,
+      "target_height": 360,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "pure",
+      "category_label": "纯画面",
+      "modules": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-08.png",
+        "sha256": "fc6d8f82821e19afcf7c088f820410e4cbcc693cdc6a1d803b51a538b119bf7e",
+        "sample_size": [
+          300,
+          360
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-1",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-cover-400x480",
+      "platform": "步步高",
+      "name": "封面（无Logo、无按钮）",
+      "target_width": 400,
+      "target_height": 480,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "pure",
+      "category_label": "纯画面",
+      "modules": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-11.png",
+        "sha256": "4e820de9d474c89eb0c2019a93f30412fbe566708dccc10c5b6c31cc5c4a4b58",
+        "sample_size": [
+          400,
+          480
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-2",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-530x236",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 530,
+      "target_height": 236,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-07.png",
+        "sha256": "8c0c282179b8d095b78d0ec0cf2995dca21701a3dd087ddbbecaa049281493f6",
+        "sample_size": [
+          530,
+          236
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-3",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-984x438",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 984,
+      "target_height": 438,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-04.png",
+        "sha256": "8d04643493d217169c1606edb8ec71862412d9bed12964d1141e583f664e572f",
+        "sample_size": [
+          984,
+          438
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-4",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-988x350",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 988,
+      "target_height": 350,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-10.png",
+        "sha256": "23702663fbcd7a6b1d028a69bfc8b7864affeb1ec9d4e2482a099e053e6eb2e5",
+        "sample_size": [
+          988,
+          350
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-5",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-988x460",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 988,
+      "target_height": 460,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-09.png",
+        "sha256": "2acf05816f868a34354d7c0ce54641080f8452067a8222b50cba151b5c125b65",
+        "sample_size": [
+          988,
+          460
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-6",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-1080x528",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 1080,
+      "target_height": 528,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-03.png",
+        "sha256": "c2982041f6787bb60cc2bb8522fdddcf3ebde965c1a7854fd1627ee79098addb",
+        "sample_size": [
+          1080,
+          528
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-7",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-1280x362",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 1280,
+      "target_height": 362,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-06.png",
+        "sha256": "0dcf96c2b923ed3c80abca5d8690a972049893b5eff06ee3232cbf4c045737a3",
+        "sample_size": [
+          1280,
+          362
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-8",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-logo-banner-2368x670",
+      "platform": "步步高",
+      "name": "横幅（有Logo、有按钮）",
+      "target_width": 2368,
+      "target_height": 670,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-02.png",
+        "sha256": "7f4f4441912cf215b1956a24a881d3de8bd3d05f897863dfa64085d65524258e",
+        "sample_size": [
+          2368,
+          670
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-9",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-bbg-no-logo-banner-1280x362",
+      "platform": "步步高",
+      "name": "横幅（无Logo、有按钮）",
+      "target_width": 1280,
+      "target_height": 362,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "步步高-05.png",
+        "sha256": "1e4641e9ed5d5053dab21ee90ca2413fb6eae1722923cb5bfd7a9f4d1941f6aa",
+        "sample_size": [
+          1280,
+          362
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "2-10",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-dsl-banner-830x250",
+      "platform": "读书郎",
+      "name": "矩形横幅",
+      "target_width": 830,
+      "target_height": 250,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "读书郎-02.png",
+        "sha256": "95cf9742ea9910d6923713355fc85596553312855c389f366c84596de5fb2847",
+        "sample_size": [
+          830,
+          250
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 200,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-dsl-banner-1200x350",
+      "platform": "读书郎",
+      "name": "矩形横幅",
+      "target_width": 1200,
+      "target_height": 350,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "读书郎-06.png",
+        "sha256": "5f0d32080fb831385a44e044f8e10a959fa4d53b0c87611e691d1c36e7229112",
+        "sample_size": [
+          1200,
+          350
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 200,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-dsl-rounded-card-484x580",
+      "platform": "读书郎",
+      "name": "圆角卡片（精选内容后续配置）",
+      "target_width": 484,
+      "target_height": 580,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 44,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "读书郎-04.png",
+        "sha256": "c8932b7a55495f23af96f2df573eea6f25d570fdcc3e045375e6e8b0b4b990d9",
+        "sample_size": [
+          484,
+          580
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 100,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-2",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": true,
+        "extra_heading": true,
+        "extra_description": true
+      },
+      "source_name": "精选卡片（圆角44px）"
+    },
+    {
+      "id": "learning-dsl-resource-484x580",
+      "platform": "读书郎",
+      "name": "卡片资源",
+      "target_width": 484,
+      "target_height": 580,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "user_default",
+        "label": "用户确认：有文案、无下载按钮，无其他特殊要求",
+        "sample_file": null,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 100,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-3",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-dsl-resource-500x312",
+      "platform": "读书郎",
+      "name": "封面",
+      "target_width": 500,
+      "target_height": 312,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "读书郎-01.png",
+        "sha256": "1895738075900fd507ebc005fe0ec58ea134fa6b7b44579136b1ac7754aea720",
+        "sample_size": [
+          500,
+          312
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 100,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-4",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-dsl-resource-1280x348",
+      "platform": "读书郎",
+      "name": "二级页面",
+      "target_width": 1280,
+      "target_height": 348,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "读书郎-08.png",
+        "sha256": "47b3cd183e6ade195163bb5336198cf987854d079b5810bbb78474437f3bee6f",
+        "sample_size": [
+          1280,
+          348
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 100,
+      "file_size_operator": "lt",
+      "source_leaf_id": "3-5",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-iflytek-1005x564",
+      "platform": "科大讯飞",
+      "name": "横幅",
+      "target_width": 1005,
+      "target_height": 564,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "科大讯飞-01.png",
+        "sha256": "5c062d369e2c73eadc7287acab66ff7744bef4334f402e5f207f18f24e21c0a7",
+        "sample_size": [
+          1005,
+          564
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 300,
+      "file_size_operator": "lt",
+      "source_leaf_id": "4-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-iflytek-1626x684",
+      "platform": "科大讯飞",
+      "name": "横幅",
+      "target_width": 1626,
+      "target_height": 684,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "科大讯飞-02.png",
+        "sha256": "3fbd91271d0da05cb9961c1e14d8ab12042faf19f731c728352ebddf48816468",
+        "sample_size": [
+          1626,
+          684
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": 300,
+      "file_size_operator": "lt",
+      "source_leaf_id": "4-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-ruishi-rounded-580x320",
+      "platform": "睿视",
+      "name": "横幅（32px平滑圆角）",
+      "target_width": 580,
+      "target_height": 320,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "pure",
+      "category_label": "纯画面",
+      "modules": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 32,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "睿视-01.png",
+        "sha256": "e2919045fbaa835d49cf013e27fc54b997bceec6cbd880fbe69022ac039f4965",
+        "sample_size": [
+          580,
+          320
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "5-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": false,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-ruishi-rect-580x320",
+      "platform": "睿视",
+      "name": "横幅（直角）",
+      "target_width": 580,
+      "target_height": 320,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "pure",
+      "category_label": "纯画面",
+      "modules": {
+        "feature_label": false,
+        "main_copy": false,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "睿视-02.png",
+        "sha256": "d06082262db61662452d1aafb076dd2f0ea25206b85450394290f56a7e72ff7f",
+        "sample_size": [
+          580,
+          320
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "5-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": false,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-seewo-1400x520",
+      "platform": "希沃",
+      "name": "应用商城横幅",
+      "target_width": 1400,
+      "target_height": 520,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "希沃-01.png",
+        "sha256": "b6ab0ad57fc6df650246f4ee648849f421ab3b71367fc2a5568c1f7ad240b6b4",
+        "sample_size": [
+          1400,
+          520
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "6-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xiaoyuan-660x306",
+      "platform": "小猿",
+      "name": "广告图",
+      "target_width": 660,
+      "target_height": 306,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "小猿-02.png",
+        "sha256": "f43a92d59721d93effd756f9e222238ea4e364ac9dee891d4a38447585b4ec15",
+        "sample_size": [
+          660,
+          306
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "7-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xiaoyuan-1372x480",
+      "platform": "小猿",
+      "name": "广告图",
+      "target_width": 1372,
+      "target_height": 480,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "小猿-03.png",
+        "sha256": "e3d63cd7674528e39ad870784f7bdf92ddf6c7d8a330f5a513e880657dcda673",
+        "sample_size": [
+          1372,
+          480
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "7-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xiaoyuan-2880x1020",
+      "platform": "小猿",
+      "name": "广告图",
+      "target_width": 2880,
+      "target_height": 1020,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "小猿-01.png",
+        "sha256": "eb59fff2cfb6e7ff9895159afd3edd5245ed6e372baafa6e9009d1b422b22c57",
+        "sample_size": [
+          2880,
+          1020
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "7-2",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xueersi-1854x720",
+      "platform": "学而思",
+      "name": "广告图",
+      "target_width": 1854,
+      "target_height": 720,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "学而思-02.png",
+        "sha256": "4223381ea88d9f7ccd93ab4e32f1064079baff6e2a3942856ab9a5a2383d4b08",
+        "sample_size": [
+          1854,
+          720
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "8-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xueersi-1050x498",
+      "platform": "学而思",
+      "name": "广告图",
+      "target_width": 1050,
+      "target_height": 498,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "学而思-01.png",
+        "sha256": "f961420ef0488e213b7e5640f055c4ae2e33b42b97d922b20d75b97ec918b9a5",
+        "sample_size": [
+          1050,
+          498
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "8-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xueersi-1125x885",
+      "platform": "学而思",
+      "name": "广告图",
+      "target_width": 1125,
+      "target_height": 885,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "user_default",
+        "label": "用户确认：有文案、无下载按钮，无其他特殊要求",
+        "sample_file": null,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "8-2",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-xueersi-720x342",
+      "platform": "学而思",
+      "name": "广告图",
+      "target_width": 720,
+      "target_height": 342,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "user_default",
+        "label": "用户确认：有文案、无下载按钮，无其他特殊要求",
+        "sample_file": null,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "8-3",
+      "sample_modules_before_user_override": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-cover-400x480",
+      "platform": "优学派",
+      "name": "专题封面",
+      "target_width": 400,
+      "target_height": 480,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-01.png",
+        "sha256": "f359d2b825c64f7b29e1b3f0cf0bcc0103f639f8914c9bf3d2ad16ac8d61fe2e",
+        "sample_size": [
+          400,
+          480
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-masked-840x404",
+      "platform": "优学派",
+      "name": "横幅（有遮罩）",
+      "target_width": 840,
+      "target_height": 404,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": true,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-04.png",
+        "sha256": "5040c5b2392a7c9037af0201487e8e21d5f4787e424aad69ce7639315a5f7216",
+        "sample_size": [
+          840,
+          404
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-unmasked-840x404",
+      "platform": "优学派",
+      "name": "横幅（无遮罩）",
+      "target_width": 840,
+      "target_height": 404,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-08.png",
+        "sha256": "591b049d8232ae93c41228c0b5a212250699263afe733452412dbfaf136fb114",
+        "sample_size": [
+          840,
+          404
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-2",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": false,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-double-840x404",
+      "platform": "优学派",
+      "name": "横幅双图",
+      "target_width": 840,
+      "target_height": 404,
+      "image_count": 2,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-03.png",
+        "sha256": "60f0dbc98908dfa61fe609e2b47c4c64ede4545ff42c5ef87e604ab2af7ae887",
+        "sample_size": [
+          840,
+          404
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-3",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-logo-1400x640",
+      "platform": "优学派",
+      "name": "广告图（有Logo）",
+      "target_width": 1400,
+      "target_height": 640,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-07.png",
+        "sha256": "0ad89a9fb99fb596d69db034f30ce3876ab4db0da585544a14f584485ce799a6",
+        "sample_size": [
+          1400,
+          640
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-4",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-logo-1400x340",
+      "platform": "优学派",
+      "name": "广告图（有Logo）",
+      "target_width": 1400,
+      "target_height": 340,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-05.png",
+        "sha256": "88c2a6910c557a9d865b649cf2999f9d88ac4f8e9dee9aca698aceff5452dda9",
+        "sample_size": [
+          1400,
+          340
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-5",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-logo-1536x1708",
+      "platform": "优学派",
+      "name": "广告图（有Logo）",
+      "target_width": 1536,
+      "target_height": 1708,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-09.png",
+        "sha256": "f1b2220633c291d19bd491ade83babb26c9406571a60ef2b5c0d6f05b36ab815",
+        "sample_size": [
+          1536,
+          1708
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-6",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-logo-2000x800",
+      "platform": "优学派",
+      "name": "广告图（有Logo）",
+      "target_width": 2000,
+      "target_height": 800,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-02.png",
+        "sha256": "6581695182a94c17e9090f357de686f1a6fb7dee90e288e7e5829f1c95a8d788",
+        "sample_size": [
+          2000,
+          800
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-7",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-youxuepai-logo-2560x1228",
+      "platform": "优学派",
+      "name": "广告图（有Logo）",
+      "target_width": 2560,
+      "target_height": 1228,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "优学派-06.png",
+        "sha256": "48ec8baae906ad07ad09018ccf49e3ccda2dc68e7e0456052488042e3348bc06",
+        "sample_size": [
+          2560,
+          1228
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "9-8",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-zuoyebang-446x446",
+      "platform": "作业帮",
+      "name": "广告图",
+      "target_width": 446,
+      "target_height": 446,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "作业帮-03.png",
+        "sha256": "771e97a9e54aec4046c09d9fb5c33aa8d975226cb02609aaf5a4d066602bebc8",
+        "sample_size": [
+          446,
+          446
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "10-0",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-zuoyebang-632x354",
+      "platform": "作业帮",
+      "name": "广告图",
+      "target_width": 632,
+      "target_height": 354,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "cta",
+      "category_label": "有正文 · 有下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "作业帮-02.png",
+        "sha256": "eaaad62367c16005f3c018092119e424c09a378d2acc8a8a95d22203ca6dca17",
+        "sample_size": [
+          632,
+          354
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "10-1",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": true,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-zuoyebang-1224x408",
+      "platform": "作业帮",
+      "name": "广告图",
+      "target_width": 1224,
+      "target_height": 408,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "作业帮-04.png",
+        "sha256": "77e021f80e260902b1773580dcca6f3952d7ce027668d4a9123f612f1d576fdd",
+        "sample_size": [
+          1224,
+          408
+        ],
+        "target_size_matches": true,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "10-2",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    },
+    {
+      "id": "learning-zuoyebang-1223x471",
+      "platform": "作业帮",
+      "name": "广告图",
+      "target_width": 1223,
+      "target_height": 471,
+      "image_count": 1,
+      "output_format": "PNG",
+      "category": "plain",
+      "category_label": "有正文 · 无下载按钮",
+      "modules": {
+        "feature_label": false,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      },
+      "corner_radius": 0,
+      "mask": false,
+      "evidence": {
+        "kind": "sample_review",
+        "label": "实际样图复核",
+        "sample_file": "作业帮-01.png",
+        "sha256": "43adff695e98507bac0dddfd49d97a3515e05c8d3def2a1a6611f6429b6299ca",
+        "sample_size": [
+          1224,
+          471
+        ],
+        "target_size_matches": false,
+        "phase_override": "功能名不显示；精选标和额外标题/说明暂不添加。样图保留作规格与视觉参考。"
+      },
+      "max_file_size_kb": null,
+      "file_size_operator": null,
+      "source_leaf_id": "10-3",
+      "sample_modules_before_user_override": {
+        "feature_label": true,
+        "main_copy": true,
+        "cta": false,
+        "logo": true,
+        "badge": false,
+        "extra_heading": false,
+        "extra_description": false
+      }
+    }
+  ],
+  "phase_overrides": {
+    "feature_label": false,
+    "badge": false,
+    "extra_heading": false,
+    "extra_description": false,
+    "mask_implementation": "code_bottom_gradient",
+    "source": "用户本聊天2026-11-13最新说明"
+  }
+}

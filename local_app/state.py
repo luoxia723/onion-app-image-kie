@@ -13,7 +13,10 @@ from .config import UserError
 def suite_key(pid,n): return str(pid)+'::'+str(n)
 
 def content_fingerprint(images):
-    values=sorted((s['pid'],s['set'],s['idx'],s['sha256']) for s in images)
+    images=list(images)
+    layered=any('delivery_logo_asset_id' in s for s in images)
+    values=sorted((s['pid'],s['set'],s['idx'],s['sha256'],s.get('delivery_logo_asset_id','')) if layered
+                  else (s['pid'],s['set'],s['idx'],s['sha256']) for s in images)
     return hashlib.sha256(json.dumps(values,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 class StateMixin:
@@ -84,9 +87,8 @@ class StateMixin:
         value=dict(pr)
         if 'product_facts' not in value or 'facts_version' not in value:
             frozen=previous if previous and 'product_facts' in previous and 'facts_version' in previous else None
-            product=self.product() if frozen is None else None
-            value['product_facts']=frozen['product_facts'] if frozen is not None else product['text']
-            value['facts_version']=frozen['facts_version'] if frozen is not None else product['revision']
+            value['product_facts']=frozen['product_facts'] if frozen is not None else ''
+            value['facts_version']=frozen['facts_version'] if frozen is not None else 0
         return value
 
     def get_draft(self,did):
@@ -103,8 +105,9 @@ class StateMixin:
         draft=data.get('draft');forms=data.get('form_drafts',{})
         if not isinstance(draft,dict) or not isinstance(forms,dict) or len(json.dumps(data,ensure_ascii=False))>100000:
             raise UserError('草稿内容不正确或过长')
-        allowed={'channel','image_form','pids','t1','t2','s1','s2','s3','cta','cta_enabled','cta_overrides','sets','ip','style','font','noLogo','references','feature_note','direction',
-                 'product_facts','facts_version','variants_by_placement','image_model'}
+        allowed={'channel','image_form','pids','t1','t2','s1','s2','s3','cta','cta_enabled','cta_overrides','sets','ip','style','font','noLogo','logo_asset_id','references','feature_note','direction',
+                 'product_facts','facts_version','variants_by_placement','image_model','feature_label','extra_heading','extra_description','learning_mode','learning_source',
+                 'learning_pipeline','learning_seed','learning_visual_config'}
         def clean(value): return {k:v for k,v in value.items() if k in allowed}
         with self.lock:
             if self.document('closed-draft:'+did): raise UserError('草稿已提交或删除，请新建草稿',409)
@@ -156,8 +159,12 @@ class StateMixin:
         fp=ready_fp if selected and not incomplete else None
         history=next((p for p in t['pkgs'] if p['id']==t.get('last_exported_package_id')),None)
         if history is None and t['pkgs']: history=t['pkgs'][-1]
-        matching=next((p for p in t['pkgs'] if p['fingerprint']==fp),None) if fp else None
-        ready_matching=next((p for p in t['pkgs'] if p['fingerprint']==ready_fp),None) if ready_fp else None
+        available=[p for p in reversed(t['pkgs']) if not p.get('invalid') and Path(p['path']).is_file()]
+        # An export-only Logo choice does not modify the candidate artwork.
+        # Source identity tracks coverage; package fingerprint still identifies
+        # the exact exported image bytes and selected registered Logo.
+        matching=next((p for p in available if p.get('source_fingerprint',p['fingerprint'])==fp),None) if fp else None
+        ready_matching=next((p for p in available if p.get('source_fingerprint',p['fingerprint'])==ready_fp),None) if ready_fp else None
         coverage={sl[0]['pid'] for _,sl in ready}
         return dict(selected_sets=len(selected),ready_sets=len(ready),incomplete_sets=len(incomplete),
             ready_images=len(images),can_export=bool(selected) and not incomplete,
@@ -169,5 +176,5 @@ class StateMixin:
             last_version=f"v{history['v']:03d}" if history else None,
             matching_version=f"v{matching['v']:03d}" if matching else None,
             next_version=f"v{max([p['v'] for p in t['pkgs']] or [0])+1:03d}" if fp and not matching else None,
-            has_changes=bool(history) and fp!=history['fingerprint'],
+            has_changes=bool(history) and fp!=history.get('source_fingerprint',history['fingerprint']),
             missing_placements=[{'placement_id':pid,'name':self.placement(t,r,{'pid':pid})['platform']+' '+self.placement(t,r,{'pid':pid})['name']} for pid in r['params']['pids'] if pid not in coverage])

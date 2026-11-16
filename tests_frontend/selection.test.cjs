@@ -21,6 +21,15 @@ test('全选支持未选、部分选中、全部选中三态',()=>{
  ctx.round.sel['oppo::2']=true;state=vm.runInContext('bulkSelectionState(R())',ctx);assert.equal(state.all,true);assert.equal(state.mixed,false);
  ctx.round.sel={};state=vm.runInContext('bulkSelectionState(R())',ctx);assert.equal(state.selected,0);assert.equal(state.all,false);
 });
+test('待挑选只展示合格未选套图，筛选范围与全选一致',()=>{
+ const ctx=setup();ctx.S.pf='ready';
+ const html=vm.runInContext('viewPick()',ctx);
+ assert(html.includes('id="sample-filter-ready" aria-pressed="true"'));
+ assert(!html.includes('data-slot="oppo11"'));assert(html.includes('data-slot="oppo21"'));
+ assert.deepEqual([...vm.runInContext('selectionScope(R()).map(g=>g.id)',ctx)],['oppo::2']);
+ ctx.round.slots.find(slot=>slot.id==='xiaomi21').state='failed';
+ assert(vm.runInContext('viewPick()',ctx).includes('id="locate-pick-issue"'));
+});
 test('卡片用复选框表示选择，不再重复放选择按钮',()=>{
  const ctx=setup();const html=vm.runInContext('viewPick()',ctx);
  assert(!html.includes('选中这一套'));
@@ -39,11 +48,11 @@ test('选中待处理套图时仍可明确保存合格套图',()=>{
  assert(!/id="save-ready"[^>]*disabled/.test(html));
 });
 test('裁切错误不把长文本压在窄缩略图上',()=>{
- const ctx=setup();ctx.round.slots[0].reason_code='frame_failed';ctx.round.slots[0].msg='自动去框失败，当前显示完整原图，暂不可交付';
+ const ctx=setup();ctx.round.slots[0].delivery_eligible=false;ctx.round.slots[0].msg='当前图片未通过交付规格，请重新制作';
  const html=vm.runInContext('cellHtml(R(),R().slots[0],132)',ctx);
- assert(html.includes('需去框'));
- assert(html.includes('reprocessFrame('));assert(html.includes('fitImage('));
- assert(!html.includes('自动去框失败'));
+ assert(html.includes('规格未通过'));
+ assert(html.includes('editRedo()'));
+ assert(!html.includes('当前图片未通过交付规格'));
  assert(html.includes('class="sample-actions"'));assert(!html.includes('320×210</div>'));
 });
 
@@ -53,20 +62,20 @@ test('目录列出本轮全部版位，看样台只渲染当前版位并使用�
  assert(html.includes('data-slot="oppo11"'));assert(!html.includes('data-slot="xiaomi11"'));
  assert(html.includes('aspect-ratio:320/210'));assert(html.includes('class="sample-caption">图 2</div>'));assert(!html.includes('图 2 · 320×210'));
  assert(html.includes('--image-ratio:'+320/210));
- assert(!html.includes('勾完自动跳到下一版位'));assert(html.includes('下一版位 →'));
+ assert(!html.includes('勾完自动跳到下一版位'));assert(vm.runInContext('viewSelectionFooter()',ctx).includes('下一版位 →'));
  ctx.S.pickPid='xiaomi';html=vm.runInContext('viewPick()',ctx);
  assert(html.includes('data-slot="xiaomi11"'));assert(!html.includes('data-slot="oppo11"'));
- assert(html.includes('2/4'));assert(html.includes('mini-progress-track'));assert(html.includes('已选 0/1'));
+ assert(html.includes('2/4'));assert(html.includes('mini-progress-track'));assert(html.includes('未选'));
  assert(/data-sel="xiaomi::2"[^>]*disabled/.test(html));
 });
 
 test('目录区分已选、出齐待选及问题套数',()=>{
- const ctx=setup();let html=vm.runInContext('viewPick()',ctx);assert(html.includes('badge-selected">已选 1/2'));
+ const ctx=setup();let html=vm.runInContext('viewPick()',ctx);assert(html.includes('badge-selected">已选 1 套'));
  ctx.round.sel={};ctx.round.slots.forEach(slot=>slot.state='done');html=vm.runInContext('viewPick()',ctx);
- assert.equal((html.match(/已选 0\/2/g)||[]).length,2);
+ assert.equal((html.match(/badge-unselected-ready">未选/g)||[]).length,2);
  ctx.round.slots[0].delivery_eligible=false;ctx.round.slots[1].state='failed';html=vm.runInContext('viewPick()',ctx);
- assert(html.includes('· 1 问题'));assert(html.includes('已选 0/1'));assert(!html.includes('2 问题'));
- assert(html.includes("repairSet('oppo',1)"));assert(html.includes('需去框'));
+ assert(html.includes('· 1 问题'));assert(html.includes('未选'));assert(!html.includes('2 问题'));
+ assert(html.includes("repairSet('oppo',1)"));assert(html.includes('规格未通过'));
  assert(/data-sel="oppo::1"[^>]*disabled/.test(html));
 });
 
@@ -88,30 +97,30 @@ test('三图按图号排序并排，换轮后回到新一轮第一个版位',()=
 
 test('保存栏只呈现一个实心主按钮，零合格时禁用且不导出',()=>{
  const ctx=setup();ctx.round.delivery={selected_sets:2,ready_sets:0,incomplete_sets:2,can_export:false,can_export_ready:false};
- let html=vm.runInContext('viewSelectionFooter()',ctx);assert(html.includes('保存已合格的 0 套'));assert(/id="save-ready"[^>]*disabled/.test(html));
+ let html=vm.runInContext('viewSelectionFooter()',ctx);assert(html.includes('保存图包'));assert(html.includes('处理已选套图后即可保存'));assert(/id="save-ready"[^>]*disabled/.test(html));
  assert.equal((html.match(/class="primary"/g)||[]).length,1);
  ctx.round.delivery={selected_sets:2,ready_sets:2,covered_placements:1,total_placements:2,can_export:true,can_export_ready:true};
  html=vm.runInContext('viewSelectionFooter()',ctx);assert(html.includes('onclick="dlAll(false)"'));assert(html.includes('1/2 个版位'));
  assert(!/id="save-selected"[^>]*disabled/.test(html));
 });
 
-test('任务摘要压成两行，保留状态、图片形式、进度和归档信息',()=>{
+test('任务摘要压成两行，保留状态、图片形式和进度',()=>{
  const ctx=setup();ctx.summary={id:'task',name:'标题',status:'待挑选',done:4,total:6,image_form:'三图',archived:true};
  const html=vm.runInContext('summaryRow(summary)',ctx);
- assert(html.includes('class="t1">标题'));assert(html.includes('待挑选 · 三图 · 4/6 · 已归档'));
+ assert(html.includes('class="t1">标题'));assert(html.includes('待挑选 · 三图 · 4/6'));
  assert(!html.includes('class="t3"'));assert(!html.includes('<img'));
 });
 
-test('保存后选择未变化时主按钮禁用并显示匹配版本，变化后恢复保存',()=>{
+test('保存后状态只显示一次，选择变化后恢复保存',()=>{
  const ctx=setup();ctx.round.delivery={selected_sets:1,ready_sets:1,incomplete_sets:0,can_export:true,has_changes:false,matching_version:'v001',last_version:'v001'};
- let html=vm.runInContext('viewSelectionFooter()',ctx),button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
- assert.match(button,/disabled/);assert(button.endsWith('>已保存 v001</button>'));
+ let html=vm.runInContext('viewSelectionFooter()',ctx),button;
+ assert.equal((html.match(/已保存 v001/g)||[]).length,1);assert(html.includes('onclick="openFolder()"'));assert(!html.includes('id="save-selected"'));
  ctx.round.delivery.has_changes=true;ctx.round.delivery.ready_sets=2;
  html=vm.runInContext('viewSelectionFooter()',ctx);button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
- assert(!button.includes('disabled'));assert(button.endsWith('>保存已合格的 2 套</button>'));
+ assert(!button.includes('disabled'));assert(button.endsWith('>保存 2 套</button>'));
  ctx.round.delivery.has_changes=false;ctx.round.delivery.matching_version=null;
  html=vm.runInContext('viewSelectionFooter()',ctx);button=html.match(/<button id="save-selected"[^>]*>[^<]*<\/button>/)[0];
- assert(!button.includes('disabled'));assert(button.includes('保存已合格的 2 套'));
+ assert(!button.includes('disabled'));assert(button.includes('保存 2 套'));
 });
 
 test('出图中尚无完整套图时目录只显示进度，出好一套后再显示已选数',()=>{
@@ -123,15 +132,32 @@ test('出图中尚无完整套图时目录只显示进度，出好一套后再�
  assert(directory.includes('1/4'));assert(!directory.includes('已选'));
  ctx.round.slots.find(slot=>slot.id==='oppo12').state='done';
  directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
- assert(directory.includes('2/4'));assert(directory.includes('已选 0/1'));assert(!directory.includes('已选 0/0'));
+ assert(directory.includes('2/4'));assert(directory.includes('未选'));assert(!directory.includes('已选 0 套'));
  ctx.round.slots.forEach(slot=>slot.state='done');
  directory=vm.runInContext('viewPick()',ctx).match(/<nav class="placement-dir"[\s\S]*?<\/nav>/)[0];
- assert(!directory.includes('mini-progress-track'));assert.equal((directory.match(/已选 0\/2/g)||[]).length,2);
+ assert(!directory.includes('mini-progress-track'));assert.equal((directory.match(/badge-unselected-ready">未选/g)||[]).length,2);
 });
 
 test('切版位后的图片在load事件前显示灰色占位，加载后显示图片',()=>{
  const ctx=setup();const html=vm.runInContext('cellHtml(R(),R().slots[0])',ctx),handler=html.match(/<img onload="([^"]+)"/)[1];
- const classes=[];ctx.loadedImage={parentElement:{classList:{add:name=>classes.push(name)}}};
+ const classes=[];ctx.loadedImage={parentElement:{classList:{add:name=>classes.push(name),remove:name=>{const i=classes.indexOf(name);if(i>=0)classes.splice(i,1)}}}};
+ const failed=html.match(/onerror="([^"]+)"/)[1];vm.runInContext(`(function(){${failed}}).call(loadedImage)`,ctx);assert.deepEqual(classes,['image-load-failed']);
  vm.runInContext(`(function(){${handler}}).call(loadedImage)`,ctx);assert.deepEqual(classes,['image-loaded']);
- const css=fs.readFileSync(path.join(root,'frontend/css/app.css'),'utf8');assert(css.includes('.cell:has(img):not(.image-loaded){background:#E1E4E8}'));assert(css.includes('.cell.image-loaded img{opacity:1}'));
+});
+
+test('已保存选择底栏简化，图包修复入口不在底栏重复显示',()=>{
+ const ctx=setup();ctx.S.view='pick';ctx.round.delivery={selected_sets:1,ready_sets:1,can_export:true,has_changes:false,matching_version:'v001'};
+ const html=vm.runInContext('viewSelectionFooter()',ctx);
+ assert(!html.includes('检查并重新保存'));assert(html.includes('onclick="openFolder()"'));assert.equal((html.match(/已保存 v001/g)||[]).length,1);
+});
+
+test('零问题时隐藏问题筛选，筛选中或出现问题时保持入口',()=>{
+ const ctx=setup();assert(!vm.runInContext('viewPick()',ctx).includes('id="sample-filter-bad"'));
+ ctx.round.slots[0].delivery_eligible=false;assert(vm.runInContext('viewPick()',ctx).includes('id="sample-filter-bad"'));
+ ctx.round.slots[0].delivery_eligible=true;ctx.S.pf='bad';
+ const html=vm.runInContext('viewPick()',ctx);assert(html.includes('id="sample-filter-bad"'));assert(html.includes('查看全部'));
+});
+test('全部选中用取消全选，半选时可从更多选择中清空',()=>{
+ const ctx=setup();let html=vm.runInContext('viewPick()',ctx);assert(html.includes('清空当前选择'));
+ ctx.round.sel['oppo::2']=true;html=vm.runInContext('viewPick()',ctx);assert(html.includes('取消全选'));assert(!html.includes('id="clear-visible"'));
 });

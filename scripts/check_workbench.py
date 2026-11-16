@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parents[1]
-LANES={'core':'core','history':'history','transport':'transport','all':'core'}
+LANES={'core':'core','history':'history','transport':'transport','all':''}
 
 
 def main():
@@ -25,6 +25,9 @@ def main():
             print('Python检查通过；前端检查尚未执行，需要Node.js。运行工作台本身不需要Node.js。')
             return 1
         return subprocess.run([node,'--test',*[str(p) for p in sorted((ROOT/'tests_frontend').glob('*.test.cjs'))]],cwd=ROOT).returncode
+    if args.suite in ('core','all') and args.collect:
+        print('Frontend test files (node --test):',flush=True)
+        for path in sorted((ROOT/'tests_frontend').glob('*.test.cjs')):print(path.relative_to(ROOT),flush=True)
     return 0
 
 if __name__=='__main__':sys.exit(main())

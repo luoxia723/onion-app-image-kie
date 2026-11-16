@@ -1,0 +1,552 @@
+{
+  "references": [
+    {
+      "id": "builtin-style-01",
+      "name": "清新动漫参考",
+      "path": "assets/style-references/reference-01.jpg",
+      "sha256": "1ee67e3cd1b0b9b09e9be188562583e03134fbc0fa8820cfc0111bec4963306a",
+      "points": [
+        "日系清新动漫风",
+        "暖粉奶油色调",
+        "柔和颗粒笔触",
+        "暖阳逆光氛围"
+      ]
+    },
+    {
+      "id": "builtin-style-02",
+      "name": "奇幻游戏参考",
+      "path": "assets/style-references/reference-02.jpg",
+      "sha256": "7e3b62923e085536e1eae5d61f1dc79fe8015954404a19a907bb7cbd624c1fc4",
+      "points": [
+        "Q版奇幻游戏风",
+        "橙棕暖色配蓝天",
+        "毛发细腻立体",
+        "明亮自然光影"
+      ]
+    },
+    {
+      "id": "builtin-style-03",
+      "name": "柔光动漫参考",
+      "path": "assets/style-references/reference-03.jpg",
+      "sha256": "374e563322accb07d82c7c98cfef6a7f852ecaaa75b6085ba57083954bd618f6",
+      "points": [
+        "Q版二次元画风",
+        "蓝紫色调搭配暖橙",
+        "柔和细腻的数字绘制",
+        "梦幻霓虹与边缘光"
+      ]
+    },
+    {
+      "id": "builtin-style-04",
+      "name": "暖阳清透动漫",
+      "path": "assets/style-references/reference-04.jpg",
+      "sha256": "8f95f3777eae07756cbe9f03244a4974aa0a29ddaf43d1cb6084627789cd625c",
+      "points": [
+        "日系动漫插画",
+        "暖黄奶油配色",
+        "细腻勾线平涂",
+        "柔和阳光与炫光"
+      ],
+      "source_name": "1280_720@1x.jpg"
+    },
+    {
+      "id": "builtin-style-05",
+      "name": "柔紫Q版插画",
+      "path": "assets/style-references/reference-05.png",
+      "sha256": "449aa46ef24a06a5983c7f491bce0b0fd07710f0b4e75e456b8c3ef8672ef916",
+      "points": [
+        "Q版动漫插画",
+        "紫色为主暖色点缀",
+        "线条清晰色块平涂",
+        "柔和渐变光影"
+      ],
+      "source_name": "image (1) (1).png"
+    },
+    {
+      "id": "builtin-style-06",
+      "name": "动感3D角色",
+      "path": "assets/style-references/reference-06.png",
+      "sha256": "dc69bb3c767a085d9fc95afaae23abee0b3fc68b6a5024415d973a1006c41c4e",
+      "points": [
+        "Q版三维卡通",
+        "红蓝撞色对比",
+        "光滑塑胶质感",
+        "霓虹轮廓光",
+        "火焰闪电特效"
+      ],
+      "source_name": "image (1)_副本.png"
+    },
+    {
+      "id": "builtin-style-07",
+      "name": "粉蓝柔光3D",
+      "path": "assets/style-references/reference-07.png",
+      "sha256": "debfcd83a7fc1742745d34d2114fee5951d603a4fd66982b4b090b840ef6a609",
+      "points": [
+        "Q版3D卡通画风",
+        "粉蓝马卡龙配色",
+        "光滑软糯玩偶质感",
+        "明亮柔和阳光"
+      ],
+      "source_name": "image.png"
+    },
+    {
+      "id": "builtin-style-08",
+      "name": "星空动漫插画",
+      "path": "assets/style-references/reference-08.png",
+      "sha256": "b7437680fe21268f7859a23b246eb390b1134243cde49f34b0b2f95d5eef46ba",
+      "points": [
+        "日系动漫插画",
+        "蓝紫橙粉渐变",
+        "细腻描线与平涂",
+        "夕阳暖光与星空冷光"
+      ],
+      "source_name": "image (2)_副本2.png"
+    },
+    {
+      "id": "builtin-style-09",
+      "name": "春日校园动漫",
+      "path": "assets/style-references/reference-09.jpg",
+      "sha256": "36b8a21b85f85f012b12b583e2a46255529b1943020b431aba04725e25495876",
+      "points": [
+        "日系动漫插画",
+        "明快暖色配蓝绿",
+        "细腻线条与柔和晕染",
+        "明亮柔和的日光"
+      ],
+      "source_name": "banner@1x.jpg"
+    },
+    {
+      "id": "builtin-style-10",
+      "name": "暖色绘本插画",
+      "path": "assets/style-references/reference-10.png",
+      "sha256": "a619f170a178c893cec646d1c2f2a2719717743ad6090c4c34e55871ef9bec4a",
+      "points": [
+        "日系动画插画风",
+        "暖米色搭铜绿",
+        "细腻线条与铜锈质感",
+        "柔和暖光与展柜光影"
+      ],
+      "source_name": "image (1)_副本2.png"
+    },
+    {
+      "id": "builtin-style-11",
+      "name": "欧美卡通奇幻风 11",
+      "path": "assets/style-references/reference-11.jpeg",
+      "sha256": "e01ae8c5b9567b31178a688ef2eb1ba09f302af55730054135fcc49041fb1f20",
+      "points": [
+        "欧美卡通奇幻风",
+        "金棕暖色调",
+        "3D毛发皮革质感",
+        "柔和暖光与高光"
+      ],
+      "source_name": "20260320-191925.jpeg"
+    },
+    {
+      "id": "builtin-style-12",
+      "name": "3D卡通奇幻风 12",
+      "path": "assets/style-references/reference-12.jpeg",
+      "sha256": "c219d5edad395fba1702cb6ab09d66a0368d813afbb4146a95e4955235a85d6a",
+      "points": [
+        "3D卡通奇幻风",
+        "深色底搭鲜艳撞色",
+        "细腻毛发与鳞片质感",
+        "柔和光照与边缘辉光"
+      ],
+      "source_name": "20260320-191934.jpeg"
+    },
+    {
+      "id": "builtin-style-13",
+      "name": "萌系3D卡通 13",
+      "path": "assets/style-references/reference-13.jpeg",
+      "sha256": "bb62d4b2902977fc7f8ef09aaef3ac46bc147ce25f6b4eddc7aad51825d2fa8e",
+      "points": [
+        "萌系3D卡通",
+        "暖棕橙灰配色",
+        "细腻金属皮革",
+        "柔光与冷色轮廓光"
+      ],
+      "source_name": "20260320-191945.jpeg"
+    },
+    {
+      "id": "builtin-style-14",
+      "name": "治愈系三维卡通 14",
+      "path": "assets/style-references/reference-14.jpeg",
+      "sha256": "eb9d9344a7035ba252d2f0680cb1666225202867e5a68498774a38a6315d8430",
+      "points": [
+        "治愈系三维卡通",
+        "天蓝嫩绿明黄",
+        "蓬松毛绒质感",
+        "明亮柔和光影"
+      ],
+      "source_name": "20260320-192823.jpeg"
+    },
+    {
+      "id": "builtin-style-15",
+      "name": "写实摄影风格 15",
+      "path": "assets/style-references/reference-15.jpg",
+      "sha256": "bff1bb23d3d2e1bfeebcc5e002fec3d8ea2f2df434d8325778bbe1f3011d313b",
+      "points": [
+        "写实摄影风格",
+        "黑褐橙红配色",
+        "粗粝金属质感",
+        "暖光强烈对比"
+      ],
+      "source_name": "20260320-234840.jpg"
+    },
+    {
+      "id": "builtin-style-16",
+      "name": "梦幻童趣3D画风 16",
+      "path": "assets/style-references/reference-16.jpg",
+      "sha256": "bb3a9f9d5ef630f9c47385d32facc4e73dabb7bbc4296629ca166bf6697073ee",
+      "points": [
+        "梦幻童趣3D画风",
+        "深蓝紫配柔白",
+        "柔软毛绒质感",
+        "朦胧柔和光影"
+      ],
+      "source_name": "20260321-181527.jpg"
+    },
+    {
+      "id": "builtin-style-17",
+      "name": "Q版动漫画风 17",
+      "path": "assets/style-references/reference-17.jpg",
+      "sha256": "e9efdd31554d1982c754b9c6c5a751b300e828bdc1acc088b765e9416c1d147b",
+      "points": [
+        "Q版动漫画风",
+        "粉紫蓝柔和配色",
+        "粗描边赛璐璐上色",
+        "明亮柔和光影"
+      ],
+      "source_name": "banner@1x-2.jpg"
+    },
+    {
+      "id": "builtin-style-18",
+      "name": "Q版日系动漫风 18",
+      "path": "assets/style-references/reference-18.png",
+      "sha256": "ed0d63a7665d4f20f69679887c64e81db3a8c242693f6e7fbbe1696b11c8cfab",
+      "points": [
+        "Q版日系动漫风",
+        "高饱和彩虹渐变",
+        "粗描边与网点纹理",
+        "放射光芒与星光"
+      ],
+      "source_name": "image (1).png"
+    },
+    {
+      "id": "builtin-style-19",
+      "name": "日系动漫插画 19",
+      "path": "assets/style-references/reference-19.png",
+      "sha256": "5ba3e7a42f006b6489d47e3cfaa29d89b0d5f27a38c05e8afe124fc3259d8644",
+      "points": [
+        "日系动漫插画",
+        "明亮粉黄撞色",
+        "细腻描线与平涂",
+        "柔和高光与阴影"
+      ],
+      "source_name": "image (2).png"
+    },
+    {
+      "id": "builtin-style-20",
+      "name": "清新动漫宣传风 20",
+      "path": "assets/style-references/reference-20.png",
+      "sha256": "38f3a10d78934706ec04c62fcf19907333805c91aea965df8f49a87671ecb13c",
+      "points": [
+        "清新动漫宣传风",
+        "蓝白渐变配色",
+        "手绘泼溅笔触",
+        "明亮柔和逆光",
+        "虚化梦幻背景"
+      ],
+      "source_name": "image (2)_副本.png"
+    },
+    {
+      "id": "builtin-style-21",
+      "name": "二次元插画风 21",
+      "path": "assets/style-references/reference-21.png",
+      "sha256": "9f59c43760fe1e2b7efff2735d6b9f5f6ad08e731f0600270f8c6b525f2b106b",
+      "points": [
+        "二次元插画风",
+        "黄橙搭配深灰",
+        "线条清晰色块平涂",
+        "柔和明暗塑形"
+      ],
+      "source_name": "image_副本.png"
+    },
+    {
+      "id": "builtin-style-22",
+      "name": "日系卡通插画 22",
+      "path": "assets/style-references/reference-22.png",
+      "sha256": "e5faf7bacc88f55b107bad02f8ce61cfa5202b8336476477357064a82146ab80",
+      "points": [
+        "日系卡通插画",
+        "暖橙黄色调",
+        "柔和细腻笔触",
+        "夕阳逆光氛围"
+      ],
+      "source_name": "image_副本2.png"
+    },
+    {
+      "id": "builtin-style-23",
+      "name": "日系动漫插画 23",
+      "path": "assets/style-references/reference-23.png",
+      "sha256": "028abd4dcaaf7fad2116be9063a7d2b608ef8eab7e11a69b5b6599d1199fb84e",
+      "points": [
+        "日系动漫插画",
+        "蓝紫渐变配色",
+        "线条清晰平涂",
+        "柔和霓虹光影"
+      ],
+      "source_name": "image_副本3.png"
+    },
+    {
+      "id": "builtin-style-24",
+      "name": "3D卡通科幻风 24",
+      "path": "assets/style-references/reference-24.png",
+      "sha256": "883fa27083f460f16dc7ac64515ee63cd17762771c05ce4d978578187766df93",
+      "points": [
+        "3D卡通科幻风",
+        "蓝紫霓虹配亮黄",
+        "细腻光滑塑胶质感",
+        "冷暖对比发光"
+      ],
+      "source_name": "image_副本4.png"
+    },
+    {
+      "id": "builtin-style-25",
+      "name": "3D卡通画风 25",
+      "path": "assets/style-references/reference-25.png",
+      "sha256": "ae5368121ce861155dd0c6142a80b5c0e8b0905a2a9f0a617cebbcc1f26d5716",
+      "points": [
+        "3D卡通画风",
+        "高饱和红蓝撞色",
+        "光滑塑胶质感",
+        "明亮立体光影",
+        "放射状动感背景"
+      ],
+      "source_name": "image_副本5.png"
+    },
+    {
+      "id": "builtin-style-26",
+      "name": "国风二次元画风 26",
+      "path": "assets/style-references/reference-26.jpg",
+      "sha256": "bf8f83aaebd806e513bd40ac2b0630379a67ec0d6f3acca4b0f25c72aa5c69d8",
+      "points": [
+        "国风二次元画风",
+        "暖棕金与青绿色",
+        "细腻勾线与柔和上色",
+        "暖光晕染与高光点缀"
+      ],
+      "source_name": "img_v3_02rf_f053f5f5-ddef-4044-bf8a-31296b405a3g.jpg"
+    },
+    {
+      "id": "builtin-style-27",
+      "name": "童趣三维卡通风 27",
+      "path": "assets/style-references/reference-27.png",
+      "sha256": "d76aa13f7b2a3c320678dd9f857c153d7305745bfb110632b1cb4b0d4e5b3035",
+      "points": [
+        "童趣三维卡通风",
+        "蓝橙撞色明快",
+        "圆润光滑塑胶质感",
+        "明亮暖阳与柔和阴影"
+      ],
+      "source_name": "screenshot-20260320-221119.png"
+    },
+    {
+      "id": "builtin-style-28",
+      "name": "实景摄影海报 28",
+      "path": "assets/style-references/reference-28.png",
+      "sha256": "aef7d6ef24dff48ebbe325522bbfd85dca80325f2a292535d931654e1abb81e4",
+      "points": [
+        "实景摄影海报",
+        "蓝白绿鲜明配色",
+        "自然阳光明亮"
+      ],
+      "source_name": "screenshot-20260320-221358.png"
+    },
+    {
+      "id": "builtin-style-29",
+      "name": "写实风景摄影 29",
+      "path": "assets/style-references/reference-29.png",
+      "sha256": "598cd781a195909945d50935055c957fe6213db2bd7d90d0ad63f4004a1dec53",
+      "points": [
+        "写实风景摄影",
+        "紫粉与青绿撞色",
+        "自然细腻的水面质感",
+        "柔和夕照与剪影",
+        "湖面镜像倒影"
+      ],
+      "source_name": "screenshot-20260320-221428.png"
+    },
+    {
+      "id": "builtin-style-30",
+      "name": "三维卡通微缩风 30",
+      "path": "assets/style-references/reference-30.png",
+      "sha256": "600608e3a808dde6ab42a7d99a82bcf3a978f07cbb8baf53882e810cc9ca3fc3",
+      "points": [
+        "三维卡通微缩风",
+        "蓝白主色暖橙点缀",
+        "光滑塑胶玩具质感",
+        "明亮柔光浅景深"
+      ],
+      "source_name": "screenshot-20260320-221504.png"
+    },
+    {
+      "id": "builtin-style-31",
+      "name": "喜庆3D卡通风 31",
+      "path": "assets/style-references/reference-31.png",
+      "sha256": "887c26dd6984837d51d300f0ffc463ac06efb657e447b72b6dcb9bd489fbb0a3",
+      "points": [
+        "喜庆3D卡通风",
+        "红金暖色配色",
+        "光滑柔润质感",
+        "暖光柔和通透"
+      ],
+      "source_name": "screenshot-20260320-221528.png"
+    },
+    {
+      "id": "builtin-style-32",
+      "name": "摄影拼贴海报风 32",
+      "path": "assets/style-references/reference-32.png",
+      "sha256": "8b5606b4bde191520bc0dab64982fa464006f6ce1f1d78f0e6a25dead0bc658a",
+      "points": [
+        "摄影拼贴海报风",
+        "深蓝灰配霓虹色",
+        "暖色逆光与散景"
+      ],
+      "source_name": "screenshot-20260320-221615.png"
+    },
+    {
+      "id": "builtin-style-33",
+      "name": "写实职场摄影 33",
+      "path": "assets/style-references/reference-33.png",
+      "sha256": "b2d346d5e3ae3ee936ad5f7bd158b0f6085836801c8222a479d7c48d3fb3f704",
+      "points": [
+        "写实职场摄影",
+        "紫白黑撞色",
+        "清晰平面图形",
+        "冷暖混合光"
+      ],
+      "source_name": "screenshot-20260320-221640.png"
+    },
+    {
+      "id": "builtin-style-34",
+      "name": "活泼拼贴海报风 34",
+      "path": "assets/style-references/reference-34.png",
+      "sha256": "d87c75f431b6fa08ff2932149185917a1f58e5644f61572d8175f1550053e717",
+      "points": [
+        "活泼拼贴海报风",
+        "明黄粉绿撞色",
+        "实拍与扁平图形",
+        "撕纸边缘质感",
+        "暖阳明暗对比"
+      ],
+      "source_name": "screenshot-20260320-221719.png"
+    },
+    {
+      "id": "builtin-style-35",
+      "name": "写实运动宣传风 35",
+      "path": "assets/style-references/reference-35.png",
+      "sha256": "29cd3296999c6319355a5abfc8e1555ef67ab1802232ba9551d7d9010154e7c2",
+      "points": [
+        "写实运动宣传风",
+        "蓝绿白高对比配色",
+        "摄影与流线图形拼贴",
+        "冷色灯光与明暗对比"
+      ],
+      "source_name": "screenshot-20260320-221742.png"
+    },
+    {
+      "id": "builtin-style-36",
+      "name": "3D卡通画风 36",
+      "path": "assets/style-references/reference-36.png",
+      "sha256": "3fcd0d218e5bd9815d8f97e7cbbe39e5556cf7cfcafda18c8d54813eeae034cb",
+      "points": [
+        "3D卡通画风",
+        "暖橙棕配深蓝",
+        "圆润光滑质感",
+        "暖光柔和漫射"
+      ],
+      "source_name": "screenshot-20260320-221925.png"
+    },
+    {
+      "id": "builtin-style-37",
+      "name": "简洁商业海报风 37",
+      "path": "assets/style-references/reference-37.png",
+      "sha256": "9808f3c360705f98d1b5076ef6d925348eaba766847a0edb6ddefd4aa7ea2463",
+      "points": [
+        "简洁商业海报风",
+        "奶油黄黑橙配色",
+        "扁平矢量质感",
+        "柔和浅色光影"
+      ],
+      "source_name": "screenshot-20260320-222009.png"
+    },
+    {
+      "id": "builtin-style-38",
+      "name": "写实商业摄影风 38",
+      "path": "assets/style-references/reference-38.png",
+      "sha256": "0b4783149098cacc3ce503ece95c4103f97cb3f8e32143f42504eea8110c7e42",
+      "points": [
+        "写实商业摄影风",
+        "绿棕暖色配色",
+        "透明杯与粗糙石材",
+        "自然阳光与柔焦光斑"
+      ],
+      "source_name": "screenshot-20260320-222258.png"
+    },
+    {
+      "id": "builtin-style-39",
+      "name": "写实纪实摄影 39",
+      "path": "assets/style-references/reference-39.png",
+      "sha256": "be94da0506bae6247ef6dc6497b68a6f01d9537addc90062e7f44ddedb3c92a5",
+      "points": [
+        "写实纪实摄影",
+        "暖黄绿蓝撞色",
+        "真实细腻质感",
+        "暖光明暗对比"
+      ],
+      "source_name": "screenshot-20260320-222435.png"
+    },
+    {
+      "id": "builtin-style-40",
+      "name": "日系动漫插画 40",
+      "path": "assets/style-references/reference-40.jpg",
+      "sha256": "4b3583a83b02cc0e2ac69ea42fb96ba9ab825bead1f6e64b81f9013f083d5bef",
+      "points": [
+        "日系动漫插画",
+        "橙黄暖色调",
+        "细腻描线与平涂",
+        "夕阳侧光",
+        "背景柔焦虚化"
+      ],
+      "source_name": "画板 2_副本.jpg"
+    },
+    {
+      "id": "builtin-style-41",
+      "name": "温馨写实插画 41",
+      "path": "assets/style-references/reference-41.jpg",
+      "sha256": "62025c93400615f791aee016e6b2423e7e8e21e45d30d7a6623839dd551c30f9",
+      "points": [
+        "温馨写实插画",
+        "橙棕暖色调",
+        "细腻光滑质感",
+        "柔和暖阳光影",
+        "浅景深虚化"
+      ],
+      "source_name": "画板 3.jpg"
+    },
+    {
+      "id": "builtin-style-42",
+      "name": "日系动漫插画 42",
+      "path": "assets/style-references/reference-42.jpg",
+      "sha256": "028285b8b72ba643156e2fadf3043789510c1c51912c9f93fa45c08406d96e68",
+      "points": [
+        "日系动漫插画",
+        "橙黄色暖调",
+        "细腻线稿与平涂",
+        "柔和暖光"
+      ],
+      "source_name": "画板 4.jpg"
+    }
+  ]
+}

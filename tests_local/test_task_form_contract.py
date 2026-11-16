@@ -60,7 +60,7 @@ def test_user_material_choices_reach_planner_and_actual_first_image_refs(tmp_pat
               references=[dict(id='user-ref',path=str(tmp_path/'reference.png'),note='参考空间构图',name='reference.png',purpose='composition')])
     validate(pr,tmp_path)
     r=make_round(pr,'material-choices',tmp_path,2,True,defer_planning=True)
-    data=plan_input(r)['jobs'][0];meta=r['set_metadata']['1']
+    data=plan_input(r)['jobs'][0];meta=next(iter(r['set_metadata'].values()))
     assert data['style']['name']==pr['style']
     assert data['feature_note']==pr['feature_note'] and data['reference_notes']==['参考空间构图']
     if ip_choice=='none':assert meta['ip_id']=='' and data['ip']=='普通原创初中生'
@@ -69,7 +69,9 @@ def test_user_material_choices_reach_planner_and_actual_first_image_refs(tmp_pat
     compile_plans(r,FixturePlanner().plan(r,lambda x:None))
     refs=r['slots'][0]['refs']
     assert any(x.get('role')=='角色 IP' for x in refs)==(ip_choice!='none')
-    assert any('Logo' in x.get('role','') for x in refs)==(not no_logo)
+    assert not any('Logo' in x.get('role','') for x in refs)
+    assert r['slots'][0]['brand_logo_layer']['enabled']==(not no_logo)
+    assert r['configs'][0]['config']['logo']=='不用'
     assert any(x['path']==pr['references'][0]['path'] for x in refs)
     assert r['configs'][0]['config']['ip_asset_id']==meta['ip_id']
     assert pr['feature_note'] in r['slots'][0]['prompt']
@@ -99,6 +101,12 @@ def test_all_available_ip_variants_can_be_selected_without_losing_identity(tmp_p
 @pytest.mark.parametrize('channel',sorted({p['category'] for p in PLACEMENTS}))
 def test_channel_accepts_only_its_placements(channel,tmp_path):
     pr=params('单图');pr.update(channel=channel,pids=[p['id'] for p in PLACEMENTS if p['category']==channel and p['image_form']=='单图'])
+    if channel=='学习机':
+        from local_app.learning_pipeline import normalize
+        assert len(normalize(pr)['pids'])==44
+        pr['pids'].append(next(p['id'] for p in PLACEMENTS if p['category']!=channel and p['image_form']=='单图'))
+        with pytest.raises(UserError,match='学习机'):normalize(pr)
+        return
     validate(pr,tmp_path)
     pr['pids'].append(next(p['id'] for p in PLACEMENTS if p['category']!=channel and p['image_form']=='单图'))
     with pytest.raises(UserError,match='^所选版位不属于当前渠道，请重新选择$'):validate(pr,tmp_path)
@@ -106,12 +114,15 @@ def test_channel_accepts_only_its_placements(channel,tmp_path):
 
 def test_channel_uses_catalog_categories_and_remains_optional(tmp_path,monkeypatch):
     from local_app.planning import BY_ID
-    pr=params('单图');pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图']
+    # Learning-machine configurations now have a separate baseline→suite
+    # contract; the generic optional-category path only covers other channels.
+    pr=params('单图');pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图' and p['category']!='学习机']
+    pr.update(feature_label='AI拍题精学',extra_heading='动画精讲',extra_description='查看已确认的讲解')
     validate(pr,tmp_path)
     pr['channel']='未配置渠道'
     with pytest.raises(UserError,match='所选版位不属于当前渠道'):validate(pr,tmp_path)
-    placement=BY_ID[pr['pids'][0]];monkeypatch.setitem(placement,'category','学习机')
-    pr.update(channel='学习机',pids=[placement['id']])
+    placement=BY_ID[pr['pids'][0]];monkeypatch.setitem(placement,'category','自定义渠道')
+    pr.update(channel='自定义渠道',pids=[placement['id']])
     validate(pr,tmp_path)
 
 

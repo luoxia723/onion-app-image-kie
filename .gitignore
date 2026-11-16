@@ -19,3 +19,20 @@ __pycache__/
 .cache/
 
 .venv-backup-*/
+
+# Local databases, exports, backups and upload directories.
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.zip
+*.tar
+*.tar.gz
+uploads/
+backups/
+.restored/
+dist/
+assets/logos/review/

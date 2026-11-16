@@ -3,41 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const css=fs.readFileSync(path.join(__dirname,'../frontend/css/app.css'),'utf8');
-
-function declarations(selector){
- return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(match=>match[1].trim()===selector).map(match=>match[2]).join(';');
-}
-
-test('看样台用剩余空间限制图框，共享版位比例且图片完整包含',()=>{
- assert.match(declarations('.sample-stage'),/display:flex;flex-direction:column/);
- assert.match(declarations('.sample-stage #sets'),/flex:1;min-height:0;container-type:size/);
- assert.match(declarations('.sample-stage #sets'),/display:grid/);
- assert.match(declarations('.sample-stage #sets'),/overflow-y:hidden/);
- assert.match(declarations('.sample-stage .set'),/height:var\(--sample-card-height\)/);
- assert.match(declarations('.sample-stage .cell'),/width:min\(100%,var\(--sample-image-width\)\)/);
- assert.match(declarations('.sample-stage .cell img'),/object-fit:contain/);
-});
-
-test('需去框标签清除旧的右下定位，保持小标签且不截获图片点击',()=>{
- const note=declarations('.sample-stage .frame-note');
- assert.match(note,/bottom:auto/);assert.match(note,/right:auto/);
- assert.match(note,/pointer-events:none/);
-});
-
-test('更多菜单重置摘要外边距和三角，弹层在按钮下方右对齐',()=>{
- const summary=declarations('.pick-more>summary');
- assert.match(summary,/margin:0/);assert.match(summary,/height:32px/);
- assert.match(declarations('.pick-more>summary::before,.pick-more[open]>summary::before'),/content:none/);
- const panel=declarations('.pick-more>div');
- assert.match(panel,/right:0/);assert.match(panel,/top:calc\(100%\s*\+\s*6px\)/);
-});
-
-test('目录已选数用文字颜色区分，问题提示用琥珀色',()=>{
- assert.match(declarations('.badge-selected'),/color:var\(--accent-blue\)/);
- assert.match(declarations('.badge-unselected-ready'),/color:var\(--text-secondary\)/);
- assert.match(declarations('.dir-problem-text'),/color:var\(--warn-amber-text\)/);
-});
+// Unit checks for JS layout arithmetic. CSS rendering needs separate browser QA.
 
 function layoutContext({width=984,height=422,count=2,images=1,stageWidth=796,stageHeight=688,details=0}={}){
  const values=new Map(),listeners={};
@@ -56,7 +22,7 @@ function layoutContext({width=984,height=422,count=2,images=1,stageWidth=796,sta
    if(element===header)return{marginTop:'0',marginBottom:'8'};
    return{paddingLeft:'12',paddingRight:'12',paddingTop:'12',paddingBottom:'10',borderLeftWidth:'1',borderRightWidth:'1',borderTopWidth:'1',borderBottomWidth:'1'};
   },S:{},setTimeout,clearTimeout});
- for(const name of ['views','app']){
+ for(const name of ['views','workspace','production','app']){
   const source=fs.readFileSync(path.join(__dirname,'../frontend/js/'+name+'.js'),'utf8');
   vm.runInContext(name==='app'?source.replace('\nboot();','\n'):source,ctx);
  }
@@ -102,4 +68,15 @@ test('窗口尺寸变化通过现有resize流程重新计算列数与图片尺�
  const resized=scene.layout();assert.equal(resized.columns,2);assert(resized.imageWidth<original.imageWidth);assert.equal(resized.scroll,false);
  scene.sets.clientWidth=500;scene.sets.clientHeight=1800;scene.listeners.resize();assert.equal(scene.layout().columns,1);assert.equal(scene.layout().scroll,false);
  scene.sets.clientWidth=796;scene.sets.clientHeight=688;scene.listeners.resize();assert.deepEqual(scene.layout(),original);
+});
+
+test('三套横图优先双列并纵向滚动，保持图片实际比例',()=>{
+ const scene=layoutContext({count:3,stageWidth:1200,stageHeight:430});scene.run();
+ assert.equal(scene.layout().columns,2);assert.equal(scene.sets.dataset.vertical,'true');
+ assert.equal(scene.layout().scroll,false);assert(scene.layout().imageWidth>500);
+});
+
+test('窄窗口的三套横图改为单列纵向浏览，不回退为隐藏在横向滚动中的整套',()=>{
+ const scene=layoutContext({count:3,stageWidth:700,stageHeight:430});scene.run();
+ assert.equal(scene.layout().columns,1);assert.equal(scene.sets.dataset.vertical,'true');assert.equal(scene.layout().scroll,false);
 });

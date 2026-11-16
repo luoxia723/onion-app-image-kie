@@ -32,7 +32,7 @@ function editor(request=async url=>url==='/bootstrap'?{product:{text:'产品资�
  const ctx=vm.createContext({crypto:webcrypto,structuredClone,TextEncoder,URLSearchParams,setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer},clearTimeout,
   window:{addEventListener(name,fn){listeners[name]=fn}},history:{replaceState(){}},
   document:{addEventListener(){},querySelector(selector){return selector==='#main'?{scrollTop:0}:null}},mockRequest:request});
- for(const name of ['views','drafts','app']){
+ for(const name of ['views','drafts','workspace','production','app']){
   const source=fs.readFileSync(path.join(__dirname,'../frontend/js/'+name+'.js'),'utf8');
   vm.runInContext(name==='app'?source.replace('\nboot();','\n'):source,ctx);
  }
@@ -106,14 +106,14 @@ test('空表单不会盖过其他形式中已填写的文案',async()=>{
  other.run('openDraft=async id=>opened.push(id);S.drafts=[{id:"has-copy",draft:{channel:"",image_form:"三图"},form_drafts:{"单图":{t1:"保留的标题"}}}]');
  await other.run('newTask()');assert.deepEqual(opened,[]);
 });
-test('重新打开工作台时按最近任务形式读取服务端记忆的渠道配置',async()=>{
+test('重新打开进入任务中心，新建时再读取记忆的渠道配置',async()=>{
  const {ctx,run}=editor(async url=>url==='/bootstrap'?{
   placements:[],assets:{ips:[],logos:[],fonts:[],styles:[]},product:{text:'产品资料',revision:2},
   form_defaults:{'单图':{channel:'信息流'},'三图':{channel:'应用商店',pids:['store']}},
- }:{drafts:[]});
+ }:url.startsWith('/workbench/')?{items:[],total:0,counts:{},next_cursor:null}:{drafts:[]});
  ctx.location={hash:''};ctx.setInterval=()=>0;
  run('refresh=async()=>{S.summaries=[{image_form:"三图"}]}');await run('boot()');
- assert.equal(run('S.draft.image_form'),'三图');assert.equal(run('S.draft.channel'),'应用商店');assert.equal(run('S.draftId'),null);
+ assert.equal(run('S.view'),'tasks');await run('newDraft()');assert.equal(run('S.draft.image_form'),'三图');assert.equal(run('S.draft.channel'),'应用商店');assert.equal(run('S.draftId'),null);
 });
 
 test('删除当前草稿提供撤销，按新ID PUT恢复内存中的最新文案和其他形式内容',async()=>{

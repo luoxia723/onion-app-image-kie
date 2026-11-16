@@ -40,10 +40,15 @@ DEFAULT_POLL_TIMEOUT = 240
 
 
 class KieError(Exception):
-    def __init__(self, message: str, exit_code: int = 3, *, uncertain_submit: bool = False):
+    def __init__(self, message: str, exit_code: int = 3, *, uncertain_submit: bool = False,
+                 http_status: int | None = None, provider_code: int | None = None,
+                 provider_task_id: str | None = None):
         super().__init__(message)
         self.exit_code = exit_code
         self.uncertain_submit = uncertain_submit
+        self.http_status = http_status
+        self.provider_code = provider_code
+        self.provider_task_id = provider_task_id
 
 
 class GenerationTimeout(KieError):
@@ -200,9 +205,10 @@ def build_create_request(
     if aspect_ratio not in aspect_ratios(model):
         raise ValueError("unsupported model 1K aspect_ratio")
     if not input_urls:
-        raise ValueError("Sunburst image-to-image requires at least one reference image; no model fallback is allowed")
+        raise ValueError("image-to-image requires at least one reference image; no model fallback is allowed")
     task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": RESOLUTION, "background": "opaque", "input_urls": input_urls}
     if model==GPT_IMAGE_2: task_input.pop("background")
+    # Flare defaults to PNG. Explicit output_format=png can trigger KIE's SVG validation.
     return json_request(
         f"{api_base.rstrip('/')}/api/v1/jobs/createTask",
         api_key,
@@ -230,6 +236,11 @@ def _message_from_body(body: dict[str, Any]) -> str:
     return str(body.get("msg") or body.get("message") or body.get("error") or "unknown KIE error")
 
 
+def _error_task_id(body):
+    value=(body.get('data') or {}).get('taskId') if isinstance(body,dict) and isinstance(body.get('data'),dict) else None
+    return value if isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9._:-]{1,200}',value) else None
+
+
 def _raise_for_api_code(body: dict[str, Any], operation: str) -> None:
     code = body.get("code")
     success = body.get("success")
@@ -240,13 +251,14 @@ def _raise_for_api_code(body: dict[str, Any], operation: str) -> None:
     except (TypeError, ValueError):
         numeric = 500
     message = _message_from_body(body)
+    metadata=dict(provider_code=numeric,provider_task_id=_error_task_id(body))
     if numeric == 401:
-        raise KieError("KIE_API_KEY invalid or expired", 2)
+        raise KieError("KIE_API_KEY invalid or expired", 2, **metadata)
     if numeric == 402:
-        raise KieError("KIE account credits are insufficient", 3)
+        raise KieError("KIE account credits are insufficient", 3, **metadata)
     if numeric in {400, 404, 422, 433, 501, 505}:
-        raise KieError(f"{operation} rejected ({numeric}): {message}", 4)
-    raise KieError(f"{operation} failed ({numeric}): {message}", 3)
+        raise KieError(f"{operation} rejected ({numeric}): {message}", 4, **metadata)
+    raise KieError(f"{operation} failed ({numeric}): {message}", 3, **metadata)
 
 
 def request_json(
@@ -272,18 +284,21 @@ def request_json(
             return body
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
+            try:error_body=json.loads(raw)
+            except (ValueError,TypeError):error_body={}
+            metadata=dict(http_status=exc.code,provider_task_id=_error_task_id(error_body))
             if exc.code == 401:
-                raise KieError("KIE_API_KEY invalid or expired", 2)
+                raise KieError("KIE_API_KEY invalid or expired", 2, **metadata)
             if exc.code == 402:
-                raise KieError("KIE account credits are insufficient", 3)
+                raise KieError("KIE account credits are insufficient", 3, **metadata)
             if exc.code in {400, 404, 422, 433}:
-                raise KieError(f"{operation} rejected: HTTP {exc.code}: {raw[:500]}", 4)
+                raise KieError(f"{operation} rejected: HTTP {exc.code}: {raw[:500]}", 4, **metadata)
             if (exc.code == 429 or 500 <= exc.code <= 599) and attempt < retries:
                 wait = waits[min(attempt - 1, len(waits) - 1)]
                 log("WARN", f"{operation} HTTP {exc.code}; retrying in {wait}s ({attempt}/{retries})")
                 time.sleep(min(wait, max(0, retry_deadline - time.monotonic())) if retry_deadline is not None else wait)
                 continue
-            raise KieError(f"{operation} failed: HTTP {exc.code}: {raw[:500]}", 3)
+            raise KieError(f"{operation} failed: HTTP {exc.code}: {raw[:500]}", 3, **metadata)
         except (urllib.error.URLError, TimeoutError) as exc:
             if retry_network and attempt < retries:
                 wait = waits[min(attempt - 1, len(waits) - 1)]
@@ -355,6 +370,8 @@ def load_output_state(output: Path) -> dict[str, Any]:
     if state and state.get("status") == "restart_ready":
         if count != 1:
             raise KieError("invalid timeout restart journal; refusing a new task", 1)
+    elif state and state.get("status") == "rate_limited" and not state.get("task_id"):
+        return {}
     elif state and not state.get("task_id"):
         raise KieError(f"previous KIE task submission was uncertain; refusing to create a duplicate for {output}", 3)
     return state

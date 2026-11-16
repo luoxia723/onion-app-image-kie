@@ -48,7 +48,7 @@ def test_end_to_end_dependency_prompt_versions_and_zip(engine):
     for s in r['slots']:
         cfg=r['configs'][s['config_idx']]
         label=s['refs'][-1]['label'] if s.get('frame') and s['idx']==1 else '参考图1' if s.get('frame') else None
-        assert s['orig']==positive_prompt.compose(cfg['config'],cfg['direction'],s['idx'],s['refs'],label)
+        assert s['orig']==positive_prompt.compose(cfg['config'],cfg['direction'],s['idx'],s['refs'])
         if s['idx']>1:
             assert len(s['refs'])==1
             h=next(x for x in r['slots'] if x['id']==s['first_id'])
@@ -72,9 +72,11 @@ def test_end_to_end_dependency_prompt_versions_and_zip(engine):
             assert hashlib.sha256(z.read(image['path'])).hexdigest()==image['sha256']
     s=r['slots'][0]
     old=s['att']
+    selection_key=s['pid']+'::1'
+    assert r['sel'][selection_key]
     e.mutate(tid,'regenerate',{'image_id':s['id']})
     assert all(x['att']==old+1 for x in r['slots'] if x['set']==1)
-    assert not r['sel'].get('1')
+    assert not r['sel'].get(selection_key)
     wait_done(e,tid)
     e.mutate(tid,'adopt',{'set':1,'adopted':True})
     # Simulator is deterministic: unchanged pixels reuse the package even after regeneration.
@@ -123,8 +125,8 @@ def test_settings_redaction_and_validation(engine,tmp_path):
     for invalid in (0,21):
         with pytest.raises(UserError):engine.create({**params(),'sets':invalid},'invalid-'+str(invalid))
     p=next(p for p in PLACEMENTS if p['platform']=='喜马拉雅' and p['logo_policy']=='required')
-    task=engine.create({**params(),'pids':[p['id']],'noLogo':True},'required-logo')
-    assert engine.task(task['id'])['rounds'][0]['configs'][0]['config']['logo']=='洋葱学园'
+    with pytest.raises(UserError,match='要求使用 Logo'):
+        engine.create({**params(),'pids':[p['id']],'noLogo':True},'required-logo')
 
 def test_restart_does_not_resubmit_unknown(engine):
     e=engine;p=params();t=e.create(p,'recovery-batch');e.mutate(t['id'],'stop',{})
@@ -304,6 +306,10 @@ def test_repair_timeout_resumes_same_task_and_version(engine):
 def test_manual_prompt_is_verbatim_and_survives_later_retry(engine):
     e=engine;tid=e.create(params(True,1),'manual-free-edit')['id'];r=wait_done(e,tid)['rounds'][0]
     prompt='自由改写\n主标题："我的新标题"\n参考图按原顺序使用。'
+    from local_app.brand_logo import prompt_rule
+    prompt+='\n'+prompt_rule(r['slots'][1]['brand_logo_layer'])
+    from local_app.natural_canvas import prompt_rule as canvas_rule
+    prompt+='\n'+canvas_rule(r['slots'][1]['natural_canvas_plan'])
     with e.lock:
         head,second,third=r['slots'];before=json.loads(json.dumps(second['refs']));head_version=head['att']
         e.mutate(tid,'regenerate',{'image_id':second['id'],'prompt':prompt})

@@ -25,20 +25,30 @@ def simulate(job, output):
     dr.rounded_rectangle((w*.6,h*.39,w*.89,h*.76),radius=max(2,int(u*.025)),fill='#ffffff')
     font_path = next((p for p in ['/System/Library/Fonts/PingFang.ttc','/System/Library/Fonts/Hiragino Sans GB.ttc','/System/Library/Fonts/Supplemental/Arial Unicode.ttf','C:/Windows/Fonts/msyh.ttc','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'] if Path(p).exists()),None)
     def font(size): return ImageFont.truetype(font_path, max(10,int(size))) if font_path else ImageFont.load_default()
+    modules=(p.get('learning_rule') or {}).get('modules')
     title = pr.get('t1','') if p['image_count']==1 else pr.get('s'+str(slot['idx']),'')
+    if modules is not None and not modules['main_copy']:title=''
     fs = min(u*.09,w*.78/max(5,min(len(title),12)))
     chars=max(4,int(w*.78/fs))
     lines=[title[i:i+chars] for i in range(0,len(title),chars)][:4]
     y=h*.20
+    if modules and modules['feature_label']:dr.text((w*.08,h*.10),pr.get('feature_label',''),font=font(u*.045),fill=ink)
     for line in lines:
         dr.text((w*.08,y),line,font=font(fs),fill=ink)
         y+=fs*1.4
-    if p['image_count']==1:
+    if p['image_count']==1 and (modules is None or modules['main_copy']):
         sub=pr.get('t2','')
-        dr.text((w*.08,min(h*.63,y+u*.045)),sub[:24],font=font(u*.038),fill=ink)
-    if pr.get('cta'):
+        dr.text((w*.08,min(h*.63,y+u*.045)),sub[:24],font=font(fs if modules else u*.038),fill=ink)
+    if modules:
+        for key,fraction in [('extra_heading',.66),('extra_description',.73)]:
+            if modules[key]:dr.text((w*.08,h*fraction),pr.get(key,''),font=font(u*.035),fill=ink)
+    cta=pr.get('cta','') if pr.get('cta_enabled',True) else ''
+    override=pr.get('cta_overrides',{}).get(p['id'],{'mode':'inherit'})
+    if override['mode']!='inherit':cta=override.get('text','') if override['mode']=='custom' else ''
+    if p.get('cta_policy')=='forbidden':cta=''
+    if cta:
         dr.rounded_rectangle((w*.08,h*.78,w*.43,h*.90),radius=max(3,int(u*.03)),fill=ink)
-        dr.text((w*.10,h*.80),pr['cta'],font=font(u*.044),fill='white')
+        dr.text((w*.10,h*.80),cta,font=font(u*.044),fill='white')
     dr.text((w*.04,h*.04),'模拟预览',font=font(u*.032),fill=ink)
     im.save(output,'PNG')
 
@@ -52,6 +62,10 @@ def main():
     failed_references=[]
     if job['simulation']:progress('generating')
     try:
+        from local_app.config import UserError
+        if job['slot'].get('frame'):raise UserError('此制作流程已停用，请重新提交配置制作')
+        from local_app.learning_delivery import require_confirmed_sample
+        if not job.get('query_only'):require_confirmed_sample(job['placement'])
         if job['simulation']:
             simulate(job, output)
             result={'ok':True,'source':str(output)}

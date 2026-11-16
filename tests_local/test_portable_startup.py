@@ -30,6 +30,25 @@ def test_complete_bundle_has_no_external_asset_dependency():
     launcher.check_bundle(ROOT)
 
 
+def test_run_help_needs_only_runtime_dependencies(tmp_path):
+    # The developer environment can still have retired image libraries. Block
+    # them explicitly so it cannot hide a broken clean-install entry point.
+    script='''
+import importlib.abc,sys,runpy
+class RuntimeOnly(importlib.abc.MetaPathFinder):
+    def find_spec(self,fullname,path=None,target=None):
+        if fullname.split('.')[0] in ('cv2','numpy'):
+            raise ModuleNotFoundError(fullname)
+sys.meta_path.insert(0,RuntimeOnly())
+sys.path.insert(0,sys.argv[1])
+sys.argv=[sys.argv[1]+'/run.py','--help']
+runpy.run_path(sys.argv[0],run_name='__main__')
+'''
+    result=subprocess.run([sys.executable,'-c',script,str(ROOT)],cwd=tmp_path,capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stdout+result.stderr
+    assert '--state-dir' in result.stdout and '--env-file' in result.stdout
+
+
 def test_missing_bundle_fails_before_installing(tmp_path):
     with pytest.raises(launcher.SetupError,match='不完整'):launcher.ensure_environment(tmp_path)
     assert not (tmp_path/'.venv').exists()
@@ -73,10 +92,14 @@ def test_no_keys_fresh_workspace_serves_ui_and_can_be_configured(tmp_path):
         assert urllib.request.urlopen(base).status==200
         public=json.load(urllib.request.urlopen(base+'/api/settings'))
         assert not public['key_configured'] and not public['planning_key_configured']
+        assert public['planning_base_url']=='https://ops-ai-gateway.yc345.tv/v1'
+        assert public['planning_model']=='gpt-6.1-terra'
+        assert public['image_model']=='gpt-image-2-6/flare-image-to-image'
         data={'planning_api_key':'test-only-planning','kie_api_key':'test-only-kie'}
         req=urllib.request.Request(base+'/api/settings',data=json.dumps(data).encode(),method='PUT',
             headers={'Content-Type':'application/json','X-Onion-Request':'1'})
         updated=json.load(urllib.request.urlopen(req))
         assert updated['key_configured'] and updated['planning_key_configured'] and not updated['simulation']
         assert 'test-only-' not in json.dumps(updated)
+        assert updated['planning_base_url']==public['planning_base_url']
     finally:server.shutdown();server.server_close();engine.close()

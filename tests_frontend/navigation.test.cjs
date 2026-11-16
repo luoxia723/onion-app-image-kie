@@ -75,3 +75,9 @@ test('打开任务期间主区域用骨架，失败或较旧请求结束不残�
  assert.equal(run('S.openingTask'),'loading');assert(run('viewPick()').includes('pick-skeleton'));assert(!run('viewHead()').includes('正在打开，请稍候'));
  reject(Error('offline'));await assert.rejects(pending);assert.equal(run('S.openingTask'),null);
 });
+
+test('单一任务列表保留生成中、待挑选和历史任务，不按旧分组重复展示',()=>{
+ const {run}=setup();run('S.summaries=[{is_summary:true,id:"a",name:"生成中",category:"running",status:"正在处理",done:0,total:1},{is_summary:true,id:"b",name:"待挑选",category:"attention",status:"待挑选",done:1,total:1},{is_summary:true,id:"c",name:"已保存",category:"history",status:"已保存 v001",done:1,total:1}];S.q=""');
+ const html=run('taskList()');for(const id of ['a','b','c'])assert.equal((html.match(new RegExp('data-task="'+id+'"','g'))||[]).length,1);
+ assert(!html.includes('>历史<'));assert(!html.includes('>待挑选与处理<'));assert(html.includes('>任务<'));
+});

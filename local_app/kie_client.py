@@ -36,19 +36,28 @@ def generate(job,key,failed_references,progress):
 
 
 def _generate(job,key,failed_references,progress):
+    if job['slot'].get('production_mode')=='local_resize':raise UserError('本机缩放任务不能提交图片模型')
+    from .learning_delivery import require_confirmed_sample
+    if not job.get('query_only'):require_confirmed_sample(job['placement'])
     slot=job['slot'];output=Path(slot['output']);refs=slot['refs']
+    if slot.get('frame'):raise UserError('此制作流程已停用，请重新提交配置制作')
     paths=[(Path(r['path']) if Path(r['path']).is_absolute() else ROOT/r['path']).resolve() for r in refs]
     from poster_prompt import validate_text
     validate_text(slot['prompt'])
+    if slot.get('brand_logo_layer'):
+        from .brand_logo import validate_prompt
+        validate_prompt(slot['prompt'],slot['brand_logo_layer'])
+    if slot.get('natural_canvas_plan'):
+        from .natural_canvas import validate_prompt as validate_canvas_prompt
+        validate_canvas_prompt(slot['prompt'],slot['natural_canvas_plan'])
     if slot.get('prompt_origin')!='manual':
         render.validate_reference_labels(slot['prompt'],refs);render.validate_logo_prompt_rule(slot['prompt'],refs)
     render.validate_asset_reference_bindings(refs)
-    if slot.get('frame'):
-        from blue_frame import validate_layout
-        validate_layout(slot['frame']['frame_layout_path'],job['placement']['target_size'],refs,paths,slot['prompt'],
-                        inherited_base=paths[0] if slot['idx']>1 else None,check_prompt=slot.get('prompt_origin')!='manual')
     model=normalize_model(job.get('image_model',render.MODEL))
     ratio=render.nearest_aspect_ratio(job['placement']['target_width'],job['placement']['target_height'],model)
+    if slot.get('natural_canvas_plan'):
+        from .natural_canvas import aspect_ratio
+        ratio=aspect_ratio(slot['natural_canvas_plan'])
     fingerprint=render.request_fingerprint(model,slot['prompt'],paths,ratio,render.RESOLUTION)
     state_path=render.task_state_path(output);state=render.load_output_state(output)
     if state.get('status')=='rate_limited':state={}
@@ -96,10 +105,4 @@ def _generate(job,key,failed_references,progress):
         state.update(status='downloaded',sha256=render.sha256_file(output));render.atomic_write_json(state_path,state)
     result={'ok':True,'source':str(output),'state':state}
     progress('processing')
-    if slot.get('frame'):
-        from blue_frame import process_candidate
-        try:
-            rec=process_candidate(output,slot['frame']['frame_layout_path'])
-            result.update(source=rec['candidate_filepath'],frame_status='processed',frame_processing=rec,frame_review=rec.get('needs_crop_review',False))
-        except Exception:result.update(frame_review=True,frame_status='failed')
     return result

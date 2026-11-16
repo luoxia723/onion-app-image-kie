@@ -37,13 +37,20 @@ def check_bundle(root):
     required=['run.py','requirements.txt','local_app/server.py','frontend/index.html',
               'local_app/maintenance.py','local_app/safety.py','frontend/js/maintenance.js','local_app/scheduler.py','local_app/workbench.py','local_app/delivery.py','local_app/kie_client.py',
               'frontend/js/prompt-drafts.js','scripts/font_library.py','scripts/poster_prompt.py',
-              'config/channel-placement-rules.json','assets/asset-manifest.json',
+              'config/channel-placement-rules.json','config/builtin-style-references.json','config/learning-machine-workflow.json','local_app/learning_workflow.py','local_app/learning_source.py','local_app/learning_adaptation.py','assets/asset-manifest.json',
+              'config/learning-machine-content-rules.json','config/learning-machine-master-groups.json',
+              'config/learning-machine-logo-templates.json','config/learning-machine-mask-templates.json',
+              'local_app/learning_runtime.py','local_app/learning_executor.py','local_app/natural_canvas.py',
+              'frontend/js/workspace.js','frontend/js/production.js','frontend/js/learning-runs.js',
+              'assets/logos/learning-logo-black.png','assets/logos/learning-logo-white-app.png',
               'SKILL.md','skills/visual-scene-planner/SKILL.md','references/art-direction.md',
               'references/scene-planning-app.md']
     missing=[name for name in required if not (root/name).is_file()]
     if not missing:
         manifest=json.loads((root/'assets/asset-manifest.json').read_text(encoding='utf-8'))
         missing.extend(item['path'] for item in manifest['assets'] if not (root/item['path']).is_file())
+        references=json.loads((root/'config/builtin-style-references.json').read_text(encoding='utf-8'))
+        missing.extend(item['path'] for item in references['references'] if not (root/item['path']).is_file())
     if missing: raise SetupError('项目文件不完整，请重新下载完整源码包：'+', '.join(missing[:4]))
 
 
@@ -63,9 +70,8 @@ for raw in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines():
         if not applies:continue
     name,expected=requirement.strip().split('==',1)
     assert version(name)==expected
-import PIL,cv2,numpy as np
+import PIL
 from PIL import Image
-assert cv2.resize(np.zeros((2,2,3),dtype=np.uint8),(1,1)).shape==(1,1,3)
 assert Image.new('RGB',(1,1)).mode=='RGB'
 '''
 
