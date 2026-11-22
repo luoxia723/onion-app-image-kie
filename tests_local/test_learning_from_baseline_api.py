@@ -7,11 +7,11 @@ import time
 from PIL import Image
 
 from local_app.learning_executor import LearningExecutor
-from tests_local.test_learning_setup_api import api
+from tests_local.test_learning_setup_api import api,production_learning_api
 
 
-def test_from_confirmed_baseline_http_action_is_explicit_and_idempotent(api,monkeypatch):
-    _,request=api;calls=[];original=LearningExecutor.generate_image
+def test_from_confirmed_baseline_http_action_is_explicit_and_idempotent(production_learning_api,monkeypatch):
+    _,request=production_learning_api;calls=[];original=LearningExecutor.generate_image
     def generate(self,job,event):
         calls.append(job['kind']);assert job['simulation'] is True
         if job['kind']=='background_expansion':

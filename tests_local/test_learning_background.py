@@ -158,6 +158,11 @@ def test_prepare_job_is_offline_and_guide_first_with_real_source_hashes(tmp_path
     assert '参考图1锁定最终构图' in job['prompt'] and '参考图2提供原始人物' in job['prompt']
     assert '不能保留为背景条带' in job['prompt'] and '不重新放大人物' in job['prompt']
     assert '四周额外的自然背景间距' in job['prompt'] and '均不贴边' in job['prompt']
+    assert '只在参考图1的背景待补区延展' in job['prompt']
+    assert '字形、字重、字色、描边、字号层级、行序和对齐' in job['prompt']
+    assert '所有文字边缘留在安全区域内' in job['prompt'] and '不重新排字' in job['prompt']
+    assert '按钮、外框和投影' in job['prompt']
+    assert '微调仅限背景衔接和外部接缝' in job['prompt']
     assert '蓝框' not in job['prompt'] and '白色辅助边带' in job['prompt']
     assert job['background_plan']['version']==3 and job['background_plan']['unmarked_canvas']
     assert '正文逐字保留："遇到不会的题"' in job['prompt'] and '按钮文字逐字保留："立即体验"' in job['prompt']
@@ -192,6 +197,7 @@ def test_no_padding_and_threshold_checks_are_geometry_only_and_do_not_claim_cont
     assert threshold['requires_ai_repair']
     prompt=background.repair_prompt({},exact)
     assert '本张无广告正文' in prompt and '本张无独立按钮' in prompt
+    assert '按钮、外框和投影' not in prompt and '不重新排字' not in prompt
 
 
 @pytest.mark.parametrize('sizes',[(0,512,1400,340),(1536,-1,1400,340),(1536,512,False,340),(1536,512,100000,100000)])

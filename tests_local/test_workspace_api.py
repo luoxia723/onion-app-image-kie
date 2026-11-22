@@ -3,12 +3,12 @@ import json
 import re
 import time
 
-from tests_local.test_learning_setup_api import api
+from tests_local.test_learning_setup_api import api,production_learning_api
 from tests_local.test_brand_logo import ready
 
 
-def test_production_index_assets_and_unconfirmed_run_are_readable_without_models(api):
-    engine,request=api
+def test_production_index_assets_and_unconfirmed_run_are_readable_without_models(production_learning_api):
+    engine,request=production_learning_api
     status,index=request('/');assert status==200
     scripts=re.findall(rb'<script src="([^"]+)"',index)
     assert b'/js/workspace.js' in scripts and b'/js/production.js' in scripts

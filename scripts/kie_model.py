@@ -18,6 +18,12 @@ ASPECT_RATIOS = {
 
 GPT_IMAGE_2 = "gpt-image-2-image-to-image"
 GPT_IMAGE_26_FLARE = "gpt-image-2-6/flare-image-to-image"
+NANO_BANANA_REPAIR = "nano-banana-2-1"
+# Native 1K canvases verified on KIE, including its pixel rounding.
+NANO_REPAIR_SIZES = {
+    "1:1": (1024, 1024), "4:5": (928, 1152), "5:4": (1152, 928),
+    "16:9": (1376, 768), "3:2": (1264, 848), "21:9": (1584, 672),
+}
 MODELS = {
     MODEL: "GPT Image 2.5 Sunburst",
     GPT_IMAGE_2: "GPT Image 2",
@@ -37,6 +43,12 @@ def aspect_ratios(model=MODEL):
         labels=("1:1","3:2","2:3","4:3","3:4","5:4","4:5","16:9","9:16","2:1","1:2","3:1","1:3","21:9","9:21")
         return {k:int(k.split(":")[0])/int(k.split(":")[1]) for k in labels}
     return ASPECT_RATIOS
+
+
+def provider_aspect_ratios(model):
+    if model == NANO_BANANA_REPAIR:
+        return NANO_REPAIR_SIZES
+    return aspect_ratios(model)
 
 
 def normalize_resolution(value=None) -> str:

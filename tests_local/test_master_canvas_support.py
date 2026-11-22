@@ -64,6 +64,21 @@ def test_application_freeze_passes_source_direction_to_relayout_prompt(engine,tm
     assert master['single_regeneration_prompt']==master['prompt']
 
 
+def test_learning_shared_canvas_uses_source_copy_to_plan_content_removal(engine,tmp_path):
+    task,round=ready(engine)
+    params=ordinary(task,round)
+    params.update(target_kind='learning',pids=['learning-ruishi-rect-580x320','learning-dsl-resource-500x312','learning-baidu-512x512'])
+    result=freeze_adaptation(engine,params,tmp_path/'learning-removal')
+    masters={master['content_mode']:master for master in result['compiled']['masters']}
+    for mode,removed in (('pure','body'),('copy','cta')):
+        master=masters[mode]
+        assert master['main_visual_framing']['removed_ad_module']==removed
+        assert master['concept_audit_box']==master['shared_visible_box']
+        assert '先拉远镜头' not in master['prompt'] and '锁定主体缩小' not in master['prompt']
+    assert '每天进步一点' in masters['copy']['prompt']
+    assert 'main_visual_framing' not in masters['copy_cta']
+
+
 def test_historical_version_uses_its_own_clean_bytes_and_corruption_refused(engine,tmp_path):
     task,round=ready(engine);slot=round['slots'][0];old=copy.deepcopy(slot);old.pop('versions')
     slot['versions']=[old];slot['att']=2

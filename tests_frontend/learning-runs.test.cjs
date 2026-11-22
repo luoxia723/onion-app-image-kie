@@ -28,23 +28,28 @@ function setup(service=async()=>runFixture()){
  return {context,execute,messages,hashes,downloads};
 }
 
-test('默认模拟制作创建独立运行并只启动基准图，不继承全局真实模式或自动扩套',async()=>{
- const calls=[];const {execute,hashes}=setup(async(path,method,body)=>{calls.push({path,method,body});return path.endsWith('/baseline')?runFixture({status:'generating_baseline',busy:true}):runFixture()});
+test('学习机按钮只启动正式基准图，全局模拟设置不改变提交模式',async()=>{
+ const calls=[];const {execute,hashes}=setup(async(path,method,body)=>{calls.push({path,method,body});return path.endsWith('/baseline')?runFixture({mode:'real',status:'generating_baseline',busy:true}):runFixture({mode:'real'})});
+ execute('CFG.simulation=true;CFG.kie=true;CFG.planningKey=true');
+ const html=execute('viewProductionStart()');
+ assert.match(html,/id="learning-start-real"[^>]*>生成基准图/);
+ assert.doesNotMatch(html,/learning-mode|本机演练|生成演练基准图/);
  await execute('startLearningRun()');
  assert.deepEqual(calls.map(x=>x.path),['/learning-machine/runs','/learning-machine/runs/run-one/baseline']);
- assert.equal(calls[0].body.mode,'simulation');assert(calls.every(x=>x.body.idempotency_key));
+ assert.equal(calls[0].body.mode,'real');assert(calls.every(x=>x.body.idempotency_key));
  assert.equal(execute('S.view'),'learning-run');assert.equal(execute('S.cur'),null);assert(hashes.at(-1).includes('view=learning-run&run=run-one'));
  assert.equal(execute('S.submitting'),false);
 });
-test('真实制作必须显式选择且先检查两个Key，缺配置不会创建运行',async()=>{
+test('学习机正式制作先检查两个Key，缺配置不会创建运行',async()=>{
  const calls=[];const {execute,context}=setup(async(...args)=>{calls.push(args);return runFixture({mode:args[2]?.mode||'real'})});
- execute('opens=0;openCfg=async()=>{opens++}');await execute('startLearningRun("real")');
+ execute('opens=0;openCfg=async()=>{opens++}');await execute('startLearningRun()');
  assert.equal(calls.length,0);assert.equal(execute('opens'),1);
  context.real=runFixture({mode:'real'});execute('CFG.kie=true;CFG.planningKey=true');
- await execute('startLearningRun("real")');assert.equal(calls[0][2].mode,'real');
+ await execute('startLearningRun()');assert.equal(calls[0][2].mode,'real');
 });
-test('模拟请求收到错误的真实模式响应时停止，不继续提交基准图',async()=>{
- const calls=[];const {execute,messages}=setup(async(path)=>{calls.push(path);return runFixture({mode:'real'})});
+test('正式制作收到旧模拟模式响应时停止，不继续提交基准图',async()=>{
+ const calls=[];const {execute,messages}=setup(async(path)=>{calls.push(path);return runFixture({mode:'simulation'})});
+ execute('CFG.kie=true;CFG.planningKey=true');
  await execute('startLearningRun()');assert.deepEqual(calls,['/learning-machine/runs']);assert(messages.some(message=>message.includes('制作模式与请求不一致')));
 });
 test('确认基准图与扩展是分开的请求，模式/版本/哈希必须一致才解锁',async()=>{
@@ -93,7 +98,7 @@ test('成品展示后端已合成图片，版本可查且不重复叠Logo或灰�
  const output={id:'one',platform:'优学派',name:'横幅 <测试>',width:840,height:404,image_index:1,status:'done',version:2,image_url:'/composited-v2.png',baseline_version:2,versions:[{version:1,image_url:'/composited-v1.png',baseline_version:1}]};
  const run=readyRun({mode:'simulation',outputs:[output],name:'<script>alert(1)</script>'});run.approval=approval(run);
  const {context,execute}=setup();context.run=run;execute('installLearningRun(run);S.view="learning-run";S.learningOutputVersions={one:1}');
- const html=execute('viewLearningRun()');assert(html.includes('本地模拟演练'));assert(html.includes('/composited-v1.png'));assert(html.includes('横幅 &lt;测试&gt;'));assert(!html.includes('learning-logo-mask-overlay'));assert(html.includes('正在查看历史版本'));
+ const html=execute('viewLearningRun()');assert(html.includes('历史模拟记录'));assert(html.includes('/composited-v1.png'));assert(html.includes('横幅 &lt;测试&gt;'));assert(!html.includes('learning-logo-mask-overlay'));assert(html.includes('正在查看历史版本'));
  assert(!execute('viewLearningRunHead()').includes('<script>'));
 });
 test('只有全部成品完成才允许图包，下载使用服务返回地址并重读版本',async()=>{
@@ -223,7 +228,7 @@ test('已确认基准按新规则建立独立批次，只调用from-baseline不�
  assert(!html.match(/id="learning-run-expand"[^>]*disabled/));
 });
 test('未确认、忙碌或正在查看旧基准时不能建立新规则批次',async()=>{
- const calls=[];const source=readyRun();const {context,execute}=setup(async(...args)=>calls.push(args));context.source=source;
+ const calls=[];const source=readyRun({mode:'real'});const {context,execute}=setup(async(...args)=>calls.push(args));context.source=source;
  execute('installLearningRun(source);S.view="learning-run"');await execute('makeLearningRunFromBaseline()');assert.equal(calls.length,0);assert.match(execute('viewLearningRun()'),/id="learning-run-from-baseline"[^>]*disabled/);
  context.approved=approval(source);execute('LEARNING_RUNS.current.approval=approved;LEARNING_RUNS.current.busy=true');await execute('makeLearningRunFromBaseline()');assert.equal(calls.length,0);
  execute('LEARNING_RUNS.current.busy=false;S.learningBaselineVersion=0');await execute('makeLearningRunFromBaseline()');assert.equal(calls.length,0);
@@ -237,7 +242,7 @@ test('来源说明只对应当前继承基准，后续新生成的基准不会�
  execute('source.baseline.inherited=false');assert.equal(execute('viewLearningBaselineSource(source)'),'');
 });
 test('建立新规则批次遇到未知响应失败时沿用幂等键，成功后保持同一基准哈希',async()=>{
- const source=readyRun();source.approval=approval(source);const next=readyRun({id:'new-run',status:'baseline_confirmed',baseline:{...source.baseline,inherited:true}});next.approval=approval(next);
+ const source=readyRun({mode:'real'});source.approval=approval(source);const next=readyRun({id:'new-run',mode:'real',status:'baseline_confirmed',baseline:{...source.baseline,inherited:true}});next.approval=approval(next);
  const calls=[];let fail=true;const {context,execute}=setup(async(path,method,body)=>{calls.push({path,body});if(fail){fail=false;const error=new Error('connection lost');error.status=500;throw error}return next});context.source=source;
  execute('installLearningRun(source);S.view="learning-run"');await execute('makeLearningRunFromBaseline()');assert.equal(execute('S.learningRunId'),'run-one');await execute('makeLearningRunFromBaseline()');
  assert.equal(calls.length,2);assert.equal(calls[0].body.idempotency_key,calls[1].body.idempotency_key);assert.equal(execute('LEARNING_RUNS.current.baseline.sha256'),source.baseline.sha256);
@@ -318,4 +323,48 @@ test('同一运行的迟到旧修订不能回退新背景版本或清除待恢�
  const stale=readyRun({revision:6,outputs:[{id:'one',version:2,status:'done'}]});const {context,execute}=setup();context.current=current;context.stale=stale;
  execute('installLearningRun(current);LEARNING_RUNS.backgroundKeys["run-one:one"]={key:"current-key",source_version:2,accepted:true};installLearningRun(stale)');
  assert.equal(execute('LEARNING_RUNS.current.revision'),7);assert.equal(execute('LEARNING_RUNS.current.outputs[0].version'),3);assert.equal(execute('LEARNING_RUNS.backgroundKeys["run-one:one"].key'),'current-key');
+});
+
+test('有字母版复核按钮直接展示并绑定候选版本，待复核图不可当成品下载',async()=>{
+ const master={id:'learning-master-E3',group_id:'E3',version:1,status:'visual_hold',visual_review:{
+  status:'needs_review',can_accept:true,can_repair:true,review_sha256:'candidate-hash',
+  original_url:'/api/learning-machine/runs/run-one/images/visual-master-original/learning-master-E3?version=1',
+  first:{verdict:'repair',body:'第三步',issues:[{where:'末行',detail:'疑似错字'}]},
+  verification:{verdict:'pass',body:'第一步',issues:[]},
+  before_focus:{verdict:'pass',checks:[{text:'的第一步'}]}
+ }};
+ const run=readyRun({mode:'real',status:'failed',suite:{status:'failed'},masters:[master]});run.approval=approval(run);
+ const calls=[];const {context,execute}=setup(async(path,method,body)=>{calls.push({path,method,body});return run});
+ context.run=run;execute('installLearningRun(run);S.view="learning-run";S.learningRunId=run.id');
+ assert.match(execute('viewLearningRun()'),/复核文字/);
+ execute('openLearningImage("", "母版", "master", "learning-master-E3", 1)');
+ const details=execute('viewLearningImageDetails(run)');
+ assert.match(details,/查看审核原图/);
+ assert.match(details,/确认无误，继续制作/);
+ assert.match(details,/确认有问题，修复文字/);
+ assert.match(details,/疑似错字/);
+ assert.match(details,/疑字局部复核 · 通过/);
+ assert.match(details,/读到「的第一步」/);
+ assert.doesNotMatch(details,/下载这张图片/);
+ await execute('resolveLearningVisual("master","learning-master-E3","accept")');
+ assert.equal(calls[0].path,'/learning-machine/runs/run-one/visual/master/learning-master-E3');
+ assert.equal(calls[0].body.action,'accept');
+ assert.equal(calls[0].body.version,1);
+ assert.equal(calls[0].body.sha256,'candidate-hash');
+});
+
+test('学习机概念图入口默认全选，查看上传图时只创建待确认批次',async()=>{
+ const calls=[];
+ const run=readyRun({mode:'real',concept:{id:'abc'},baseline:{id:'baseline',version:1,status:'done',uploaded:true,image_url:'/source'}});
+ const {execute}=setup(async(path,method,body)=>{calls.push({path,method,body});return run});
+ execute('CFG.kie=true;CFG.planningKey=true;setLearningConceptOrigin(true)');
+ assert.equal(execute('S.draft.pids.length'),44);
+ assert.match(execute('viewLearningSource(S.draft)'),/请上传不带 Logo 的横向 16:9 图片/);
+ assert.match(execute('copyFields(S.draft)[0][1]'),/图上正文/);
+ assert.equal(execute('formIssue(S.draft).field'),'concept-upload');
+ execute("S.draft.concept={id:'a'.repeat(64),width:1600,height:900,button_text:'开始学习'}");
+ await execute('startLearningRun()');
+ assert.deepEqual(calls.map(row=>row.path),['/learning-machine/runs']);
+ assert.equal(calls[0].body.params.concept.button_text,'开始学习');
+ assert.equal(execute('LEARNING_RUNS.current.baseline.uploaded'),true);
 });

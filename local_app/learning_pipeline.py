@@ -58,7 +58,7 @@ def public_contract():
                        fixed_prompt_templates_ready=True,scene_planning_execution_ready=True,
                        scope='offline_preview',runtime_available=True,
                        requires_baseline_confirmation=True,auto_expand=False,
-                       reason='本接口仅保存配置与预览；通过独立制作入口生成基准图，用户查看确认后才扩展整套。默认本地演练，真实制作需明确选择。'),
+                       reason='本接口仅保存配置与预览；通过独立制作入口生成或上传基准图，用户查看确认后才扩展整套。'),
         placements=placement_contracts())
 
 

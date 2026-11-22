@@ -244,7 +244,7 @@ def build_guide(source,target_guided_png,group_plan):
         full_source_preserved_in_guide=True,source_cropped_in_guide=False,unmarked_canvas=True)
 
 
-def repair_prompt(allowed_text,group_plan,*,source_size=None):
+def repair_prompt(allowed_text,group_plan,*,source_size=None,removed=None):
     group=_checked(group_plan);text=_text(allowed_text)
     if text!=group['allowed_text']:raise UserError('共享母版提示词文字与冻结内容不一致')
     cross_direction=False
@@ -269,6 +269,11 @@ def repair_prompt(allowed_text,group_plan,*,source_size=None):
         '草稿的色块、渐变和拼接边界只是待补全占位，不是最终设计。' if cross_direction else
         '参考图1是布局草稿，锁定主体缩小后的大小和位置；色块、渐变和拼接边界只是待补全占位，不是最终设计。'
         '参考图2提供本张人物、场景和文字细节，不照搬其满幅裁边或放大主体。')
+    if removed:
+        from .learning_prompts import _framing_prompt, removal_framing
+        framing=_framing_prompt(removal_framing({'main_visual_safe_area':group['content_safe_box']},group['aspect_ratio'],removed))
+        layout=('参考图1只提示画幅和保留区。参考图2提供主体身份、原有互动和画风。'
+                '按删除指定广告内容后的新布局重新安排元素，延续场景并补全背景。')
     return ('生成一张完整自然的'+group['aspect_ratio']+'画幅图片，连续场景一直画满四边，场景完整延续到画布边缘，不留制作辅助线或外部白带。'
         +framing+layout+
         '延续原有透视、光线、色彩、材质和画风，自然重绘所有占位区域并消除接缝，不留下单色色条、重复拉伸的背景或拼贴边界。'

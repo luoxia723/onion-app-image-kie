@@ -200,13 +200,16 @@ def build_create_request(
     model: str = MODEL,
 ) -> urllib.request.Request:
     normalize_resolution(resolution)
-    from kie_model import normalize_model, aspect_ratios, GPT_IMAGE_2
-    model=normalize_model(model)
-    if aspect_ratio not in aspect_ratios(model):
+    from kie_model import provider_aspect_ratios, GPT_IMAGE_2, NANO_BANANA_REPAIR
+    if aspect_ratio not in provider_aspect_ratios(model):
         raise ValueError("unsupported model 1K aspect_ratio")
     if not input_urls:
         raise ValueError("image-to-image requires at least one reference image; no model fallback is allowed")
     task_input: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": RESOLUTION, "background": "opaque", "input_urls": input_urls}
+    if model == NANO_BANANA_REPAIR:
+        if len(input_urls) != 1:
+            raise ValueError("typography repair requires one source image")
+        task_input = dict(prompt=prompt, aspect_ratio=aspect_ratio, resolution=RESOLUTION, image_input=input_urls, output_format="png")
     if model==GPT_IMAGE_2: task_input.pop("background")
     # Flare defaults to PNG. Explicit output_format=png can trigger KIE's SVG validation.
     return json_request(
@@ -494,8 +497,10 @@ def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths,
     """Resume one active task, replacing only a confirmed timeout within its saved cap."""
     request=request_fn or request_json
     upload=upload_fn or upload_references
-    from kie_model import normalize_model
-    model=normalize_model(getattr(args,"image_model",MODEL))
+    from kie_model import provider_aspect_ratios
+    model=getattr(args,"image_model",MODEL)
+    if aspect_ratio not in provider_aspect_ratios(model):
+        raise ValueError("unsupported model 1K aspect_ratio")
     limit = getattr(args, "max_timeout_restarts", 0)
     if type(limit) is not int or limit not in (0, 1):
         raise ValueError("max_timeout_restarts must be 0 or 1")

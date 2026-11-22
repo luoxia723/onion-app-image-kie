@@ -20,7 +20,7 @@ from .config import UserError
 from .instance import InstanceLock
 from .scene_planner import ApiScenePlanner, PlanningStopped, chat_content, validate_schema
 import render
-from kie_model import MODELS, aspect_ratios, normalize_model
+from kie_model import MODELS, NANO_BANANA_REPAIR, NANO_REPAIR_SIZES, aspect_ratios, normalize_model
 
 
 class LearningExecutionError(UserError):
@@ -110,6 +110,19 @@ def _upload_cache(path):
 
 
 class LearningExecutor:
+    def inspect_typography(self,path,allowed,independent,reference,stop_event,*,removed_module=None):
+        from .learning_visual import inspect
+        return inspect(self.settings,path,allowed,independent,reference,lambda:_stopped(stop_event),
+                       removed_module=removed_module)
+
+    def inspect_suspect_text(self,path,targets,stop_event):
+        from .learning_visual import inspect_suspect_text
+        return inspect_suspect_text(self.settings,path,targets,lambda:_stopped(stop_event))
+
+    def inspect_brush_mark(self,path,original,target,stop_event):
+        from .learning_visual import inspect_brush_mark
+        return inspect_brush_mark(self.settings,path,original,target,lambda:_stopped(stop_event))
+
     def __init__(self,settings):
         self.settings=settings
 
@@ -156,10 +169,13 @@ class LearningExecutor:
     def generate_image(self,job,stop_event=None):
         marker=job.get('stop_marker');_check_stop(stop_event,marker)
         if type(job.get('simulation')) is not bool:raise UserError('图片执行模式必须明确')
-        try:model=normalize_model(job.get('model'))
+        repair=job.get('kind')=='typography_repair'
+        try:model=NANO_BANANA_REPAIR if repair else normalize_model(job.get('model'))
         except ValueError as exc:raise UserError(str(exc)) from None
         ratio=job.get('aspect_ratio')
-        allowed=set().union(*(aspect_ratios(value) for value in MODELS)) if job['simulation'] else aspect_ratios(model)
+        allowed=NANO_REPAIR_SIZES if repair else set().union(*(aspect_ratios(value) for value in MODELS)) if job['simulation'] else aspect_ratios(model)
+        if repair and (job['simulation'] or job.get('model')!=model):
+            raise UserError('文字修复需要已确认的真实母版')
         if ratio not in allowed:raise UserError('当前模型不支持冻结母版比例' if not job['simulation'] else '演练画幅比例不正确')
         if not isinstance(job.get('prompt'),str) or not job['prompt'].strip():raise UserError('图片提示词不能为空')
         if job.get('kind')=='background_expansion':
@@ -216,9 +232,11 @@ class LearningExecutor:
         return result
 
     def _real(self,job,output,stop_event):
-        marker=job.get('stop_marker');model=normalize_model(job.get('model'));ratio=job['aspect_ratio']
+        marker=job.get('stop_marker');model=job['model'] if job.get('kind')=='typography_repair' else normalize_model(job.get('model'));ratio=job['aspect_ratio']
         api_key=self.settings.key;api_base=self.settings.base;upload_base=self.settings.upload
         rows=job.get('reference_bindings',[]);paths=_bindings(rows);prompt=job['prompt']
+        if model==NANO_BANANA_REPAIR and [row.get('kind') for row in rows]!=['typography_source']:
+            raise UserError('文字修复须以待修母版作为唯一参考')
         if job.get('kind') in ('master','single') and (not rows or rows[0].get('kind')!='confirmed_baseline'):
             raise UserError('后续图片必须以已确认基准图作为参考图1')
         if job.get('kind')=='background_expansion':
@@ -348,10 +366,12 @@ class LearningExecutor:
             with Image.open(output) as image:
                 image.verify();width,height=image.size
             a,b=map(int,ratio.split(':'))
-            if abs(width*b-height*a)/max(width*b,height*a)>.005:
+            verified_native=model==NANO_BANANA_REPAIR and (width,height)==NANO_REPAIR_SIZES[ratio]
+            if not verified_native and abs(width*b-height*a)/max(width*b,height*a)>.005:
                 raise LearningExecutionError('模型返回画幅与固定比例不符，请审核原图后处理',reason_code='ratio_mismatch',query_required=False,state=_safe_state(state))
             # Native tiers can differ by a rounding pixel. Keep the provider's
             # untouched PNG and crop at most the tiny ratio rounding margin.
+            if verified_native:a,b=width,height
             scale=min(width//a,height//b);exact=(a*scale,b*scale)
             if scale<1:raise LearningExecutionError('模型返回图片过小',reason_code='invalid_image')
             if exact!=(width,height):

@@ -62,7 +62,7 @@ def public_config(engine):
                 'prompt_templates_version':groups['version'],
                 'template_text_defaults':copy.deepcopy(groups['text_defaults']),
                 'offline_prompt_preview_ready':True,
-                'runtime_available':True,'runtime_modes':['simulation','real'],'default_runtime_mode':'simulation',
+                'runtime_available':True,'runtime_modes':['real'],'default_runtime_mode':'real',
                 **learning_mask.config(),
                 'placements': placements,
                 'saved_configuration': copy.deepcopy(engine.document(CONFIGURATION_DOCUMENT))}
@@ -116,6 +116,9 @@ def save_and_preview(engine, params):
             raise UserError('正在进行本机数据维护，请稍后保存配置')
         params = copy.deepcopy(params)
         params.setdefault('image_model',engine.settings.image_model)
+        if params.get('concept') is not None:
+            from .learning_concept import params_for_concept
+            params_for_concept(engine.settings,params)
         params['references'] = _registered_references(engine.settings, params.get('references', []))
         seed = params.get('learning_seed')
         if seed is not None and (not isinstance(seed, str) or not seed or len(seed) > 128):
@@ -128,6 +131,9 @@ def save_and_preview(engine, params):
         normalized['learning_mask_snapshot'] = {pid:learning_mask.preset_for(pid) for pid in normalized['pids']}
         from . import learning_prompts
         prompt_plan=learning_prompts.build(plan,params['image_model'])
+        if normalized.get('concept'):
+            from .learning_concept import LABELS, configure_plan
+            configure_plan(plan,prompt_plan)
         plan['prompt_plan']=prompt_plan
         plan['master_count']=prompt_plan['counts']['master_count']
         plan['planned_image_calls']=prompt_plan['counts']['planned_image_calls']
@@ -146,6 +152,9 @@ def save_and_preview(engine, params):
             output['dependency_ids']=list(output['depends_on'])
             output['size_plan']=size_plan(output['width'],output['height'],params['image_model'],aspect_ratio=reuse['aspect_ratio'])
             method=output['size_plan']['source_ratio']+'目标安全区构图 → '+('AI自然扩展背景 → ' if reuse['background_image_required'] else '轻量裁切 → ')+'精确尺寸'
+            if reuse.get('concept_route'):
+                output['concept_route']=reuse['concept_route']
+                method=LABELS[reuse['concept_route']]+(' → GPT 补齐版位背景' if reuse['background_image_required'] else '')+' → 精确尺寸'
             if output['logo_required']:method+=' → 固定Logo图层'
             output['size_plan']['method_label']=method
             output['method']=method

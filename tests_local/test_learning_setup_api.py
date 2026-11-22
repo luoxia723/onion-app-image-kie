@@ -13,6 +13,7 @@ from PIL import Image
 
 from local_app.config import Settings, UserError
 from local_app.engine import Engine
+from local_app.learning_executor import LearningExecutor
 from local_app.learning_setup import CONFIGURATION_DOCUMENT, public_config
 from local_app.learning_sizing import export_exact, plan
 from local_app.server import Handler
@@ -44,6 +45,30 @@ def api(tmp_path, monkeypatch):
     server.shutdown();server.server_close();thread.join(5);engine.close()
 
 
+class FixtureLearningExecutor(LearningExecutor):
+    """Use local fixture pixels at the provider boundary of a real-mode run."""
+    def plan_scene(self,run,stop_event):
+        return super().plan_scene({**run,'mode':'simulation'},stop_event)
+
+    def generate_image(self,job,stop_event):
+        result=super().generate_image({**job,'simulation':True},stop_event)
+        return {**result,'simulated':False}
+
+    def inspect_typography(self,path,allowed,independent,reference,stop_event,*,removed_module=None):
+        return dict(verdict='pass',body=allowed.get('t1',''),cta=allowed.get('cta',''),
+                    issues=[],model='test-fixture',text_matches=True)
+
+
+@pytest.fixture
+def production_learning_api(api):
+    from local_app.learning_runtime import LearningRuntime
+    engine,_=api
+    engine.settings.key='test-only-image'
+    engine.settings.planning_key='test-only-planning'
+    engine.learning_runtime=LearningRuntime(engine,FixtureLearningExecutor(engine.settings))
+    return api
+
+
 def test_config_assets_and_only_one_pipeline_are_available_without_keys(api):
     engine,request=api;status,cfg=request('/api/learning-machine/config')
     assert status==200 and cfg['pipeline']=='baseline_then_suite'
@@ -52,6 +77,7 @@ def test_config_assets_and_only_one_pipeline_are_available_without_keys(api):
     assert sum(p['cta_required'] for p in cfg['placements'])==14
     assert cfg['execution']['enabled'] is False and not engine.tasks
     assert cfg['offline_prompt_preview_ready'] is True
+    assert cfg['runtime_modes']==['real'] and cfg['default_runtime_mode']=='real'
     assert len(cfg['master_groups'])==16
     assert len(cfg['mask_presets'])==1
     assert sum(p['mask_template']['enabled'] for p in cfg['placements'])==1

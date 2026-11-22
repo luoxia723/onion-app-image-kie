@@ -1,7 +1,21 @@
 """Verify delivery JPEG constraints and useful quality against the old encoder."""
-from PIL import Image, ImageChops, ImageDraw, ImageStat
+import pytest
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageStat
 
 from scripts.image_compress import compress
+from scripts.image_quality import EncodingQuality
+
+
+@pytest.mark.parametrize('origin', [(36, 35), (418, 135), (106, 306)], ids=['left', 'right', 'bottom'])
+def test_small_lettering_is_retained_across_layouts(origin):
+    reference = Image.new('RGB', (640, 360), '#ded5c6')
+    ImageDraw.Draw(reference).text(origin, 'NOTES 123', font=ImageFont.load_default(size=18), fill='#493b2f')
+    blurred = reference.filter(ImageFilter.GaussianBlur(1.15))
+    sharp = ImageChops.add(reference, Image.new('RGB', reference.size, (2, 2, 2)))
+
+    quality = EncodingQuality(reference)
+
+    assert quality.loss(sharp) < quality.loss(blurred)
 
 
 def test_jpeg_uses_budget_to_retain_color_edges(tmp_path):

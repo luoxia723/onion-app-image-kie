@@ -24,11 +24,13 @@ async function openMasterCanvasFromOrdinary(imageId){
 }
 function openMasterCanvasFromLearningBaseline(){
  const run=LEARNING_RUNS.current;if(!run||learningRunBusy(run)||LEARNING_RUNS.actionBusy||isSharedCanvasRun(run))return;
+ if(run.mode!=='real')return toast('请选择正式制作的来源图片');
  if(!learningBaselineApproved(run)||(S.learningBaselineVersion??run.baseline.version)!==run.baseline.version)return toast('请先查看并确认当前基准图');
  showMasterCanvasDialog({source:{kind:'learning',run_id:run.id,baseline:true,baseline_version:run.baseline.version},targetKind:'learning',count:1,expectedMode:run.mode,title:'已确认基准图 · 第'+run.baseline.version+'版',returnFocusId:'master-canvas-learning-baseline',previews:[{url:run.baseline.image_url,label:'基准图第'+run.baseline.version+'版'}]},run.params.pids);
 }
 function openMasterCanvasFromLearningOutput(outputId,version){
  const run=LEARNING_RUNS.current;if(!run||learningRunBusy(run)||LEARNING_RUNS.actionBusy)return;
+ if(run.mode!=='real')return toast('请选择正式制作的来源图片');
  if(isSharedCanvasRun(run)&&run.target_kind==='ordinary')return toast('请从原普通任务的完整套图建立多尺寸计划');
  const output=(run.outputs||[]).find(row=>row.id===outputId);
  if(!output||output.status!=='done'||Number(version)!==output.version)return toast('请先切回当前已完成的图片版本');

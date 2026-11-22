@@ -94,7 +94,7 @@ test('保存计划后聚焦并滚到可见结果，预览位于版位长列表�
 test('配置预览不能冒充真实基准图或用户确认，制作动作进入独立运行流程',()=>{
  const {run}=setup();run('S.learningPreview={baseline:{aspect_ratio:"16:9",state:"not_generated",has_image:false,artifact_ready:false,approval:{required:true,status:"waiting_for_image",confirmed:false,can_confirm:false}},confirmation:{required:true,confirmed:false,can_confirm:false,can_expand:false},suite:{can_expand:false},outputs:[],execution:{enabled:false,prompt_generation_ready:false}}');
  const h=run('viewLearningPlanPreview()');assert(h.includes('基准图待生成'));assert(h.includes('配置预览不代表基准图已生成或已确认'));assert(h.includes('等待用户确认基准图，不会自动开始'));assert(!h.includes('<img'));
- assert(!h.includes('id="learning-confirm-baseline"'));assert(!h.includes('onclick="learningRunAction'));assert(h.includes('从右侧开始模拟或真实制作'));assert(h.includes('不满意可重新生成'));
+ assert(!h.includes('id="learning-confirm-baseline"'));assert(!h.includes('onclick="learningRunAction'));assert(h.includes('配置预览不会生成图片'));assert(h.includes('不满意可重新生成'));
 });
 test('Logo操作区先于预览画布，保存按钮不落在长画布下方',()=>{
  const {run}=setup();run('S.view="learning-logo";S.learningLogoPid="learning-a"');const h=run('viewLearningLogoConfig()');

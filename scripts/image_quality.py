@@ -2,6 +2,9 @@
 from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 
+_DETAIL_WEIGHTS = [min(255, 8 * abs(level - 128)) for level in range(256)]
+
+
 def tight_png_budget(width, height, byte_limit):
     """Flag a PNG budget of at most 0.4 bytes per pixel."""
     return byte_limit is not None and byte_limit * 5 <= 2 * width * height
@@ -28,6 +31,9 @@ class EncodingQuality:
         self.backgrounds = [Image.new('RGBA', image.size, color) for color in ('white', 'black')] if self.transparent else [None]
         self.colors = [self._visible(self.reference, background) for background in self.backgrounds]
         self.details = [_detail(rgb) for rgb in self.colors]
+        self.detail_weights = [detail.point(_DETAIL_WEIGHTS) for detail in self.details]
+        # The floor limits the influence of isolated edges in nearly flat images.
+        self.detail_weight_means = [max(8, ImageStat.Stat(weights).mean[0]) for weights in self.detail_weights]
         self.logo_box = logo_box
 
     @staticmethod
@@ -48,9 +54,13 @@ class EncodingQuality:
             raise ValueError('Candidate size must match reference')
         rgba = candidate.convert('RGBA')
         worst = 0
-        for background, reference, detail in zip(self.backgrounds, self.colors, self.details):
+        for background, reference, detail, weights, weight_mean in zip(
+                self.backgrounds, self.colors, self.details, self.detail_weights, self.detail_weight_means):
             visible = self._visible(rgba, background)
-            error = _error(reference, visible) + 2 * _error(detail, _detail(visible))
+            detail_error = ImageChops.difference(detail, _detail(visible))
+            weighted_error = ImageStat.Stat(ImageChops.multiply(detail_error, weights)).mean[0]
+            error = (_error(reference, visible) + 2 * ImageStat.Stat(detail_error).mean[0]
+                     + 0.5 * weighted_error * 255 / weight_mean)
             if self.logo_box:
                 error += 0.5 * _error(reference.crop(self.logo_box), visible.crop(self.logo_box))
             worst = max(worst, error)

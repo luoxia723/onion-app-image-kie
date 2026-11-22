@@ -43,6 +43,11 @@ def _source_plan(engine,params,source):
     normalized['learning_logo_snapshot']=learning_logo.freeze_templates(engine.settings,normalized['pids'])
     normalized['learning_mask_snapshot']={pid:learning_mask.preset_for(pid) for pid in normalized['pids']}
     compiled=learning_prompts.build(plan,normalized['image_model'])
+    if normalized.get('concept'):
+        from .learning_concept import configure_plan
+        configure_plan(plan,compiled)
+        plan.update(params=copy.deepcopy(normalized),prompt_plan=compiled)
+        return plan
     for master in compiled['masters']:
         if master.get('reuse_baseline'):
             master.update(prompt=master['single_regeneration_prompt'],reuse_baseline=False,image_generation_required=True,
@@ -114,8 +119,16 @@ def freeze_run(engine,params,run_dir,*,confirmed_source=None):
                 asset_bindings=list(bindings.values()),placements=placements,placement_snapshots=copy.deepcopy(placements),
                 group_snapshot=groups,logo_snapshot=logo,mask_snapshot=masks)
     frozen['baseline_reference_bindings']=resolve_bindings(frozen,frozen['compiled']['baseline']['reference_bindings'])
+    if normalized.get('concept') and not confirmed_source:
+        from .learning_concept import resolve
+        concept,source=resolve(engine.settings,normalized['concept'])
+        target=run_dir/'baselines'/('v1'+source.suffix)
+        _copy_checked(source,target,concept['id'])
+        frozen['uploaded_baseline']=dict(id='baseline',version=1,status='done',raw_path=str(target),sha256=concept['id'],
+                                         prompt=frozen['compiled']['baseline']['prompt'],uploaded=True)
     if confirmed_source:
-        baseline=copy.deepcopy(confirmed_source['baseline']);path=run_dir/'baselines'/'v1.png'
+        baseline=copy.deepcopy(confirmed_source['baseline'])
+        path=run_dir/'baselines'/('v1'+(Path(baseline['raw_path']).suffix if normalized.get('concept') else '.png'))
         _copy_checked(_source_path(engine,confirmed_source,baseline['raw_path']),path,baseline['sha256'])
         replacements={str(record['path']):bindings[key]['path'] for key,record in source_bindings.items() if key in bindings}
         actual=[]
@@ -194,6 +207,10 @@ def compile_single(run,output_id):
                   output_ids=[output_id],delivery_count=1,reuse_baseline=False,image_generation_required=True,
                   needs_image_model_call=True,force_image_regeneration=True,reuse_existing_master=False,
                   updates_shared_master=False,updates_siblings=False)
+    if master.get('main_visual_framing',{}).get('removed_ad_module'):
+        master.pop('concept_audit_box',None)
+        if not output.get('background_image_required'):
+            master['concept_audit_box']=output['crop_box']
     return master
 
 

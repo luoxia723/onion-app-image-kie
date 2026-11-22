@@ -290,7 +290,7 @@ test('学习机整套计数忽略旧多套配置，不宣称真实模型调用�
  const ctx=context();Object.assign(ctx.S.draft,{channel:'学习机',pids:placements.filter(p=>p.category==='学习机').map(p=>p.id),sets:3});
  const count=ctx.S.draft.pids.map(id=>placements.find(p=>p.id===id)).reduce((n,p)=>n+p.image_count,0);
  assert.equal(vm.runInContext('totalOf(S.draft)',ctx),count);
- const detail=vm.runInContext('learningProduction(S.draft)',ctx);assert(detail.includes('先生成并查看 1 张基准图'));assert(detail.includes('可先审核计划，再开始模拟或真实制作'));assert(!detail.includes('个模型任务'));
+ const detail=vm.runInContext('learningProduction(S.draft)',ctx);assert(detail.includes('先生成并查看 1 张基准图'));assert(detail.includes(`${count} 张成品`));assert(!detail.includes('个模型任务'));
  const html=vm.runInContext('viewForm()',ctx);assert(!html.includes('id="f-sets"'));assert(html.includes('固定生成一整套'));
 });
 test('普通任务统一选择黑字或白字APP版，兼容旧别名且保留不用Logo限制',()=>{

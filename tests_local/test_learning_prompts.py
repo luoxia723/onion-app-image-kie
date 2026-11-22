@@ -1,10 +1,12 @@
 import copy
 import json
 import socket
+from types import SimpleNamespace
 
 import pytest
 
 from local_app.config import UserError
+from local_app import learning_logo
 from local_app import learning_pipeline as pipeline
 from local_app import learning_prompts as prompts
 from scripts.kie_model import GPT_IMAGE_26_FLARE, MODEL
@@ -106,7 +108,15 @@ def test_style_language_is_expanded_and_font_reference_only_on_textual_masters()
     for m in result['masters']:
         fonts=[r for r in m['reference_bindings'] if r['kind']=='font']
         assert bool(fonts)==(m['content_mode']!='pure')
-        if fonts:assert fonts[0]['asset_id']==font and '不继承参考原文' in fonts[0]['purpose']
+        if fonts:
+            assert fonts[0]['asset_id']==font and '不继承参考原文' in fonts[0]['purpose']
+            instruction=next(line for line in m['prompt'].splitlines() if line.startswith(f"参考图{fonts[0]['slot']}："))
+            for feature in ('字形比例','笔画粗细','描边层次','字色搭配','主次字号关系'):
+                assert feature in instruction
+            assert '保留后半句和末尾标点' in m['prompt']
+            assert instruction in m['single_regeneration_prompt']
+        else:
+            assert '字色搭配' not in m['prompt']
 
 
 def test_ip_and_builtin_style_bindings_do_not_leak_paths_or_apply_logo_style():
@@ -149,8 +159,11 @@ def test_image_prompts_only_include_visual_context_not_application_or_export_pro
     assert derivative['allowed_text']=={'t1':'拍照下载也要保留这句'}
 
 
-def test_content_safe_area_insets_crop_and_mask_edges_and_exports_preserve_unknown_content():
-    result=compiled()
+def test_content_safe_area_insets_crop_and_mask_edges_and_exports_preserve_unknown_content(tmp_path):
+    draft=plan()
+    params=draft['normalized_params']
+    params['learning_logo_snapshot']=learning_logo.freeze_templates(SimpleNamespace(state_dir=tmp_path),params['pids'])
+    result=prompts.build(draft,GPT_IMAGE_26_FLARE)
     for entry in [result['baseline'],*result['masters']]:
         frame=entry.get('mask_safe_area') or entry['shared_safe_area']
         safe=entry['content_safe_area']
@@ -162,6 +175,9 @@ def test_content_safe_area_insets_crop_and_mask_edges_and_exports_preserve_unkno
     assert all(o['natural_background_threshold_percent']==8 for o in result['outputs'])
     cta=next(m for m in result['masters'] if m['group_id']=='D6')
     assert '按钮外框、投影' in cta['prompt']
+    assert '正文、描边和按钮整体避开' in cta['prompt']
+    copy_only=next(m for m in result['masters'] if m['group_id']=='E7')
+    assert '正文和描边整体避开' in copy_only['prompt']
 
 
 def test_main_visual_workflow_contract_protects_the_whole_action_group_not_just_face():

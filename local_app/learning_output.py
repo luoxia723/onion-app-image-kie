@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from io import BytesIO
+import math
 import os
 from pathlib import Path
 import shutil
@@ -10,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops
 
 from scripts.image_quality import EncodingQuality, logo_bounds, tight_png_budget
 from .config import UserError
@@ -95,6 +96,45 @@ class _AlphaPalette:
         result.putpalette(indexed.getpalette()[:colors*3] + self.fringe_colors)
         result.info['transparency'] = bytes([255]*colors + self.levels)
         return result
+
+
+def _rounded_alpha(width, height, radius, *, coverage_steps):
+    """Compute the fraction of each edge pixel covered by the rounded rectangle."""
+    radius = min(radius, width // 2, height // 2)
+    alpha = Image.new('L', (width, height), 255)
+    if not radius:
+        return alpha
+    radius_squared = radius * radius
+
+    def circle_integral(x):
+        return (x * math.sqrt(radius_squared - x*x) + radius_squared * math.asin(x / radius)) / 2
+
+    corner_data = bytearray()
+    for y in range(radius):
+        # In a single quadrant, the lower and upper bounds of the pixel row
+        # determine which columns are entirely outside or inside the circle.
+        bottom = radius - y - 1
+        full = math.sqrt(radius_squared - (bottom + 1)**2)
+        empty = math.sqrt(radius_squared - bottom**2)
+        first_partial = radius - math.ceil(empty)
+        first_opaque = radius - math.floor(full)
+        corner_data.extend(b'\x00' * first_partial)
+        for x in range(first_partial, first_opaque):
+            left = radius - x - 1
+            start = max(left, full)
+            end = min(left + 1, empty)
+            area = max(0, full - left) + circle_integral(end) - circle_integral(start) - bottom * (end - start)
+            level = min(coverage_steps, max(0, round(area * coverage_steps)))
+            corner_data.append(round(255 * level / coverage_steps))
+        corner_data.extend(b'\xff' * (radius - first_opaque))
+
+    corner = Image.frombytes('L', (radius, radius), bytes(corner_data))
+    right = corner.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    alpha.paste(corner, (0, 0))
+    alpha.paste(right, (width - radius, 0))
+    alpha.paste(corner.transpose(Image.Transpose.FLIP_TOP_BOTTOM), (0, height - radius))
+    alpha.paste(right.transpose(Image.Transpose.FLIP_TOP_BOTTOM), (width - radius, height - radius))
+    return alpha
 
 
 class _LogoPalette:
@@ -407,12 +447,9 @@ def export_output(source,target,placement_id,logo_snapshot,*,mask_snapshot=None,
         radius=row['corner_radius'];limit=row.get('max_file_size_kb')
         local_edge_colors=False
         if radius:
-            scale=4
-            alpha=Image.new('L',(width*scale,height*scale),0)
-            ImageDraw.Draw(alpha).rounded_rectangle((0,0,width*scale-1,height*scale-1),radius=radius*scale,fill=255)
-            # Area sampling keeps the curve antialiased without the alpha
-            # overshoot and ghost pixels produced by a sharpening filter.
-            alpha=alpha.resize((width,height),Image.Resampling.BOX)
+            # Limit the number of alpha values needed by indexed PNG, leaving
+            # palette entries for the artwork under a channel byte limit.
+            alpha=_rounded_alpha(width,height,radius,coverage_steps=32 if limit is not None else 255)
             original_alpha=image.getchannel('A')
             local_edge_colors=original_alpha.getextrema()==(255,255)
             image.putalpha(ImageChops.multiply(original_alpha,alpha))

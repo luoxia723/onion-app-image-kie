@@ -49,7 +49,10 @@ def _ordinary(engine, source):
             path,sha=version.get('jpeg'),version.get('sha256')
             contains_logo=not bool(params.get('noLogo'))
             if version.get('delivery_eligible') is False:raise UserError('来源图片未通过交付规格，请先完成制作',409)
-        rows.append(dict(image_index=slot['idx'],path=path,sha256=sha,task_id=task['id'],image_id=sid,
+        source_placement=engine.placement(task,round,slot)
+        modules=dict(main_copy=bool(params.get('t1') or params.get('t2') or params.get('s'+str(slot['idx']))),
+                     cta=bool(_effective_cta(params,source_placement)))
+        rows.append(dict(image_index=slot['idx'],path=path,sha256=sha,task_id=task['id'],image_id=sid,ad_modules=modules,
                          att=att,source_kind='ordinary',source_contains_logo=contains_logo,
                          actual_prompt=version.get('prompt',''),
                          mode='simulation' if round.get('simulation',True) else 'real',raw_selected=use_raw))
@@ -77,6 +80,10 @@ def _learning(engine, source,source_runtime=None):
             (row.get('version'),row.get('sha256'),run.get('mode'))):
             raise UserError('请先确认来源批次当前基准图',409)
         sha=row.get('sha256');image_id='baseline';kind='learning_baseline';contains=False
+        modules=row.get('ad_modules')
+        if modules is None:
+            concept=run['params'].get('concept') if row.get('uploaded') else None
+            modules=dict(main_copy=bool(concept),cta=bool(concept and concept.get('button_text')))
     else:
         ids=source.get('output_ids')
         if not isinstance(ids,list) or len(ids)!=1 or not isinstance(ids[0],str):raise UserError('请选择一张学习机无Logo来源图')
@@ -87,8 +94,9 @@ def _learning(engine, source,source_runtime=None):
             raise UserError('来源图片版本不正确')
         if versions.get(row['id'],row['version'])!=row['version']:raise UserError('来源图片版本已更新，请重新选择',409)
         sha=row.get('raw_sha256');image_id=row['id'];kind='learning_output';contains=False
+        modules=run.get('placement_snapshots',{}).get(row.get('placement_id'),{}).get('modules',{})
     value=dict(image_index=1,path=row.get('raw_path'),sha256=sha,run_id=rid,image_id=image_id,
-               version=row['version'],source_kind=kind,source_contains_logo=contains,
+               version=row['version'],source_kind=kind,source_contains_logo=contains,ad_modules=copy.deepcopy(modules),
                actual_prompt=row.get('prompt',''),mode=run['mode'])
     return [value],copy.deepcopy(run['params']),[Path(run['directory']),engine.settings.output/'.restored'],dict(
         kind='learning',run_id=rid,image_id=image_id,image_count=1,mode=run['mode'],name=run.get('name') or run['params'].get('t1',''))
@@ -144,7 +152,7 @@ def _target_copy(params,p,index,count,learning):
 
 def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
     """Return frozen sources, groups and renderer snapshots without generating."""
-    from . import master_canvas,brand_logo,learning_logo,learning_mask
+    from . import master_canvas,brand_logo,learning_logo,learning_mask,learning_prompts
     from .planning import BY_ID
     from .learning_pipeline import CONTENT_BY_ID
     from .learning_sizing import content_size
@@ -204,9 +212,15 @@ def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
     masters=[]
     for group in geometry['groups']:
         source=sources[group['source_index']-1]
-        prompt=master_canvas.prompt(group['allowed_text'],group,source_size=[source['width'],source['height']])
+        removed=learning_prompts.removed_ad_module(source['ad_modules'],group['allowed_text']) if learning else None
+        prompt=master_canvas.prompt(group['allowed_text'],group,source_size=[source['width'],source['height']],removed=removed)
+        framing={}
+        if removed:
+            framing=dict(main_visual_framing=learning_prompts.removal_framing(
+                {'main_visual_safe_area':group['content_safe_box']},group['aspect_ratio'],removed),
+                concept_audit_box=group['shared_visible_box'])
         masters.append({**group,'group_id':group['id'],'canvas_plan':copy.deepcopy(group),'source_id':source['id'],
-            'source_index':group['source_index'],'prompt':prompt,
+            'source_index':group['source_index'],'prompt':prompt,**framing,
             'output_ids':group['target_ids'],'placement_ids':list(dict.fromkeys(target_map[i]['placement_id'] for i in group['target_ids'])),
             'reuse_baseline':False,'needs_image_model_call':True,'image_generation_required':True,
             'single_regeneration_prompt':prompt,

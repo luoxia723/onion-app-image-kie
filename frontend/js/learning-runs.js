@@ -1,6 +1,6 @@
 /* Learning runs use their own API/state; ordinary task rounds stay independent. */
 let LEARNING_RUNS={items:[],current:null,loading:false,error:'',actionBusy:false,actionKeys:{},backgroundKeys:{},masterKeys:{},lastListAt:0};
-const LEARNING_IMAGE_STATUS={not_generated:'待开始',waiting_for_baseline_confirmation:'等待确认基准图',queued:'等待中',generating:'制作中',processing:'尺寸与图层处理中',done:'已完成',failed:'需要处理',interrupted:'已中断',blocked:'等待来源母版恢复'};
+const LEARNING_IMAGE_STATUS={not_generated:'待开始',waiting_for_baseline_confirmation:'等待确认基准图',queued:'等待中',generating:'制作中',processing:'尺寸与图层处理中',done:'已完成',failed:'需要处理',interrupted:'已中断',blocked:'等待来源母版恢复',visual_hold:'等待文字复核'};
 const LEARNING_RUN_STATUS={configured:'待生成基准图',generating_baseline:'正在生成基准图',waiting_for_confirmation:'待确认基准图',baseline_confirmed:'基准图已确认',generating_suite:'正在制作整套',completed:'整套已完成',failed:'需要处理',interrupted:'制作已中断'};
 function learningRunPath(id,suffix=''){return '/learning-machine/runs/'+encodeURIComponent(id)+suffix}
 function isSharedCanvasRun(run){return run?.kind==='shared_canvas_adaptation'}
@@ -49,32 +49,33 @@ async function refreshLearningRun(){
  }catch(error){if(epoch===viewEpoch&&S.view==='learning-run'&&S.learningRunId===id){LEARNING_RUNS.error=error.message;S.connectionLost=true;softRender()}}
  finally{LEARNING_RUNS.loading=false}
 }
-async function startLearningRun(mode='simulation'){
+async function startLearningRun(){
  if(S.submitting||S.navigationPending||LEARNING_RUNS.actionBusy||S.uploadingPurpose)return;
- if(mode!=='simulation'&&mode!=='real')return;
  if(!learningForm(S.draft))return;
  if(S.learningLogoDirty)return toast('请先保存Logo模板');
  S.tried=true;normalizeLearningDraft(S.draft);const issue=formIssue(S.draft);
  if(issue){focusLearningFormIssue(issue);return}
- if(mode==='real'&&(!CFG.kie||!CFG.planningKey)){toast('真实制作需要配置规划和生图Key');return openCfg()}
+ if(!CFG.kie||!CFG.planningKey){toast('请先配置画面规划和图片生成 Key');return openCfg()}
  const params=structuredClone(S.draft);params.image_model=params.image_model||CFG.imageModel;
- const fingerprint=JSON.stringify({params,mode});
+ const fingerprint=JSON.stringify(params);
  if(S.learningCreateFingerprint!==fingerprint){S.learningCreateKey=crypto.randomUUID();S.learningCreateFingerprint=fingerprint}
  LEARNING_RUNS.actionBusy=true;S.submitting=true;render();
- try{await persistDraft();const run=await request('/learning-machine/runs','POST',{params,mode,idempotency_key:S.learningCreateKey});
-  if(run.mode!==mode)throw new Error('制作模式与请求不一致，已停止提交，请刷新后核对');
+ try{await persistDraft();const run=await request('/learning-machine/runs','POST',{params,mode:'real',idempotency_key:S.learningCreateKey});
+  if(run.mode!=='real')throw new Error('制作模式与请求不一致，已停止提交，请刷新后核对');
   installLearningRun(run);S.learningCreateKey=null;S.learningCreateFingerprint=null;S.cur=null;S.view='learning-run';S.learningOutputVersions={};S.learningBaselineVersion=null;S.learningBaselineExpanded=null;S.learningRunChannel='';S.learningImagePreview=null;
   productionSelectStage(run,'baseline');save(false);render();
+  if(run.concept){toast('请核对概念图和填写的文案');return}
   const key='initial-baseline:'+run.id;
   LEARNING_RUNS.actionKeys[key]=LEARNING_RUNS.actionKeys[key]||crypto.randomUUID();
   const started=await request(learningRunPath(run.id,'/baseline'),'POST',{idempotency_key:LEARNING_RUNS.actionKeys[key]});
   if(S.view==='learning-run'&&S.learningRunId===run.id)installLearningRun(started);
-  toast(mode==='real'?'基准图已提交，完成后请先查看确认':'正在本机生成演练基准图，不调用模型');
+  toast('基准图已提交，完成后请先查看确认');
  }catch(error){LEARNING_RUNS.error=error.message;report(error)}
  finally{LEARNING_RUNS.actionBusy=false;S.submitting=false;render()}
 }
 async function makeLearningRunFromBaseline(){
  const run=LEARNING_RUNS.current;if(!run||isSharedCanvasRun(run)||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
+ if(run.mode!=='real')return toast('请选择正式制作的基准图');
  const baseline=run.baseline||{};
  if(!learningBaselineApproved(run)||(S.learningBaselineVersion??baseline.version)!==baseline.version)return toast('请先查看并确认当前基准图后再沿用');
  const scope='from-baseline:'+run.id+':'+baseline.version;
@@ -99,6 +100,7 @@ async function learningRunAction(action,outputId=null){
  if(action==='expand'&&run.suite?.status==='completed'&&run.suite.baseline_version===baseline.version&&learningRunOutputsReady(run))return toast('这一版基准图的整套已经完成，可单独重出某张图片');
  const output=outputId&&(run.outputs||[]).find(x=>x.id===outputId);
  if(action==='regenerate'&&!output)return;
+ if(action==='baseline'&&run.concept)return;
  if(action==='regenerate'&&output.logo_refresh_pending)return toast('本图等待本机Logo更新，请使用“重试Logo更新”，不需要重新生图');
  if(action==='regenerate'&&output.background_repair_pending)return toast('本图已有背景适配任务，请先恢复背景查询，避免重新提交');
  if(action==='regenerate'&&S.learningOutputVersions?.[outputId]&&S.learningOutputVersions[outputId]!==output.version)return toast('请切回本图当前版本后重出');
@@ -118,6 +120,25 @@ async function learningRunAction(action,outputId=null){
   if(action==='confirm')toast('基准图已确认，可以扩展整套');
  }catch(error){if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error);if(error.status&&error.status<500)delete LEARNING_RUNS.actionKeys[scope]}}
  finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch){render();if(focusResults){const results=document.getElementById('learning-stage-progress');results?.focus({preventScroll:true});results?.scrollIntoView({block:'start',behavior:'auto'})}}}
+}
+async function resolveLearningVisual(kind,id,action){
+ const run=LEARNING_RUNS.current;
+ if(!run||learningRunBusy(run)||LEARNING_RUNS.actionBusy)return;
+ const row=(kind==='master'?run.masters:run.outputs).find(item=>item.id===id),review=row?.visual_review;
+ if(!review)return;
+ const scope=[run.id,'visual',kind,id,row.version,action].join(':');
+ const key=LEARNING_RUNS.actionKeys[scope]||(LEARNING_RUNS.actionKeys[scope]=crypto.randomUUID());
+ const epoch=viewEpoch;LEARNING_RUNS.actionBusy=true;LEARNING_RUNS.error='';render();
+ try{
+  const next=await request(learningRunPath(run.id,'/visual/'+kind+'/'+encodeURIComponent(id)),'POST',
+   {action,version:row.version,sha256:review.review_sha256,idempotency_key:key});
+  delete LEARNING_RUNS.actionKeys[scope];
+  if(epoch!==viewEpoch||LEARNING_RUNS.current?.id!==run.id)return;
+  installLearningRun(next);
+ }catch(error){
+  if(error.status&&error.status<500)delete LEARNING_RUNS.actionKeys[scope];
+  if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error)}
+ }finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
 }
 async function packageLearningRun(){
  const run=LEARNING_RUNS.current;if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
@@ -186,7 +207,7 @@ async function repairLearningOutputBackground(outputId,forceAi=false){
 async function configureLearningRunAgain(){
  const run=LEARNING_RUNS.current;if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
  const params={...structuredClone(run.params),channel:'学习机',image_form:'单图',sets:1,references:[]};
- await newDraft(params);S.learningCreateMode='simulation';toast('已复制文案与版位，请确认画面设定后生成新基准图');
+ await newDraft(params);toast('已复制文案与版位，请确认画面设定后生成新基准图');
 }
 function backFromLearningRun(){if(S.submitting||LEARNING_RUNS.actionBusy)return;if(typeof openWorkspacePage==='function')return openWorkspacePage('tasks');viewEpoch++;S.view='form';S.learningRunId=null;S.learningImagePreview=null;save(false);render()}
 function setLearningBaselineVersion(version){if(LEARNING_RUNS.current&&!isSharedCanvasRun(LEARNING_RUNS.current))productionSelectStage(LEARNING_RUNS.current,'baseline');S.learningBaselineVersion=Number(version);S.learningBaselineExpanded=true;render()}
@@ -306,9 +327,9 @@ function viewLearningImageDetails(run){
  const current=preview.kind==='baseline'?run.baseline:(preview.kind==='master'?run.masters:run.outputs)?.find(row=>row.id===preview.id);
  const history=preview.kind==='baseline'?run.baseline_versions:current?.versions,versions=learningVersions(current,history);
  const selected=current&&learningPromptVersion(run,preview.kind,preview.id,preview.version);
- const title=selected?[preview.kind==='baseline'?(isSharedCanvasRun(run)?'来源图快照':'基准图'):selected.platform||selected.channel||'',preview.kind==='baseline'?'':selected.name||'成品','第'+selected.version+'版'].filter(Boolean).join(' · '):preview.label;
- const imageUrl=selected?selected.image_url:preview.url;
- return `<div class="mask learning-image-modal" role="dialog" aria-modal="true" aria-label="学习机图片详情" onclick="if(event.target===this)closeLearningImage()"><div class="learning-image-dialog"><div class="learning-image-detail-header"><h3>${esc(title)}</h3><button class="x" id="learning-image-close" aria-label="关闭图片详情" onclick="closeLearningImage()">×</button></div><div class="learning-image-detail-layout"><div class="learning-image-visual">${imageUrl?`<img src="${esc(imageUrl)}" alt="${esc(title)}"><a href="${esc(imageUrl)}" download>下载这张图片</a>`:'<div class="learning-run-placeholder">这版图片尚未完成，可查看已保存的提示词。</div>'}</div><section class="learning-image-info" aria-label="图片版本与实际提示词">${versions.length?`<label class="learning-detail-version">图片版本<select id="learning-image-version" onchange="setLearningImageDetailVersion(this.value)">${versions.map(row=>`<option value="${row.version}" ${row.version===preview.version?'selected':''}>第${row.version}版${row.version===current.version?' · 当前':''}</option>`).join('')}</select></label>`:''}${selected?.baseline_version?`<p class="field-help">${isSharedCanvasRun(run)?'来源快照记录：第':'来源：基准图第'}${selected.baseline_version}版</p>`:''}${selected?viewProductionImageActions(run,preview.kind,current,selected):''}${selected?viewLearningActualPrompt(run,selected,preview.kind,preview.id,true,'detail'):isSharedCanvasRun(run)?'<p class="field-help">这是冻结的来源图快照，未重新生图；原历史提示词请在来源任务中查看。</p>':'<p class="field-help">这张图片未保存可查看的提示词记录。</p>'}${selected&&preview.kind==='output'&&typeof openMasterCanvasFromLearningOutput==='function'&&!(isSharedCanvasRun(run)&&run.target_kind==='ordinary')?`<button id="master-canvas-learning-output" ${learningRunBusy(run)||selected.version!==current.version||selected.status!=='done'?'disabled':''} onclick="openMasterCanvasFromLearningOutput(${learningRunJs(preview.id)},${selected.version})">制作多尺寸母版</button>`:''}</section></div></div></div>`;
+ const title=selected?[preview.kind==='baseline'?(isSharedCanvasRun(run)?'来源图快照':'基准图'):selected.platform||selected.channel||'',preview.kind==='baseline'?'':selected.name||(preview.kind==='master'?'母版 '+(selected.group_id||preview.id):'成品'),'第'+selected.version+'版'].filter(Boolean).join(' · '):preview.label;
+ const imageUrl=selected?(selected.image_url||selected.visual_review?.repair_url||selected.visual_review?.original_url):preview.url;
+ return `<div class="mask learning-image-modal" role="dialog" aria-modal="true" aria-label="学习机图片详情" onclick="if(event.target===this)closeLearningImage()"><div class="learning-image-dialog"><div class="learning-image-detail-header"><h3>${esc(title)}</h3><button class="x" id="learning-image-close" aria-label="关闭图片详情" onclick="closeLearningImage()">×</button></div><div class="learning-image-detail-layout"><div class="learning-image-visual">${imageUrl?`<img src="${esc(imageUrl)}" alt="${esc(title)}">${selected?.image_url?`<a href="${esc(imageUrl)}" download>下载这张图片</a>`:''}`:'<div class="learning-run-placeholder">这版图片尚未完成，可查看已保存的提示词。</div>'}</div><section class="learning-image-info" aria-label="图片版本与实际提示词">${versions.length?`<label class="learning-detail-version">图片版本<select id="learning-image-version" onchange="setLearningImageDetailVersion(this.value)">${versions.map(row=>`<option value="${row.version}" ${row.version===preview.version?'selected':''}>第${row.version}版${row.version===current.version?' · 当前':''}</option>`).join('')}</select></label>`:''}${selected?.baseline_version?`<p class="field-help">${isSharedCanvasRun(run)?'来源快照记录：第':'来源：基准图第'}${selected.baseline_version}版</p>`:''}${selected?viewProductionVisual(preview.kind,selected,learningRunBusy(run)||LEARNING_RUNS.actionBusy,selected.version===current.version):''}${selected?viewProductionImageActions(run,preview.kind,current,selected):''}${selected?viewLearningActualPrompt(run,selected,preview.kind,preview.id,true,'detail'):isSharedCanvasRun(run)?'<p class="field-help">这是冻结的来源图快照，未重新生图；原历史提示词请在来源任务中查看。</p>':'<p class="field-help">这张图片未保存可查看的提示词记录。</p>'}${selected&&preview.kind==='output'&&run.mode==='real'&&typeof openMasterCanvasFromLearningOutput==='function'&&!(isSharedCanvasRun(run)&&run.target_kind==='ordinary')?`<button id="master-canvas-learning-output" ${learningRunBusy(run)||selected.version!==current.version||selected.status!=='done'?'disabled':''} onclick="openMasterCanvasFromLearningOutput(${learningRunJs(preview.id)},${selected.version})">制作多尺寸母版</button>`:''}</section></div></div></div>`;
 }
 function viewLearningBaselineSource(run){
  const source=run.baseline_source;if(run.baseline?.inherited!==true||typeof source?.run_id!=='string'||!source.run_id)return '';

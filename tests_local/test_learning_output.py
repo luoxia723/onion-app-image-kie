@@ -57,6 +57,11 @@ def test_rounded_card_has_one_clean_alpha_transition(tmp_path):
     assert alpha.crop((0, 0, 44, 44)).tobytes() == alpha.crop((440, 0, 484, 44)).transpose(
         Image.Transpose.FLIP_LEFT_RIGHT).tobytes()
     assert alpha.getpixel((44, 0)) == alpha.getpixel((0, 44)) == 255
+    for x, y in ((15, 10), (17, 8), (16, 9), (20, 6)):
+        # Independently measure the approved 44 px circle at subpixel scale.
+        covered = sum((44 - x - (i + 0.5) / 64) ** 2 + (44 - y - (j + 0.5) / 64) ** 2 <= 44 ** 2
+                      for i in range(64) for j in range(64))
+        assert abs(alpha.getpixel((x, y)) - 255 * covered / 4096) <= 5
     assert target.stat().st_size < 100 * 1024
 
 

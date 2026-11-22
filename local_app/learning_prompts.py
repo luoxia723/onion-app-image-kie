@@ -21,6 +21,10 @@ NATURAL_BACKGROUND_THRESHOLD_PERCENT = 8
 MODES = {'pure':(), 'copy':('t1',), 'copy_cta':('t1','cta')}
 LIMITS = {'t1':1000,'cta':1000,'feature_label':1000,'extra_heading':1000,
           'extra_description':1000,'feature_note':200,'product_facts':20000}
+FONT_REFERENCE_PURPOSE = (
+    '只参考字形比例、笔画粗细、描边层次、字色搭配和主次字号关系，正文和标题使用同一套字体风格；'
+    '不继承参考原文或整图画风，按本次给定原文排字'
+)
 
 
 def _read(path):
@@ -93,7 +97,39 @@ def _percent_box(box):
     return '横向'+str(round(box[0]*100,1))+'%—'+str(round(box[2]*100,1))+'%，纵向'+str(round(box[1]*100,1))+'%—'+str(round(box[3]*100,1))+'%'
 
 
+def removed_ad_module(source_modules, target_text):
+    if source_modules.get('main_copy') and not (target_text.get('t1') or target_text.get('subtitle')):
+        return 'body'
+    if source_modules.get('cta') and not target_text.get('cta'):
+        return 'cta'
+    return None
+
+
+def removal_framing(contract, ratio, removed):
+    return dict(contract,source_framing='recompose_after_content_removal',removed_ad_module=removed,
+                orientation='wide' if Fraction(ratio.replace(':','/'))>=1 else 'tall',
+                inspection='removal_composition_review')
+
+
 def _framing_prompt(contract):
+    if removed:=contract.get('removed_ad_module'):
+        if contract['orientation']=='wide':
+            placement=('把主要动作放到画面中部并向左右展开，关键互动道具放在视线交汇处。'
+                       '有辅助分镜时，可移到释放的侧面空间，与主场景形成清楚的主次。')
+        else:
+            placement=('让主动作在画面中部形成完整的纵向构图，上下空间交给原有道具、场景或辅助分镜。'
+                       '辅助分镜比主场景小，避免把主场景挤到画面一角。')
+        if removed=='cta':
+            reflow=('构图：移除按钮、按钮框和投影后，重新安排正文与主视觉的间距和位置。'
+                    '沿用正文的字风、配色和阅读层级，保留完整文案，用原有画面内容承接按钮腾出的位置。')
+        else:
+            reflow=('构图：去掉广告正文和按钮后，重新分配整张画面的空间。'
+                    '把原文案区用于主要人物、互动道具或原有分镜。')
+            if contract['orientation']=='wide':
+                placement+='有多个人物时，按原本动作关系分布在中线两侧。'
+        return (reflow+placement+'按目标画幅等比调整主体大小，以原有内容重新建立画面重心；腾出的空间不留成大片空底。'
+                '完整保留关键主视觉，放在画面的'+_percent_box(contract['main_visual_safe_area'])+'范围内。'
+                '边缘保留少量自然留白，指定Logo留位使用低对比背景；人物、道具和辅助分镜均避开留位。')
     return ('构图：镜头退远，把主体和动作涉及的关键道具作为一组缩小、重排，完整放在画面的'
             +_percent_box(contract['main_visual_safe_area'])+'范围内。整组高度最多占画面'
             +str(round(contract['max_group_height_fraction']*100,1))+'%。'
@@ -106,7 +142,7 @@ def _reference_prompt(bindings):
     roles={'confirmed_baseline':'保留这张图的主体身份、人数、画风、配色与主题，重新安排景别和构图',
            'ip_identity':'只参考人物身份、发型、脸型与服装识别，不继承原图文字和裁边',
            'style':'只参考造型、色彩、光线与材质，不复制原图人物或广告字',
-           'font':'只参考允许文字的字形，不复制原文字或整幅构图'}
+           'font':FONT_REFERENCE_PURPOSE}
     descriptions=[]
     for row in bindings:
         role=roles.get(row['kind'])
@@ -123,6 +159,7 @@ def _reference_prompt(bindings):
 def _content_prompt(mode,allowed):
     if mode=='pure':return '不排广告正文、CTA文字或按钮。'
     text='正文逐字写：'+_quoted(allowed['t1'])+'。'
+    text+='按原顺序呈现全文及标点，允许按语意换行。空间较紧时重排或等比缩小整个字块，保留后半句和末尾标点。'
     if mode=='copy_cta':
         text+='独立按钮逐字写：'+_quoted(allowed['cta'])+'。按钮外框、投影完整可见。'
     else:
@@ -130,10 +167,12 @@ def _content_prompt(mode,allowed):
     return text+'正文优先清晰，与主体分区安排，不遮住脸、手或关键物体。只使用这些广告文字。'
 
 
-def _brand_space_prompt(zones):
+def _brand_space_prompt(zones,mode):
     boxes=sorted({tuple(round(x,3) for x in z['master_box']) for z in zones})
     if not boxes:return ''
-    return '品牌留位：'+ '；'.join(_percent_box(box) for box in boxes)+'。这些区域只放低对比背景，不绘Logo或占位框。'
+    foreground={'pure':'主视觉','copy':'正文和描边','copy_cta':'正文、描边和按钮'}[mode]
+    return ('品牌留位：'+'；'.join(_percent_box(box) for box in boxes)
+            +f'。这些区域只放低对比背景，{foreground}整体避开，不绘Logo或占位框。')
 
 
 def _mapped(box,region):
@@ -184,7 +223,7 @@ def _visual(visual):
         from scripts.font_library import font_references
         candidates={'font.'+p.stem for p in font_references()}
         if font_id not in candidates:raise UserError('冻结的字体素材不可用，请重新保存配置')
-        font=dict(kind='font',asset_id=font_id,purpose='只约束允许文字的字体造型，不继承参考原文或整图画风')
+        font=dict(kind='font',asset_id=font_id,purpose=FONT_REFERENCE_PURPOSE)
     return style,identity,bindings,font,missing
 
 
@@ -290,6 +329,9 @@ def build(plan,model=None):
         content_safe=_inset(mask_safe)
         framing=_framing_contract(mask_safe,group['layout'])
         allowed={key:texts[key] for key in MODES[mode]}
+        if concept:=params.get('concept'):
+            removed=removed_ad_module({'main_copy':True,'cta':bool(concept['button_text'])},allowed)
+            if removed:framing=removal_framing(framing,ratio,removed)
         missing=list(visual_missing)+[key for key,value in allowed.items() if not value]
         unsupported=ratio not in supported
         # Once approved, the baseline is the sole scene/identity/style image.
@@ -300,7 +342,7 @@ def build(plan,model=None):
         zones=_logo_zones(plan,pids,crops)
         prompt='根据参考图1重新构图，制作一张'+ratio+'广告图，保持原有主体身份、人数、画风和主题，允许调整姿态与机位。\n'+_framing_prompt(framing)+'\n'+_content_prompt(mode,allowed)+'\n'+common_rules
         if mode!='pure':prompt+='\n文字含描边、按钮外框和投影均放在画面的'+_percent_box(content_safe)+'范围内。'
-        brand_space=_brand_space_prompt(zones)
+        brand_space=_brand_space_prompt(zones,mode)
         if brand_space:prompt+='\n'+brand_space
         if mask_zones:prompt+='\n底部只延续背景，关键信息留在上述范围内；不要自行画灰层。'
         if texts['feature_note']:prompt+='\n补充画面要求：'+_quoted(texts['feature_note'])+'。排字仍以给定正文和按钮规则为准。'

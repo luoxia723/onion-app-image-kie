@@ -114,16 +114,20 @@ class WorkbenchMixin:
             self.put_document(key,value);return value
 
     def cleanup_candidates(self):
+        import re
         protected=set()
+        folder=self.settings.state_dir/'uploads';now=time.time()
         for draft in self.list_drafts():
             for p in [draft['draft'],*draft.get('form_drafts',{}).values()]:
                 protected.update(str(Path(r.get('path','')).resolve()) for r in p.get('references',[]))
+                concept=p.get('concept')
+                if isinstance(concept,dict) and isinstance(concept.get('id'),str) and re.fullmatch('[a-f0-9]{64}',concept['id']):
+                    protected.update(str((folder/(concept['id']+suffix)).resolve()) for suffix in ('.png','.jpg','.webp'))
         for t in self.tasks.values():
             for r in t['rounds']:
                 for s in r['slots']:
                     for v in [s,*s.get('versions',[])]:
                         protected.update(str((Path(ref['path']) if Path(ref['path']).is_absolute() else ROOT/ref['path']).resolve()) for ref in v.get('refs',[]))
-        folder=self.settings.state_dir/'uploads';now=time.time()
         restore_root=(self.settings.output/'.restored').resolve()
         def protect_paths(value):
             if isinstance(value,dict):

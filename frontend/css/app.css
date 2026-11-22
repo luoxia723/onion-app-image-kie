@@ -226,8 +226,6 @@ summary::marker{color:#7e8c9e}
 .sets-stepper button:last-child{border-radius:0 6px 6px 0}
 .learning-run-start{display:grid;gap:12px}
 .learning-run-start p{font-size:12px;color:#7b8798}
-.learning-mode-options{display:flex;gap:16px;font-size:14px;margin-bottom:4px}
-.learning-mode-options label{display:flex;gap:6px;align-items:center}
 .learning-pipeline{padding:12px 16px;background:#f7f9fd;border:1px solid var(--line);border-radius:7px;margin:12px 0 20px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7890}
 .learning-pipeline b{display:inline-grid;width:20px;height:20px;place-items:center;background:#dce9ff;color:#2563eb;border-radius:50%;margin-right:5px}
 .learning-pipeline p{flex-basis:100%;font-size:11px;margin-top:4px}
@@ -901,3 +899,7 @@ h1{font-size:25px}
 .learning-logo-template-action h3{font-size:13px;margin:0 0 8px}
 .learning-logo-template-action button{min-height:38px;margin-right:10px}
 .learning-logo-template-action>.field-help{display:inline}
+
+.concept-source{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-block:12px}
+.concept-source img,.concept-crop-preview{display:block;width:min(100%,280px);border-radius:8px}
+.concept-crop-preview{object-fit:cover}

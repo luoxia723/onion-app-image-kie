@@ -227,6 +227,38 @@ function uploadLearningSource(){
  const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';
  input.onchange=()=>{if(input.files[0])addLearningSource(input.files[0])};input.click();
 }
+function setLearningConceptOrigin(upload){
+ if(S.submitting||S.navigationPending||S.uploadingPurpose||!learningForm(S.draft)||learningConcept(S.draft)===upload)return;
+ if(upload){S.draft.concept={button_text:''};normalizeLearningDraft(S.draft,true);S.learningAutoSelectAll=true}
+ else delete S.draft.concept;
+ S.learningPlacementsOpen=false;invalidateLearningPreview();save();render();
+}
+function setLearningConceptButton(text){
+ if(!learningConcept(S.draft)||S.submitting)return;
+ S.draft.concept.button_text=text;
+ S.draft.cta=text.trim()||LEARNING_DEFAULT_CTA;
+ invalidateLearningPreview();save();updSum();
+}
+function uploadLearningConcept(){
+ if(S.submitting||S.navigationPending||S.uploadingPurpose||!learningConcept(S.draft))return;
+ const picker=document.createElement('input');picker.type='file';picker.accept='image/png,image/jpeg,image/webp';
+ picker.onchange=()=>{if(picker.files[0])addLearningConcept(picker.files[0])};picker.click();
+}
+async function addLearningConcept(file){
+ if(S.submitting||S.navigationPending||S.uploadingPurpose||!learningConcept(S.draft))return;
+ if(file.size>10*1024*1024)return toast('图片不能超过 10MB');
+ const draft=S.draft,source=draft.concept;S.uploadingPurpose='learning_concept';render();
+ try{
+  const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+  for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+  const result=await request('/uploads','POST',{purpose:'learning_concept',name:file.name,data:btoa(binary)});
+  if(S.draft!==draft||draft.concept!==source||!learningConcept(draft))return;
+  draft.concept={id:result.id,name:result.name,width:result.width,height:result.height,button_text:'',source_path:result.path};
+  if(source.id)draft.t1='';
+  normalizeLearningDraft(draft);invalidateLearningPreview();save();
+ }catch(error){if(S.draft===draft)report(error)}
+ finally{S.uploadingPurpose=null;render()}
+}
 let learningPlanTimer=null;
 function scheduleLearningAdaptation(){
  const draft=S.draft;if(!learningUpload(draft)||!draft.learning_source||S.learningReadPending)return;

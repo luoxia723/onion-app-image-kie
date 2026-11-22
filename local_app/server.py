@@ -116,7 +116,9 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/api/learning-machine/runs':
             runtime=self.learning_runtime()
             if method=='GET':return self.json({'runs':runtime.list()})
-            if method=='POST':return self.json(runtime.create(body.get('params'),mode=body.get('mode','simulation'),idempotency_key=body.get('idempotency_key')))
+            if method=='POST':
+                if body.get('mode','real')!='real':raise UserError('学习机新任务仅支持正式制作')
+                return self.json(runtime.create(body.get('params'),mode='real',idempotency_key=body.get('idempotency_key')))
         learning_run=re.fullmatch(r'/api/learning-machine/runs/([a-f0-9]{32})(?:/(.*))?',path)
         if learning_run:
             runtime=self.learning_runtime();rid,action=learning_run.groups()
@@ -128,6 +130,8 @@ class Handler(BaseHTTPRequestHandler):
             if method=='POST' and action=='confirm':return self.json(runtime.confirm_baseline(rid,body.get('baseline_version')))
             if method=='POST' and action=='expand':return self.json(runtime.expand_suite(rid,idempotency_key=body.get('idempotency_key')))
             if method=='POST' and action=='from-baseline':
+                if runtime.get(rid)['mode']!='real':
+                    raise UserError('请选择正式制作的基准图',409)
                 return self.json(runtime.create_from_confirmed_baseline(rid,idempotency_key=body.get('idempotency_key'),pids=body.get('pids')))
             if method=='POST' and action=='refresh-logos':
                 return self.json(runtime.refresh_logos(rid,body.get('idempotency_key'),body.get('placement_ids')))
@@ -139,6 +143,17 @@ class Handler(BaseHTTPRequestHandler):
             redraw=re.fullmatch(r'outputs/([^/]+)/regenerate',action or '')
             if method=='POST' and redraw:return self.json(runtime.regenerate_output(rid,unquote(redraw.group(1)),idempotency_key=body.get('idempotency_key'),resume=body.get('resume',False),expected_version=body.get('expected_version')))
             if method=='POST' and action=='package':return self.json(runtime.package(rid,logo_asset_id=body.get('logo_asset_id')))
+            visual=re.fullmatch(r'visual/(master|output)/([^/]+)',action or '')
+            if method=='POST' and visual:
+                kind,image_id=visual.groups()
+                if type(body.get('version')) is not int:raise UserError('请确认当前图片版本')
+                return self.json(runtime.resolve_visual_review(rid,kind,unquote(image_id),body.get('action'),
+                    body['version'],body.get('sha256'),body.get('idempotency_key')))
+            preview=re.fullmatch(r'images/visual-(master|output)-(original|repair)/([^/]+)',action or '')
+            if method=='GET' and preview:
+                kind,variant,image_id=preview.groups();version=get('version')
+                if not version or not re.fullmatch(r'[1-9]\d*',version):raise UserError('图片版本不正确')
+                return self.file(runtime.visual_image(rid,kind,unquote(image_id),int(version),variant))
             if method=='POST' and action=='open-folder':
                 with self.engine.lock:folder=Path(runtime._run(rid)['directory'])/'packages'
                 folder.mkdir(parents=True,exist_ok=True)
@@ -251,7 +266,7 @@ class Handler(BaseHTTPRequestHandler):
             if purpose=='uploaded_master':
                 from .learning_setup import generation_unavailable
                 generation_unavailable()
-            if not isinstance(purpose,str) or purpose not in (*REFERENCE_PURPOSES,'uploaded_master') or purpose=='legacy':raise UserError('请选择参考图用途')
+            if not isinstance(purpose,str) or purpose not in (*REFERENCE_PURPOSES,'uploaded_master','learning_concept') or purpose=='legacy':raise UserError('请选择参考图用途')
             if len(note)>200: raise UserError('参考图说明最多 200 字')
             try:
                 data=base64.b64decode(body.get('data',''),validate=True)
@@ -261,12 +276,17 @@ class Handler(BaseHTTPRequestHandler):
                 if im.format not in ('PNG','JPEG','WEBP') or im.width*im.height>40000000: raise ValueError()
                 suffix={'PNG':'.png','JPEG':'.jpg','WEBP':'.webp'}[im.format]
             except Exception: raise UserError('请选择 10MB 以内的 PNG、JPG 或 WebP 图片')
+            if purpose=='learning_concept':
+                from .learning_concept import check_ratio
+                check_ratio(im)
             import hashlib
             sha=hashlib.sha256(data).hexdigest()
             dest=settings.state_dir/'uploads'/(sha+suffix)
             dest.parent.mkdir(exist_ok=True)
             dest.write_bytes(data)
             result=dict(id=sha,path=str(dest),name=Path(str(body.get('name','参考图片'))).name,note=note,purpose=purpose)
+            if purpose=='learning_concept':
+                result.update(width=im.width,height=im.height,thumbnail_url='/api/uploads/'+sha)
             if purpose=='uploaded_master':
                 from . import learning_source
                 pr={'learning_mode':'upload','learning_source':result};learning_source.registered(pr,settings);result.update(pr['learning_source'])

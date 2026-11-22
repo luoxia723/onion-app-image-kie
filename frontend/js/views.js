@@ -117,11 +117,13 @@ const IMAGE_FORMS = {
 function learningForm(pr){return pr.channel==='学习机'&&imageFormOf(pr)==='单图'}
 function invalidateLearningPreview(){S.learningPreview=null;S.learningPreviewError='';document.getElementById?.('learning-plan-preview')?.remove?.()}
 function learningUpload(pr){return learningForm(pr)&&pr.learning_mode==='upload'}
+function learningConcept(pr){return learningForm(pr)&&!!pr.concept}
 function normalizeLearningDraft(pr,selectAll=false){
  if(!learningForm(pr))return pr;
  pr.learning_mode='generate';pr.learning_pipeline='baseline_then_suite';pr.sets=1;pr.variants_by_placement={};
  pr.noLogo=false;delete pr.logo_asset_id;delete pr.learning_source;pr.cta_enabled=true;pr.cta_overrides={};
- if(!String(pr.cta||'').trim()||pr.cta===DEF_CTA)pr.cta=LEARNING_DEFAULT_CTA;
+ if(learningConcept(pr))pr.cta=String(pr.concept.button_text||'').trim()||LEARNING_DEFAULT_CTA;
+ else if(!String(pr.cta||'').trim()||pr.cta===DEF_CTA)pr.cta=LEARNING_DEFAULT_CTA;
  if(selectAll)pr.pids=formPlacements(pr).map(p=>p.id);
  return pr;
 }
@@ -147,14 +149,18 @@ function viewLearningAdaptation(pr){
 }
 function viewLearningSource(pr){
  if(!learningForm(pr))return '';
- return '<p class="learning-flow-note">生成基准图 → 确认基准图并扩展整套</p>';
+ const concept=learningConcept(pr),source=pr.concept,disabled=S.submitting||S.uploadingPurpose?'disabled':'';
+ const toggle=`<div class="config-segments" role="group" aria-label="画面来源"><button type="button" aria-pressed="${!concept}" class="${concept?'':'active'}" ${disabled} onclick="setLearningConceptOrigin(false)">先生成基准图</button><button type="button" aria-pressed="${concept}" class="${concept?'active':''}" ${disabled} onclick="setLearningConceptOrigin(true)">上传概念图</button></div>`;
+ if(!concept)return toggle+'<p class="learning-flow-note">生成基准图 → 确认基准图并扩展整套</p>';
+ return toggle+`<div class="concept-source">${source.id?`<img src="/api/uploads/${esc(encodeURIComponent(source.id))}" alt="上传的概念图"><span class="field-help">${esc(source.width)}×${esc(source.height)}</span>`:''}<div><button type="button" id="concept-upload" ${disabled} onclick="uploadLearningConcept()">${S.uploadingPurpose==='learning_concept'?'正在上传…':source.id?'更换概念图':'上传 16:9 概念图'}</button><p class="field-help">请上传不带 Logo 的横向 16:9 图片，成品会按版位规则添加 Logo。</p></div></div>`;
 }
 function copyFields(pr){
- return learningForm(pr)?[['t1','推广文案']]:IMAGE_FORMS[imageFormOf(pr)]?.fields||[];
+ return learningForm(pr)?[['t1',learningConcept(pr)?'图上正文':'推广文案']]:IMAGE_FORMS[imageFormOf(pr)]?.fields||[];
 }
 function learningProduction(pr){
  if(!learningForm(pr))return '';
- return pr.pids.length?`先生成并查看 1 张基准图，确认后再完成 ${pr.pids.length} 个版位、${totalOf(pr)} 张成品。可先审核计划，再开始模拟或真实制作。`:'默认全选学习机版位，可按需要调整。';
+ if(learningConcept(pr))return '按所选版位扩整套。先预览各版位如何使用概念图，再确认开始制作。';
+ return pr.pids.length?`先生成并查看 1 张基准图，确认后再完成 ${pr.pids.length} 个版位、${totalOf(pr)} 张成品。`:'默认全选学习机版位，可按需要调整。';
 }
 function imageFormOf(pr){
   if(Object.hasOwn(pr,'image_form'))return IMAGE_FORMS[pr.image_form]?pr.image_form:'';
@@ -174,7 +180,7 @@ function loadDraft(params){
   S.draft.image_form=imageFormOf(params)||(params.image_form!==undefined||params.pids?.length?'':form);
   if(!Object.hasOwn(params,'channel')){const channels=[...new Set(S.draft.pids.map(plOf).filter(Boolean).map(p=>p.category))];S.draft.channel=channels.length>1?channels:channels[0]||''}
   normalizeLearningDraft(S.draft);
-  S.visualOpen=visualCustomized(S.draft);S.referenceMode=!!S.draft.references.length;S.learningPlacementsOpen=false;S.learningCreateMode='simulation';
+  S.visualOpen=visualCustomized(S.draft);S.referenceMode=!!S.draft.references.length;S.learningPlacementsOpen=false;
   S.referencePointsPending={};
   S.formDrafts={};
   S.formError=null;
@@ -216,13 +222,14 @@ function formIssue(pr){
   if(!pr.channel)return{field:'channel',message:'请选择渠道'};
   if(!form)return{field:'image-form',message:'请选择图片形式'};
   if(!pr.pids.length)return{field:'chans',message:'请选择版位'};
+  if(learningConcept(pr)&&!pr.concept.id)return{field:'concept-upload',message:'请上传横向 16:9 概念图'};
   if(learningUpload(pr)&&!pr.learning_source)return{field:'learning-source',message:'请上传要扩展的图片'};
   if(learningUpload(pr)&&S.learningReadPending)return{field:'learning-source',message:'正在读取文案，请稍候或选择手动填写'};
   if(!learningForm(pr)&&pr.noLogo&&pr.pids.some(id=>PLACEMENTS.find(p=>p.id===id)?.logo_policy==='required'))return{field:'nologo',message:'所选版位要求使用 Logo，请选择 Logo 或移除该版位'};
   if(pr.pids.some(id=>!formPlacements(pr).some(p=>p.id===id)))return{field:'chans',message:'所选版位与当前渠道、形式不一致，请重新选择'};
   for(const [key,label] of copyFields(pr))if(!(pr[key]||'').trim())return{field:'f-'+key,message:'请填写'+label};
   if(!learningForm(pr)&&setsBad(pr))return{field:'f-sets',message:'套数请填写 1–20 的整数'};
-  if(!learningUpload(pr)&&pr.style&&pr.style!=='random'&&!STYLES.some(style=>style.name===pr.style)&&!(pr.references||[]).some(ref=>ref.purpose==='style')){
+  if(!learningConcept(pr)&&!learningUpload(pr)&&pr.style&&pr.style!=='random'&&!STYLES.some(style=>style.name===pr.style)&&!(pr.references||[]).some(ref=>ref.purpose==='style')){
     return{field:'styleq',message:'原画风已从广告画风库下线，请重新选择'};
   }
   for(const pid of pr.pids)if(plOf(pid)?.cta_policy==='required'&&!placementCtaText(pr,pid).trim())return{field:'f-cta',message:plOf(pid).platform+' '+plOf(pid).name+' 要求按钮文字，请填写统一按钮或自定义文字'};
@@ -244,6 +251,7 @@ function viewReferenceOptions(pr){return `<div class="reference-slots" id="refer
   return `<section class="reference-slot ${r?'uploaded':''}" data-purpose="${purpose}"><div class="slot-heading"><h4>${label}</h4>${r?`<button ${S.uploadingPurpose?'disabled':''} onclick="removeReference(${i})" aria-label="移除${label}">移除</button>`:''}</div>${r?`<img class="reference-thumb" src="${esc(r.thumbnail_url||r.preview||'')}" alt="${esc(r.name)}">${points}<label class="slot-note">补充说明（选填）<textarea id="ref-note-${purpose}" maxlength="200" rows="2" oninput="setReferenceNote(${i},this.value)">${esc(r.note||'')}</textarea></label>`:`<button class="reference-upload" ${S.uploadingPurpose?'disabled':''} onclick="uploadReference('${purpose}')">${S.uploadingPurpose===purpose?'正在上传…':'＋ 上传图片'}</button>`}</section>`;
 }).join('')}</div>`}
 function viewVisualOptions(pr){
+  if(learningConcept(pr))return `<section class="card visual-options" id="visual-options"><div class="section-heading"><h3>画面设定</h3></div><p class="field-help">沿用概念图的人物、画风和字风，按版位调整排版。</p><label>补充画面要求（选填）<textarea maxlength="200" rows="2" oninput="setF('feature_note',this.value)">${esc(pr.feature_note||'')}</textarea></label></section>`;
   const open=S.visualOpen??visualCustomized(pr),reference=!!(pr.references||[]).some(r=>r.purpose==='style'),fonts=typeof FONTS!=='undefined'?FONTS:[];
   const retiredStyle=pr.style&&pr.style!=='random'&&!STYLES.some(style=>style.name===pr.style);
   const summary=[reference?'参考画风':pr.style&&pr.style!=='random'?pr.style:'随机画风',pr.ip==='none'?'不用角色':['random','full_random',undefined].includes(pr.ip)?'随机角色':IPS.find(a=>a.id===pr.ip)?.label||'指定角色',learningForm(pr)?'同套视觉固定一次':pr.noLogo?'不加 Logo':pr.logo_asset_id?logoVariantLabel(pr.logo_asset_id):'按版位Logo模板'].join(' · ');
@@ -296,7 +304,7 @@ function viewForm(){
     <section class="card compose-card"><h2 class="config-section-title">文案与渠道</h2><div class="channel-row"><h3 id="channel-label">渠道</h3><div id="channel" class="config-segments" role="${multi?'group':'radiogroup'}" aria-labelledby="channel-label" tabindex="-1">${channelOptions().map(channel=>`<button role="${multi?'checkbox':'radio'}" aria-checked="${multi?pr.channel.includes(channel):pr.channel===channel}" class="${(multi?pr.channel.includes(channel):pr.channel===channel)?'active':''}" onclick="setChannel('${channel}')">${esc(channel)}</button>`).join('')}</div>${multi?'<span class="muted">沿用原任务</span>':''}${issue?.field==='channel'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div>
     <fieldset class="channel-dependent" ${unavailable?'disabled':''}>
     ${forms.length>1?`<div class="format-row"><h3 id="image-form-label">形式</h3><div class="config-segments" role="radiogroup" aria-labelledby="image-form-label" id="image-form">${forms.map(f=>`<button role="radio" aria-checked="${f===form}" class="${f===form?'active':''}" onclick="setImageForm('${f}')">${f}</button>`).join('')}</div></div>`:''}
-    ${viewLearningSource(pr)}${learningUpload(pr)?viewSourceLayout(pr):''}<div class="config-copy"><div class="copy-lines">${copyFields(pr).map(([k,label])=>fi(k,label)).join('')}${learningForm(pr)&&pr.pids.length&&!copyFields(pr).length?'<p class="field-help">所选版位为纯画面，无需填写文案。</p>':''}</div>${!learningForm(pr)||pr.pids.some(id=>plOf(id)?.cta_policy==='required')?`<div class="default-cta"><label for="f-cta">${learningForm(pr)?'CTA按钮文案':'按钮文字'}</label><input id="f-cta" maxlength="12" placeholder="${learningForm(pr)?LEARNING_DEFAULT_CTA:''}" value="${esc(pr.cta||'')}" oninput="setF('cta',this.value)">${learningForm(pr)?'<span class="field-help">默认点击下载，可自定义；仅应用于有CTA的版位。</span>':`<label class="inline-check"><input id="cta-enabled" type="checkbox" ${pr.cta_enabled!==false?'checked':''} onchange="setF('cta_enabled',this.checked)">添加按钮</label>`}${issue?.field==='f-cta'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div>`:''}${learningForm(pr)?'<p class="field-help">只填写一句确认文案；各版位按固定规则显示内容。Logo和CTA有无不作为任务选项。</p>':''}</div>
+    ${viewLearningSource(pr)}${learningUpload(pr)?viewSourceLayout(pr):''}<div class="config-copy"><div class="copy-lines">${copyFields(pr).map(([k,label])=>fi(k,label)).join('')}${learningForm(pr)&&pr.pids.length&&!copyFields(pr).length?'<p class="field-help">所选版位为纯画面，无需填写文案。</p>':''}</div>${learningConcept(pr)?`<div class="default-cta"><label for="concept-button">图上按钮文字（选填）</label><input id="concept-button" maxlength="12" value="${esc(pr.concept.button_text||'')}" oninput="setLearningConceptButton(this.value)"><span class="field-help">图上没有按钮可留空，需要按钮的版位会使用「点击下载」。</span></div>`:!learningForm(pr)||pr.pids.some(id=>plOf(id)?.cta_policy==='required')?`<div class="default-cta"><label for="f-cta">${learningForm(pr)?'CTA按钮文案':'按钮文字'}</label><input id="f-cta" maxlength="12" placeholder="${learningForm(pr)?LEARNING_DEFAULT_CTA:''}" value="${esc(pr.cta||'')}" oninput="setF('cta',this.value)">${learningForm(pr)?'<span class="field-help">默认点击下载，可自定义；仅应用于有CTA的版位。</span>':`<label class="inline-check"><input id="cta-enabled" type="checkbox" ${pr.cta_enabled!==false?'checked':''} onchange="setF('cta_enabled',this.checked)">添加按钮</label>`}${issue?.field==='f-cta'?`<span class="errtx">${esc(issue.message)}</span>`:''}</div>`:''}${learningForm(pr)?'<p class="field-help">只填写一句确认文案；各版位按固定规则显示内容。Logo和CTA有无不作为任务选项。</p>':''}</div>
     </fieldset></section>
     ${learningForm(pr)&&typeof viewLearningPlanPreview==='function'?viewLearningPlanPreview():''}
     <fieldset class="channel-dependent" ${unavailable?'disabled':''}>
@@ -305,9 +313,9 @@ function viewForm(){
     ${learningForm(pr)?`<div id="learning-placement-content" ${S.learningPlacementsOpen?'':'hidden'}><div class="learning-placement-actions"><button type="button" onclick="openLearningLogoConfig()">配置Logo模板</button><button onclick="selectLearningPlacements(true)">全选可用版位</button><button onclick="selectLearningPlacements(false)">清空</button></div>`:''}<div class="placement-table-head" aria-hidden="true"><span>平台与版位</span><span>尺寸</span><span>按钮文字</span></div><div id="chans" tabindex="-1" class="${multi?'channel-groups':'platform-groups'}">${Object.entries(grp).map(([channel,platforms])=>`${multi?`<section class="channel-placement-group"><h4 class="channel-placement-title">${esc(channel)}</h4><div class="platform-groups">`:''}${Object.entries(platforms).sort(([,a],[,b])=>(a.length>2)-(b.length>2)).map(([platform,list])=>`<section class="platform-group ${list.length>2?'span-two':''}"><h4>${esc(platform)}</h4><div class="platform-items ${list.length>2?'two-columns':''}">${list.map(p=>`<div class="placement-row ${pr.pids.includes(p.id)?'checked':''}" data-pid="${p.id}"><label class="placement-check"><input type="checkbox" aria-label="${esc(pname(p))} ${psz(p)}" ${pr.pids.includes(p.id)?'checked':''} onchange="togP('${p.id}')"><span>${esc(p.platform)} ${esc(p.name.replace(/\s*\d+×\d+/,''))}</span></label><span class="placement-size">${psz(p)}${p.logo_policy==='required'?`<span class="logo-lock ${pr.noLogo?'force-highlight':''}">🔒 Logo</span>`:''}</span>${placementCta(pr,p)}${p.rule_summary?`<small class="placement-rule">${esc(p.rule_summary)}</small>`:''}</div>`).join('')}</div></section>`).join('')}${multi?'</div></section>':''}`).join('')}</div>${!learningForm(pr)&&pending.length?`<details class="pending-placements"><summary>${pending.length} 个版位待确认，暂不可生成</summary>${pending.map(p=>`<p><b>${esc(p.platform)} · ${esc(p.name)} · ${psz(p)}</b><br>${esc(p.disabled_reason)}</p>`).join('')}</details>`:''}${issue?.field==='chans'?`<div class="errtx">${esc(issue.message)}</div>`:''}${issue?.field.startsWith('cta-')?`<div class="errtx">${esc(issue.message)}</div>`:''}${learningForm(pr)?'</div>':''}</section>
     </fieldset>${pr.channel&&!forms.length?'<div class="channel-empty" role="status">该渠道暂无版位</div>':''}
     </fieldset><fieldset class="card sum config-summary channel-dependent" id="sum" ${blocked||unavailable?'disabled':''}><h2 class="config-section-title">${learningForm(pr)?'本次制作':'本次生成'}</h2>${learningForm(pr)?'<p class="field-help">固定生成一整套，每个版位按规则输出，不挑选多套候选。</p>':`<label for="f-sets">每版位套数</label><div class="sets-stepper"><button aria-label="减少套数" onclick="stepSets(-1)">−</button><input id="f-sets" type="number" min="${SETS_MIN}" max="${SETS_MAX}" value="${pr.variants_by_placement&&new Set(Object.values(pr.variants_by_placement)).size>1?'':esc(pr.sets)}" placeholder="分别设置" class="${setsBad(pr)?'bad':''}" oninput="setSets(this.value)"><button aria-label="增加套数" onclick="stepSets(1)">＋</button></div>${issue?.field==='f-sets'?`<span class="errtx">${esc(issue.message)}</span>`:''}`}
-    <label for="image-model">图片模型</label><select id="image-model" onchange="setF('image_model',this.value)">${imageModelOptions(pr.image_model||(typeof CFG!=='undefined'&&CFG.imageModel)||IMAGE_MODEL_OPTIONS[0][0])}</select>
+    ${learningConcept(pr)?'<p class="field-help">图片模型 · GPT Image 2.6 Flare</p>':`<label for="image-model">图片模型</label><select id="image-model" onchange="setF('image_model',this.value)">${imageModelOptions(pr.image_model||(typeof CFG!=='undefined'&&CFG.imageModel)||IMAGE_MODEL_OPTIONS[0][0])}</select>`}
 
-    <div class="total-action"><div class="tot" id="tot" aria-live="polite">共 ${pr.channel?totalOf(pr):0} 张</div><p id="sum-formula">${summaryFormula(pr)}</p><p class="field-help" id="learning-production">${learningProduction(pr)}</p><button class="${learningForm(pr)?'plan-preview-button':'primary'}" id="go" ${setsBad(pr)||blocked||unavailable||!pr.pids.length||S.uploadingPurpose||learningUpload(pr)&&(!pr.learning_source||S.learningReadPending||!currentLearningPlan(pr))?'disabled':''} onclick="startGen()">${S.submitting?'正在保存…':learningForm(pr)?'仅预览计划':'开始生成'}</button>${learningForm(pr)&&typeof viewLearningRunStart==='function'?viewLearningRunStart():''}<span class="field-help" id="generation-hint">${esc(S.submitting?'正在提交配置，请稍候':!pr.channel?'先选渠道':formIssue(pr)?.message||'')}</span></div></fieldset></div>`;
+    <div class="total-action"><div class="tot" id="tot" aria-live="polite">共 ${pr.channel?totalOf(pr):0} 张</div><p id="sum-formula">${summaryFormula(pr)}</p><p class="field-help" id="learning-production">${learningProduction(pr)}</p><button class="${learningForm(pr)?'plan-preview-button':'primary'}" id="go" ${setsBad(pr)||blocked||unavailable||!pr.pids.length||S.uploadingPurpose||learningUpload(pr)&&(!pr.learning_source||S.learningReadPending||!currentLearningPlan(pr))?'disabled':''} onclick="startGen()">${S.submitting?'正在保存…':learningConcept(pr)?'预览扩版方案':learningForm(pr)?'仅预览计划':'开始生成'}</button>${learningForm(pr)&&typeof viewLearningRunStart==='function'?viewLearningRunStart():''}<span class="field-help" id="generation-hint">${esc(S.submitting?'正在提交配置，请稍候':!pr.channel?'先选渠道':formIssue(pr)?.message||'')}</span></div></fieldset></div>`;
 }
 function need(k){return copyFields(S.draft).some(([f])=>f===k)}
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import copy
-from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from fractions import Fraction
 import hashlib
@@ -31,6 +31,11 @@ CHANNEL_PACKAGE_LAYOUT='channel-placement-v1'
 
 def _digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _removed_module(entry):
+    framing=entry.get('main_visual_framing') or {}
+    return framing.get('removed_ad_module') or {'pure':'body','remove_cta':'cta'}.get(entry.get('concept_route'))
 
 
 def _package_paths(run,rows):
@@ -64,6 +69,7 @@ class LearningRuntime:
             executor=LearningExecutor(engine.settings)
         self.executor=executor
         self.stop_event=threading.Event()
+        self.visual_pool=ThreadPoolExecutor(max_workers=4,thread_name_prefix='learning-visual')
         self._closed=False
         self._threads=set()
         self.runs={}
@@ -103,7 +109,8 @@ class LearningRuntime:
         if self.engine.maintenance_active:raise UserError('正在进行本机数据维护，请稍后操作',409)
 
     def _has_receipt(self,row):
-        path=row.get('raw_path')
+        repair=row.get('visual_review',{}).get('repair') or {}
+        path=repair.get('job',{}).get('output') if repair and not repair.get('result') else row.get('raw_path')
         if not path:return False
         from scripts.render import task_state_path
         receipt=task_state_path(Path(path))
@@ -113,11 +120,35 @@ class LearningRuntime:
         except (OSError,ValueError):return False
 
     def _public_row(self,run,row,kind):
-        keep=('id','group_id','placement_id','platform','name','image_index','width','height','version','status',
+        keep=('id','group_id','master_id','placement_id','platform','name','image_index','width','height','version','status',
               'baseline_version','sha256','prompt','scene_plan','error','query_required','reuse_baseline','content_mode',
               'source_master_id','source_master_version','processing','inherited','inherited_from','logo_template',
-              'background_repair_pending','background_repair_key','regeneration_key')
+              'background_repair_pending','background_repair_key','regeneration_key','uploaded','concept_route')
         result={k:copy.deepcopy(row[k]) for k in keep if k in row}
+        if review:=row.get('visual_review'):
+            from .learning_visual import clean, composition_issue, TYPOGRAPHY
+            candidate=review.get('repair',{}).get('result')
+            stage='after' if candidate else 'before'
+            current=[review.get(stage),review.get(stage+'_verify')]
+            original=review['original']
+            result['visual_review']={
+                'status':review['status'], 'model':review['model'], 'first':review.get('before'), 'verification':review.get('before_verify'),
+                'after':review.get('after'), 'after_verification':review.get('after_verify'),
+                'before_focus':copy.deepcopy(review.get('before_focus')), 'after_focus':copy.deepcopy(review.get('after_focus')),
+                'before_brush':copy.deepcopy(review.get('before_brush')), 'after_brush':copy.deepcopy(review.get('after_brush')),
+                'review_sha256':(candidate or original)['sha256'],
+                'can_accept':review['status']=='needs_review' and (not candidate or any(clean(r) for r in current)),
+                'can_recompose':kind=='master' and review['status']=='needs_review'
+                    and bool(review.get('removed_ad_module')) and composition_issue(*current),
+                'can_repair':review['status']=='needs_review' and review.get('text_expected',True) and not review.get('repair')
+                    and not (review.get('removed_ad_module') and composition_issue(*current)) and any(
+                    i['kind'] in TYPOGRAPHY for r in current if r for i in r['issues']),
+                'can_clean_lettering':kind=='master' and run['mode']=='real' and row['status']=='done'
+                    and review['status']=='approved' and review.get('text_expected',True),
+                'repaired':bool(candidate), 'approved_by':review.get('approved_by'),
+                'original_url':self._url(run,'visual-'+kind+'-original',row['id'],row['version']),
+                'repair_url':self._url(run,'visual-'+kind+'-repair',row['id'],row['version']) if candidate else None,
+            }
         result['logo_refresh_pending']=bool(row.get('logo_refresh_source'))
         if kind=='baseline':result['aspect_ratio']=run['compiled']['baseline']['aspect_ratio']
         elif kind=='master':
@@ -157,10 +188,12 @@ class LearningRuntime:
             'planned_image_calls':compiled['counts']['planned_image_calls'],
         }
         inherited=bool(run['baseline'].get('inherited'))
+        uploaded=bool(run['baseline'].get('uploaded'))
         backgrounds=compiled['counts'].get('background_image_calls',0)
-        calls=compiled['counts']['image_model_master_calls']+backgrounds+(0 if inherited else 1)
+        calls=compiled['counts']['image_model_master_calls']+backgrounds+(0 if inherited or uploaded else 1)
         value['counts'].update(baseline_reused=inherited,background_image_calls=backgrounds,expected_new_calls=calls,planned_image_calls=calls)
         if summary:return value
+        if run['params'].get('concept'):value['concept']=copy.deepcopy(run['params']['concept'])
         value['params']={k:copy.deepcopy(run['params'][k]) for k in ('t1','t2','s1','s2','s3','cta','pids','image_model','ip','style','font','feature_note','product_facts') if k in run['params']}
         value['visual_config']=copy.deepcopy(run['plan'].get('visual_config',{}))
         if run.get('kind')=='shared_canvas_adaptation':
@@ -236,6 +269,10 @@ class LearningRuntime:
             outputs.append(dict(id=row['id'],placement_id=row['placement_id'],platform=row['platform'],name=row['name'],
                                 image_index=row['image_index'],width=row['width'],height=row['height'],
                                 master_id=mapping[row['id']]['master_id'],version=0,status='waiting_for_baseline_confirmation',versions=[]))
+        for master,entry in zip(masters,compiled['masters']):
+            if 'concept_route' in entry:master['concept_route']=entry['concept_route']
+        for output in outputs:
+            if 'concept_route' in mapping[output['id']]:output['concept_route']=mapping[output['id']]['concept_route']
         # The freeze helper returns convenient aliases for compilation. Store
         # each authoritative template and layer snapshot once, not in every
         # embedded preview representation.
@@ -249,6 +286,8 @@ class LearningRuntime:
              'baseline':dict(id='baseline',version=0,status='not_generated'), 'baseline_versions':[],
              'approval':None,'suite':{'status':'not_started','baseline_version':None},'masters':masters,'outputs':outputs,'packages':[],
              'operation_keys':{},'create_key':key,'create_signature':signature}
+        if run.get('uploaded_baseline'):
+            run.update(baseline=run.pop('uploaded_baseline'),status='waiting_for_confirmation')
         if _confirmed_source:
             provenance=dict(run_id=_confirmed_source['id'],baseline_version=_confirmed_source['baseline']['version'],
                             sha256=_confirmed_source['baseline']['sha256'],mode=_confirmed_source['mode'],
@@ -331,7 +370,10 @@ class LearningRuntime:
         from .master_canvas_support import freeze_adaptation
         rid=uuid.uuid4().hex;directory=Path(self.engine.settings.output)/'.cache'/'learning-runs'/rid
         directory.mkdir(parents=True,exist_ok=True)
-        try:frozen=freeze_adaptation(self.engine,params,directory,source_runtime=self)
+        try:
+            frozen=freeze_adaptation(self.engine,params,directory,source_runtime=self)
+            if frozen['target_kind']=='learning' and frozen['mode']!='real':
+                raise UserError('制作学习机共用母版请选择正式制作的来源图片',409)
         except Exception:
             shutil.rmtree(directory,ignore_errors=True);raise
         compiled=frozen['compiled'];baseline=frozen.pop('inherited_baseline');now=time.time()
@@ -426,7 +468,9 @@ class LearningRuntime:
         guide_path=Path(run['directory'])/'canvas-guides'/entry['id']/(source['sha256']+'.png')
         group=entry.get('canvas_plan') or entry
         with getattr(self.engine,'processing_slots',nullcontext()):guide=build_guide(path,guide_path,group)
-        refs=[dict(slot=1,kind='canvas_guide',path=guide['path'],sha256=guide['sha256'],purpose='布局草稿，原图缩小位置与共同安全区；色块只是待画满的背景'),
+        guide_purpose=('目标画幅与共同安全区；主体位置按删减内容后的构图重新安排' if _removed_module(entry)
+                       else '布局草稿，原图缩小位置与共同安全区；色块只是待画满的背景')
+        refs=[dict(slot=1,kind='canvas_guide',path=guide['path'],sha256=guide['sha256'],purpose=guide_purpose),
               dict(slot=2,kind='source_picture',path=str(path),sha256=source['sha256'],purpose='本张已选来源的人物、画风、场景与文字；旧Logo和制作辅助标记不作为保留项')]
         return dict(id=entry['id'],kind='shared_canvas_master',prompt=entry['prompt'],aspect_ratio=entry['aspect_ratio'],
                     model=run['params']['image_model'],output=str(output),reference_bindings=refs,canvas_plan=copy.deepcopy(group),
@@ -438,6 +482,13 @@ class LearningRuntime:
     def _job(self,run,entry,output,kind,baseline=None):
         from .learning_runtime_support import resolve_bindings
         if run.get('kind')=='shared_canvas_adaptation':return self._canvas_job(run,entry,output,kind)
+        if kind=='master' and entry.get('concept_route')=='background':
+            from .learning_background import prepare_job
+            width,height=(n*96 for n in map(int,entry['aspect_ratio'].split(':')))
+            with getattr(self.engine,'processing_slots',nullcontext()):
+                job=prepare_job(run,self._checked_file(run,baseline),output,width,height,entry['allowed_text'])
+            return {**job,'id':entry['id'],'stop_marker':str(Path(run['directory'])/'STOP'),
+                    'upload_cache':str(self.engine.settings.state_dir/'learning-reference-upload-cache.json')}
         refs=resolve_bindings(run,entry.get('reference_bindings',[]),
                               baseline_path=baseline.get('raw_path') if baseline else None,
                               baseline_sha256=baseline.get('sha256') if baseline else None)
@@ -461,9 +512,252 @@ class LearningRuntime:
                    query_required=bool(getattr(exc,'query_required',False)),
                    reason_code=getattr(exc,'reason_code','processing_failed'))
 
+    def _record_generated(self,run,row,entry,changes,*,single=False):
+        from .learning_visual import MODEL
+        with self.engine.lock:
+            row.update(changes)
+            allowed=entry.get('allowed_text',{})
+            text_expected=bool(allowed.get('t1') or allowed.get('cta'))
+            removed=_removed_module(entry)
+            if run['mode']=='real' and run.get('target_kind')!='ordinary' and (text_expected or removed or run['params'].get('concept')):
+                row['visual_review']=dict(status='reviewing',model=MODEL,original=copy.deepcopy(changes),
+                                          text_expected=text_expected,removed_ad_module=removed)
+            if single or row.get('visual_review'):row['status']='processing'
+            self._save(run)
+
+    def _visual_update(self,run,review,**fields):
+        with self.engine.lock:
+            review.update(fields)
+            self._save(run)
+
+    def _visual_checks(self,run,row,entry,stage,source,reference=None):
+        from .learning_visual import brush_mark_target, clean, focus_targets
+        review=row['visual_review'];allowed=entry['allowed_text']
+        removed=_removed_module(entry)
+        inspection={'removed_module':removed} if removed else {}
+        verify=stage+'_verify'
+        first=review.get(stage)
+        if not first:
+            first=self.executor.inspect_typography(source,allowed,False,reference,self.stop_event,**inspection)
+            self._visual_update(run,review,**{stage:first})
+        second=review.get(verify)
+        retrying=any(r['stage'] in (stage,verify) and r['verdict']!='unavailable' for r in review.get('history',[]))
+        if first['verdict']!='unavailable' and not second and (not clean(first) or retrying):
+            layout_issues={'crop','overlap','composition'}
+            compare=reference if any(i['kind'] in layout_issues for i in first['issues']) else None
+            second=self.executor.inspect_typography(source,allowed,True,compare,self.stop_event,**inspection)
+            self._visual_update(run,review,**{verify:second})
+        field=stage+'_focus'
+        focus=review.get(field)
+        if not focus:
+            targets=focus_targets(allowed,first,second)
+            if targets:
+                focus=self.executor.inspect_suspect_text(source,targets,self.stop_event)
+                self._visual_update(run,review,**{field:focus})
+        field=stage+'_brush'
+        brush=review.get(field)
+        if not brush and run['params'].get('concept') and not entry.get('reuse_baseline'):
+            target=brush_mark_target(allowed,first,second)
+            if target:
+                original=self._checked_file(run,run['baseline'])
+                brush=self.executor.inspect_brush_mark(source,original,target,self.stop_event)
+                self._visual_update(run,review,**{field:brush})
+        return first,second,focus,brush
+
+    def _repair_typography(self,run,row,entry):
+        from .learning_visual import repair_job, fit_repair
+        from scripts.render import task_state_path
+        review=row['visual_review']
+        operation=review.get('repair')
+        if not operation:
+            directory=Path(run['directory'])/'typography'/row['id']/f"v{row['version']}"
+            job=repair_job(directory/'native.png',review['original'],entry,review['confirmed_issues'],
+                           str(Path(run['directory'])/'STOP'),
+                           str(self.engine.settings.state_dir/'learning-reference-upload-cache.json'))
+            operation=dict(job=job,receipt_path=str(task_state_path(Path(job['output']))))
+            self._visual_update(run,review,repair=operation,status='repairing')
+        if operation.get('result'):
+            return operation['result']
+        job=copy.deepcopy(operation['job'])
+        job['stop_marker']=str(Path(run['directory'])/'STOP')
+        job['upload_cache']=str(self.engine.settings.state_dir/'learning-reference-upload-cache.json')
+        restored=(Path(self.engine.settings.output)/'.restored').resolve()
+        receipt=Path(operation['receipt_path'])
+        native=Path(job['output'])
+        if receipt.resolve().is_relative_to(restored):
+            # Backup keeps the receipt independently of the provider image.
+            native=Path(run['directory'])/'typography'/row['id']/f"v{row['version']}"/'native.png'
+            journal=task_state_path(native)
+            native.parent.mkdir(parents=True,exist_ok=True)
+            if not journal.exists():shutil.copyfile(receipt,journal)
+            if Path(job['output']).is_file() and not native.exists():shutil.copyfile(job['output'],native)
+            job['output']=str(native)
+            with self.engine.lock:
+                operation.update(job=copy.deepcopy(job),receipt_path=str(journal));self._save(run)
+        if not native.resolve().is_relative_to(Path(run['directory']).resolve()):
+            raise UserError('已恢复的修复任务缺少可用回执，请检查备份记录',409)
+        if row.get('query_required') and not task_state_path(native).is_file():
+            raise UserError('原修复任务回执缺失，请检查备份记录',409)
+        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+        if (result.get('simulated') is not False or Path(result['source']).resolve()!=native.resolve()
+                or not native.is_file() or _digest(native)!=result.get('sha256')):
+            raise UserError('文字修复图校验失败')
+        fitted=fit_repair(native,native.with_name('fitted.png'),entry['aspect_ratio'])
+        candidate=self._image_result(run,{**result,'source':str(fitted),'sha256':_digest(fitted),
+                                          'provider_original_path':str(native),'provider_original_sha256':result['sha256']},
+                                     fitted,entry['aspect_ratio'])
+        with self.engine.lock:
+            operation['result']=candidate
+            row['query_required']=False
+            self._save(run)
+        return candidate
+
+    def _visual_hold(self,run,row,review,status,message):
+        with self.engine.lock:
+            row.update(status='visual_hold',error=message,query_required=False)
+            review['status']=status
+            self._save(run)
+        return False
+
+    def _visual_gate(self,run,row,entry,*,single=False):
+        from .learning_visual import composition_issue, confirmed_issues, review_passed
+        review=row.get('visual_review')
+        if not review or review['status']=='approved':return True
+        original=review['original']
+        source=self._checked_file(run,original)
+        with self.engine.lock:
+            row.update(status='processing',error='')
+            if not review.get('repair'):row['query_required']=False
+            self._save(run)
+        allowed=entry['allowed_text']
+        removed=_removed_module(entry)
+        stage='before'
+        approved=original
+        def audit_image(path,digest):
+            box=entry.get('concept_audit_box')
+            if not box or single and not removed:return path
+            from .learning_background import _atomic_image
+            audit=Path(run['directory'])/'typography'/'audit-crops'/row['id']/(digest+'.png')
+            with Image.open(path) as image:
+                bounds=tuple(round(n*d) for n,d in zip(box,(*image.size,*image.size)))
+                _atomic_image(image.crop(bounds),audit,immutable=True)
+            return audit
+        manual=review.get('manual',{}).get('before',{})
+        if not review.get('repair') and manual.get('action')=='repair':
+            self._visual_update(run,review,confirmed_issues=manual['issues'])
+        elif not review.get('repair'):
+            first,second,focus,brush=self._visual_checks(run,row,entry,stage,audit_image(source,original['sha256']))
+            if not review_passed(first,second,focus,allowed,brush) and manual.get('action')!='accept':
+                if 'unavailable' in (first['verdict'],(second or {}).get('verdict'),(focus or {}).get('verdict'),(brush or {}).get('verdict')):
+                    return self._visual_hold(run,row,review,'unavailable','Luna 审核暂未完成，请重试审核。')
+                if removed and composition_issue(first,second):
+                    return self._visual_hold(run,row,review,'needs_review','删减内容后构图需调整，请查看主体、正文和留白。')
+                if not review.get('text_expected',True):
+                    return self._visual_hold(run,row,review,'needs_review','无字母版仍有疑点，请检查残字、按钮或主视觉。')
+                issues=confirmed_issues(first,second,allowed,focus)
+                if not issues:
+                    return self._visual_hold(run,row,review,'needs_review','Luna 发现疑点，请核对原图。')
+                self._visual_update(run,review,confirmed_issues=issues)
+        needs_repair=bool(review.get('confirmed_issues'))
+        if needs_repair:
+            self._visual_update(run,review,status='repairing')
+            approved=self._repair_typography(run,row,entry)
+            repaired=self._checked_file(run,approved)
+            stage='after'
+            self._visual_update(run,review,status='reviewing_repair')
+            first,second,focus,brush=self._visual_checks(run,row,entry,stage,audit_image(repaired,approved['sha256']),source)
+            if not review_passed(first,second,focus,allowed,brush) and review.get('manual',{}).get(stage,{}).get('action')!='accept':
+                if 'unavailable' in (first['verdict'],(second or {}).get('verdict'),(focus or {}).get('verdict'),(brush or {}).get('verdict')):
+                    return self._visual_hold(run,row,review,'unavailable','修复图已保存，请重试 Luna 审核。')
+                return self._visual_hold(run,row,review,'needs_review','修复图仍有疑点，请核对后再扩版。')
+        with self.engine.lock:
+            review['status']='approved'
+            review['approved_by']='human' if review.get('manual',{}).get(stage,{}).get('action')=='accept' else 'luna'
+            row.update(approved,status='processing' if single else 'done',error='',query_required=False)
+            self._save(run)
+        return True
+
+    def resolve_visual_review(self,rid,kind,image_id,action,version,sha256,key):
+        from .learning_visual import brush_mark_target, clean, composition_issue, focus_targets, TYPOGRAPHY
+        _key(key)
+        with self.engine.lock:
+            run=self._run(rid);self._maintenance();self._approved(run)
+            rows=run['masters'] if kind=='master' else run['outputs']
+            row=next((r for r in rows if r['id']==image_id),None)
+            review=(row or {}).get('visual_review')
+            if review and review.get('decision_key')==key:return self._public(run)
+            if action=='recompose' and 'canvas-master-'+image_id+':'+key in run['operation_keys']:
+                return self._public(run)
+            if run['busy']:raise UserError('本批仍在制作，请稍后复核',409)
+            if not review or row['version']!=version:
+                raise UserError('审核版本已更新，请重新读取',409)
+            if sum(bool(r.get('busy')) for r in self.runs.values())>=MAX_ACTIVE_RUNS:
+                raise UserError('当前学习机任务较多，请等待已有任务完成后重试',429)
+            if action=='clean_lettering' and kind=='master' and run['mode']=='real' and row['status']=='done' \
+                    and review['status']=='approved' and review.get('text_expected',True):
+                if row.get('sha256')!=sha256:raise UserError('审核图片已更新，请重新读取',409)
+                targets=[o for o in run['outputs'] if o['master_id']==image_id]
+                if any(o.get('background_repair_pending') or o.get('query_required') for o in targets):
+                    raise UserError('请先恢复本组已有处理',409)
+                self._checked_file(run,row)
+                saved={field:copy.deepcopy(row[field]) for field in (
+                    'raw_path','sha256','prompt','reference_bindings','provider_task_id',
+                    'provider_original_path','provider_original_sha256','baseline_version','reuse_baseline') if field in row}
+                self._new_version(row)
+                row.update(saved,status='visual_hold')
+                issues=[dict(kind='glyph',target='',where='正文和按钮',detail='已确认存在需清理的字面或描边问题')]
+                row['visual_review']=dict(status='needs_review',model=review['model'],original=saved,text_expected=True,
+                    removed_ad_module=review.get('removed_ad_module'),decision_key=key,
+                    manual={'before':dict(action='repair',issues=issues,sha256=sha256,at=time.time())})
+                for output in targets:
+                    self._new_version(output)
+                self._save(run)
+                return self.regenerate_canvas_master(rid,image_id,key,row['version'],_review_resume=True)
+            if review['status']=='approved':raise UserError('审核已通过，请重新读取当前版本',409)
+            candidate=review.get('repair',{}).get('result')
+            stage='after' if candidate else 'before'
+            item=candidate or review['original']
+            if item['sha256']!=sha256:raise UserError('审核图片已更新，请重新读取',409)
+            first,second=review.get(stage),review.get(stage+'_verify')
+            if action=='recompose' and kind=='master' and review['status']=='needs_review' \
+                    and review.get('removed_ad_module') and composition_issue(first,second):
+                return self.regenerate_canvas_master(rid,image_id,key,version,_review_resume=True,_redraw_review=True)
+            if action=='retry' and review['status'] in ('unavailable','needs_review'):
+                if kind=='master':
+                    entry=next(m for m in run['compiled']['masters'] if m['id']==image_id)
+                else:
+                    from .learning_runtime_support import compile_single
+                    entry=compile_single(run,image_id)
+                allowed=entry['allowed_text']
+                if run['params'].get('concept') and not entry.get('reuse_baseline') and brush_mark_target(allowed,first,second):
+                    fields=(stage+'_brush',)
+                elif focus_targets(allowed,first,second):
+                    fields=(stage+'_focus',)
+                else:
+                    fields=(stage,stage+'_verify',stage+'_focus',stage+'_brush')
+                for field in fields:
+                    result=review.get(field)
+                    if result and (review['status']=='needs_review' or result['verdict']=='unavailable'):
+                        review.setdefault('history',[]).append(dict(stage=field,**review.pop(field)))
+            elif action=='accept' and review['status']=='needs_review' and (not candidate or any(clean(r) for r in (first,second))):
+                review.setdefault('manual',{})[stage]=dict(action=action,sha256=sha256,at=time.time())
+            elif action=='repair' and stage=='before' and review.get('text_expected',True) and not review.get('repair') and review['status']=='needs_review':
+                if review.get('removed_ad_module') and composition_issue(first,second):
+                    raise UserError('请先处理构图问题，再确认文字清修',409)
+                issues=[i for r in (first,second) if r for i in r['issues'] if i['kind'] in TYPOGRAPHY]
+                if not issues:raise UserError('请先确认可见的文字问题',409)
+                review.setdefault('manual',{})[stage]=dict(action=action,issues=issues,sha256=sha256,at=time.time())
+            else:
+                raise UserError('当前审核状态不支持这个操作',409)
+            review['decision_key']=key
+            self._save(run)
+            if kind=='output':return self.regenerate_output(rid,image_id,key,expected_version=version)
+            return self.regenerate_canvas_master(rid,image_id,key,version,_review_resume=True)
+
     def generate_baseline(self,rid,idempotency_key,resume=False):
         with self.engine.lock:
             run=self._run(rid)
+            if run['params'].get('concept'):raise UserError('本批来源是上传概念图，请查看并确认原图',409)
             if run.get('kind')=='shared_canvas_adaptation':raise UserError('来源图片已冻结，请选择新的来源创建母版批次',409)
             if any(row.get('query_required') for row in [*run['masters'],*run['outputs']]):
                 raise UserError('仍有图片状态不明，请先恢复已有图片查询，再重新生成基准图',409)
@@ -523,7 +817,7 @@ class LearningRuntime:
         row.update(version=row.get('version',0)+1,status='queued',error='',query_required=False)
         for key in ('raw_path','path','sha256','raw_sha256','provider_task_id','provider_original_path','provider_original_sha256',
                     'reason_code','baseline_version','prompt','reference_bindings','source_master_id','source_master_version','reuse_baseline','processing','logo_template','logo_refresh_source',
-                    'export_crop_box','background_processing','background_repair_pending','background_repair_key','background_operation_id','background_native_path','background_source','background_original','background_force_ai'):
+                    'export_crop_box','background_processing','background_repair_pending','background_repair_key','background_operation_id','background_native_path','background_source','background_original','background_force_ai','visual_review'):
             row.pop(key,None)
         row.pop('background_request',None)
 
@@ -801,6 +1095,8 @@ class LearningRuntime:
             run=self._run(rid);baseline=self._approved(run)
             if any(o.get('background_repair_pending') for o in run['outputs']):raise UserError('请先恢复未完成的背景处理',409)
             if any(o.get('query_required') for o in run['outputs']):raise UserError('请先恢复状态不明的单张图片查询',409)
+            if any(o.get('visual_review') and o['status']!='done' for o in run['outputs']):
+                raise UserError('请先在相应图片卡片处理单张重出的文字审核',409)
             if (run['suite'].get('status')=='completed' and run['suite'].get('baseline_version')==baseline['version']
                     and all(o['status']=='done' for o in run['outputs'])):
                 return self._public(run)
@@ -810,14 +1106,25 @@ class LearningRuntime:
             recovering=run['suite'].get('baseline_version')==baseline['version'] and run['suite'].get('status') in ('failed','interrupted','completed','generating')
             run['suite']={'status':'generating','baseline_version':baseline['version']};run['status']='generating_suite'
             for master in run['masters']:
-                if not recovering or master['status']=='failed' and not master.get('query_required'):self._new_version(master)
+                if not recovering or master['status']=='failed' and not master.get('query_required') and not master.get('visual_review'):
+                    self._new_version(master)
             for output in run['outputs']:
                 if not recovering:self._new_version(output)
             self._save(run)
             def work():
                 failures=[]
                 pending={}
+                reviews={}
                 exports=[]
+                def block(master,targets):
+                    failures.append(master['id'])
+                    with self.engine.lock:
+                        for output in targets:
+                            if output['status']!='done':
+                                output.update(status='blocked',error=master['error'] if master.get('visual_review') else '来源母版尚未完成')
+                        self._save(run)
+                def queue_review(master,entry,targets):
+                    reviews[self.visual_pool.submit(self._visual_gate,run,master,entry)]=(master,targets)
                 for master in run['masters']:
                     if self.stop_event.is_set():return
                     entry=next(m for m in run['compiled']['masters'] if m['id']==master['id'])
@@ -825,11 +1132,20 @@ class LearningRuntime:
                     try:
                         if master.get('status')=='done':
                             source=self._checked_file(run,master)
+                        elif master.get('visual_review'):
+                            queue_review(master,entry,targets)
+                            continue
                         elif entry.get('reuse_baseline'):
                             source=self._checked_file(run,baseline)
-                            with self.engine.lock:
-                                master.update(status='done',raw_path=str(source),sha256=baseline['sha256'],baseline_version=baseline['version'],
-                                              prompt=entry['prompt'],reuse_baseline=True);self._save(run)
+                            changes=dict(status='done',raw_path=str(source),sha256=baseline['sha256'],
+                                         baseline_version=baseline['version'],prompt=entry['prompt'],reuse_baseline=True)
+                            if entry.get('concept_route')=='direct':
+                                self._record_generated(run,master,entry,changes)
+                                if master.get('visual_review'):
+                                    queue_review(master,entry,targets)
+                                    continue
+                            else:
+                                with self.engine.lock:master.update(changes);self._save(run)
                         else:
                             raw=self._execution_path(run,master,Path(run['directory'])/'masters'/master['id']/f"v{master['version']}.png")
                             with self.engine.lock:master.update(status='queued',raw_path=str(raw),baseline_version=baseline['version'],
@@ -845,47 +1161,63 @@ class LearningRuntime:
                             if output['status']=='done':continue
                             exports.append((output,master,source,baseline['version']))
                     except Exception as exc:
-                        failures.append(master['id'])
-                        with self.engine.lock:
-                            self._failure(master,exc)
-                            for output in targets:
-                                if output['status']!='done':output.update(status='blocked',error='来源母版尚未完成')
-                            self._save(run)
+                        with self.engine.lock:self._failure(master,exc)
+                        block(master,targets)
                 for future in as_completed(pending):
                     if self.stop_event.is_set():return
                     master,entry,targets,raw=pending[future]
                     try:
                         changes=self._image_result(run,future.result(),raw,entry['aspect_ratio'])
-                        with self.engine.lock:master.update(changes);self._save(run)
+                        self._record_generated(run,master,entry,changes)
+                        if master.get('visual_review'):
+                            queue_review(master,entry,targets)
+                            continue
                         for output in targets:
                             if output['status']=='done':continue
                             exports.append((output,master,Path(master['raw_path']),baseline['version']))
                     except Exception as exc:
-                        failures.append(master['id'])
-                        with self.engine.lock:
-                            self._failure(master,exc)
-                            for output in targets:
-                                if output['status']!='done':output.update(status='blocked',error='来源母版尚未完成')
-                            self._save(run)
+                        with self.engine.lock:self._failure(master,exc)
+                        block(master,targets)
+                for future in as_completed(reviews):
+                    master,targets=reviews[future]
+                    if self.stop_event.is_set():return
+                    try:
+                        if future.result():
+                            source=self._checked_file(run,master)
+                            exports.extend((o,master,source,baseline['version']) for o in targets if o['status']!='done')
+                            continue
+                    except Exception as exc:
+                        with self.engine.lock:self._failure(master,exc)
+                    block(master,targets)
                 failures+=self._process_exports(run,exports)
                 with self.engine.lock:
                     if not self._closed:
                         run['suite']['status']='failed' if failures else 'completed'
                         run['status']='failed' if failures else 'completed'
-                        if failures:run['error']='部分背景处理尚未完成，请恢复背景任务' if any(o.get('background_repair_pending') for o in run['outputs']) else '部分图片尚未完成，可恢复整套或单张重出'
+                        if failures:
+                            if any(m['status']=='visual_hold' for m in run['masters']):
+                                run['error']='部分母版需要复核。可在制作进度查看原图和审核结果。'
+                            else:
+                                run['error']='部分背景处理尚未完成，请恢复背景任务' if any(o.get('background_repair_pending') for o in run['outputs']) else '部分图片尚未完成，可恢复整套或单张重出'
                         self._save(run)
             self._launch(run,work)
             return self._public(run)
 
-    def regenerate_canvas_master(self,rid,master_id,idempotency_key,expected_version=None):
+    def regenerate_canvas_master(self,rid,master_id,idempotency_key,expected_version=None,*,_review_resume=False,_redraw_review=False):
         key=_key(idempotency_key);scope='canvas-master-'+master_id
         with self.engine.lock:
             run=self._run(rid)
-            if run.get('kind')!='shared_canvas_adaptation':raise UserError('该操作仅用于共用母版批次')
+            if not _review_resume and run.get('kind')!='shared_canvas_adaptation':
+                raise UserError('该操作仅用于共用母版批次')
             baseline=self._approved(run)
             master=next((m for m in run['masters'] if m['id']==master_id),None)
             if not master:raise UserError('共用母版不存在',404)
-            recovering=bool(master.get('query_required') or master.get('status')=='interrupted' and self._has_receipt(master))
+            if _review_resume and not master.get('visual_review'):
+                raise UserError('该母版没有可恢复的审核',409)
+            if _redraw_review and master.get('query_required'):
+                raise UserError('请先恢复已有图片查询',409)
+            recovering=bool(master.get('query_required') or master.get('status')=='interrupted' and self._has_receipt(master)
+                            or master.get('visual_review') and master['visual_review']['status']!='approved') and not _redraw_review
             if scope+':'+key in run['operation_keys'] and (run['busy'] or not recovering):return self._public(run)
             if expected_version is not None and (type(expected_version) is not int or expected_version!=master['version']):
                 raise UserError('母版版本已更新，请刷新后重试',409)
@@ -896,19 +1228,26 @@ class LearningRuntime:
             if not recovering:
                 self._new_version(master)
                 for output in targets:
-                    self._new_version(output);output['sizing_policy']='shared_canvas_crop'
-            raw=self._execution_path(run,master,Path(run['directory'])/'masters'/master_id/f"v{master['version']}.png")
+                    self._new_version(output)
+                    if run.get('kind')=='shared_canvas_adaptation':output['sizing_policy']='shared_canvas_crop'
+            review_pending=recovering and bool(master.get('visual_review'))
+            raw=Path(master['raw_path']) if review_pending else self._execution_path(run,master,Path(run['directory'])/'masters'/master_id/f"v{master['version']}.png")
             entry=next(m for m in run['compiled']['masters'] if m['id']==master_id)
             master.update(raw_path=str(raw),status='queued',prompt=entry['prompt'],regeneration_key=key)
             run.update(status='generating_suite');self._save(run)
             def work():
                 try:
-                    job=self._job(run,entry,raw,'master',baseline)
-                    with self.engine.lock:master['status']='generating';self._save(run)
-                    result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
-                    changes=self._image_result(run,result,raw,entry['aspect_ratio'])
-                    with self.engine.lock:
-                        master.update(changes);master.pop('regeneration_key',None);self._save(run)
+                    if not review_pending:
+                        job=self._job(run,entry,raw,'master',baseline)
+                        with self.engine.lock:master['status']='generating';self._save(run)
+                        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+                        self._record_generated(run,master,entry,self._image_result(run,result,raw,entry['aspect_ratio']))
+                    if not self.visual_pool.submit(self._visual_gate,run,master,entry).result():
+                        with self.engine.lock:
+                            for output in targets:output.update(status='blocked',error=master['error'])
+                            run.update(status='failed',error=master['error']);run['suite']['status']='failed';self._save(run)
+                        return
+                    with self.engine.lock:master.pop('regeneration_key',None);self._save(run)
                     errors=self._process_exports(run,[(o,master,Path(master['raw_path']),baseline['version']) for o in targets])
                     with self.engine.lock:
                         done=not errors and all(o['status']=='done' for o in run['outputs'])
@@ -975,12 +1314,13 @@ class LearningRuntime:
             if expected_version is not None and (type(expected_version) is not int or output['version']!=expected_version):
                 raise UserError('图片版本已更新，请刷新后重试',409)
             if not self._claim(run,'output-'+output_id,idempotency_key):return self._public(run)
-            recovering=bool(output.get('query_required'))
+            review_pending=bool(output.get('visual_review') and output['status']!='done')
+            recovering=bool(output.get('query_required') or review_pending)
             if resume and not recovering:
                 run['busy']=False;raise UserError('该图片没有待恢复的供应商任务',409)
             if not recovering:self._new_version(output)
             run['status']='generating_suite'
-            raw=self._execution_path(run,output,Path(run['directory'])/'singles'/output['placement_id']/str(output['image_index'])/f"v{output['version']}.png")
+            raw=Path(output['raw_path']) if review_pending else self._execution_path(run,output,Path(run['directory'])/'singles'/output['placement_id']/str(output['image_index'])/f"v{output['version']}.png")
             output.update(raw_path=str(raw),status='generating');self._save(run)
             def work():
                 try:
@@ -991,11 +1331,14 @@ class LearningRuntime:
                             output.update(prompt=entry['prompt'],baseline_version=baseline['version'],
                                           source_master_id='single-'+output_id,source_master_version=output['version'],reuse_baseline=False)
                             self._save(run)
-                    job=self._job(run,entry,raw,'single',baseline)
-                    result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
-                    changes=self._image_result(run,result,raw,entry['aspect_ratio'])
-                    changes.setdefault('prompt',entry['prompt'])
-                    self._process_exports(run,[(output,{**changes,'id':'single-'+output_id,'version':output['version']},Path(result['source']),baseline['version'])])
+                    if not review_pending:
+                        job=self._job(run,entry,raw,'single',baseline)
+                        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+                        self._record_generated(run,output,entry,self._image_result(run,result,raw,entry['aspect_ratio']),single=True)
+                    if not self.visual_pool.submit(self._visual_gate,run,output,entry,single=True).result():
+                        with self.engine.lock:run.update(status='failed',error=output['error']);self._save(run)
+                        return
+                    self._process_exports(run,[(output,{**output,'id':'single-'+output_id},Path(output['raw_path']),baseline['version'])])
                     with self.engine.lock:
                         if not self._closed:run['status']='completed' if all(o['status']=='done' for o in run['outputs']) else 'failed';self._save(run)
                 except Exception as exc:
@@ -1003,6 +1346,18 @@ class LearningRuntime:
                         if not self._closed:self._failure(output,exc);run.update(status='failed',error=output['error']);self._save(run)
             self._launch(run,work)
             return self._public(run)
+
+    def visual_image(self,rid,kind,image_id,version,variant):
+        with self.engine.lock:
+            run=self._run(rid)
+            rows=run['masters'] if kind=='master' else run['outputs']
+            current=next((r for r in rows if r['id']==image_id),None)
+            if current is None:raise UserError('审核图片不存在',404)
+            row=next((r for r in [current,*current.get('versions',[])] if r['version']==version),{})
+            review=row.get('visual_review',{})
+            proof=review.get('original') if variant=='original' else review.get('repair',{}).get('result')
+            if not proof:raise UserError('审核图片尚不可查看',404)
+        return self._checked_file(run,proof)
 
     def image(self,rid,kind,image_id,version=None):
         if kind=='source':
@@ -1134,3 +1489,4 @@ class LearningRuntime:
                     self._save(run)
             self._closed=True;self.stop_event.set();threads=list(self._threads)
         for thread in threads:thread.join(timeout=2)
+        self.visual_pool.shutdown(wait=False,cancel_futures=True)

@@ -39,7 +39,7 @@ test('历史版本和不合格套图拒绝作来源，完整套图可显式选�
  const key=execute('S.masterCanvasDialog.key');execute('setMasterCanvasUseRaw(true)');assert.notEqual(execute('S.masterCanvasDialog.key'),key);assert.equal(execute('S.masterCanvasDialog.source.use_raw'),true);assert(execute('viewMasterCanvasDialog()').includes('/first-raw.png'));
 });
 test('学习机基准和单图来源锁定当前版本，选择对话框不提交模型或自动扩套',()=>{
- const calls=[];const {context,execute}=setup(async(...args)=>calls.push(args));const run=sharedRun({id:'learning-run',kind:undefined,target_kind:undefined,params:{pids:['learning-baidu-512x512']},outputs:[{id:'one',status:'done',version:2,width:512,height:512,platform:'百度',image_url:'/one-v2.png'}]});context.run=run;
+ const calls=[];const {context,execute}=setup(async(...args)=>calls.push(args));const run=sharedRun({id:'learning-run',mode:'real',kind:undefined,target_kind:undefined,params:{pids:['learning-baidu-512x512']},outputs:[{id:'one',status:'done',version:2,width:512,height:512,platform:'百度',image_url:'/one-v2.png'}]});run.approval.mode='real';context.run=run;
  execute('installLearningRun(run);S.cur=null;S.view="learning-run";openMasterCanvasFromLearningBaseline()');assert.equal(execute('S.masterCanvasDialog.source.baseline_version'),1);assert.deepEqual(Array.from(execute('S.masterCanvasDialog.pids')),['learning-baidu-512x512']);
  execute('closeMasterCanvasDialog();openMasterCanvasFromLearningOutput("one",1)');assert.equal(execute('S.masterCanvasDialog'),null);
  execute('openMasterCanvasFromLearningOutput("one",2)');assert.equal(execute('S.masterCanvasDialog.source.versions.one'),2);assert.equal(execute('S.masterCanvasDialog.targets.length'),44);assert.equal(calls.length,0);

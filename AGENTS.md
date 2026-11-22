@@ -40,7 +40,7 @@
 
 修改学习机时先读 [基础配置](references/learning-machine-setup.md) 和 [提示词合同](references/learning-machine-prompts.md)。
 
-- 唯一路径：基准图 → 用户查看确认 → 按组制作 → 精确尺寸与图层导出。制作接口已接入本地演练与显式真实模式；配置预览始终不执行模型。真实模式仅按用户明确动作调用，本机演练同时替代规划与图片服务。
+- 基准图来源为模型生成或用户上传横向 16:9 概念图。两种来源都先由用户查看确认，再按组制作并精确导出。配置预览不执行模型，真实模式按明确动作提交。概念图分流、裁切审核和模型职责见[概念图扩套](references/learning-machine-setup.md#上传概念图扩套)。
 - 当前规则以 `config/learning-machine-content-rules.json`、`learning-machine-master-groups.json`、Logo/遮罩模板为准。旧 `learning-machine-workflow.json` 是兼容旧轮次所需快照，不是新任务入口。
 - 所有功能名关闭，精选角标和附加文案留待后续配置；正文、CTA 有无按版位固定。IP、画风、字体和参考素材每套确定一次。
 - 共用基准图不代表已经确认；各图生图分支独立引用确认后的同一版本。单张重出只更新目标图片。
