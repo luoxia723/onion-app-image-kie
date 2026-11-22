@@ -592,15 +592,15 @@ class LearningRuntime:
             box=self._center_box(sw,sh,output['width'],output['height'])
             return dict(kind='local',source=str(source),source_sha256=source_sha,master=proof,
                         baseline_version=baseline_version,crop_box=box,threshold_percent=threshold)
-        identity=dict(source_sha256=source_sha,target_aspect_ratio=planned['target_aspect_ratio'],aspect_ratio=planned['aspect_ratio'],
-                      allowed_text=text,helper_version=helper.VERSION,model=planned['model'])
-        base_key=hashlib.sha256(json.dumps(identity,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        simple_background=mapping.get('simple_background',False)
+        base_key=helper.reuse_key(source_sha,planned,text,simple_background=simple_background)
         key=hashlib.sha256((base_key+'\0'+str(force_nonce)).encode()).hexdigest() if force_ai else base_key
         with self.engine.lock:existing=run.setdefault('background_operations',{}).get(key)
         if existing:return dict(kind='ai',operation_id=key,master=proof,baseline_version=baseline_version)
         native=Path(run['directory'])/'backgrounds'/key/'native.png'
         with getattr(self.engine,'processing_slots',nullcontext()):
-            job=helper.prepare_job(run,source,native,output['width'],output['height'],allowed_text=text)
+            job=helper.prepare_job(run,source,native,output['width'],output['height'],allowed_text=text,
+                                   simple_background=simple_background)
         if job['reuse_key']!=base_key:raise UserError('背景扩展复用身份不一致')
         job['id']='background-'+key;job['upload_cache']=str(Path(run['directory'])/'reference-upload-cache.json')
         from render import task_state_path

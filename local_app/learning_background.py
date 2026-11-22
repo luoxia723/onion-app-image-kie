@@ -24,6 +24,7 @@ VERSION=3
 MAX_PIXELS=40000000
 SOURCE_PURPOSE='原始无Logo画面；保留主体身份、人物脸手、完整文案、关键物件及原有画风光色，不把边缘色条当作画面设计'
 GUIDE_PURPOSE='完整自然画布构图草稿；中间为等比保全的原图，整幅场景需要连续填满，色块只是待补全占位，不是成品或画风参考'
+SIMPLE_BACKGROUND_PROMPT='用简洁连续的大色面组织背景，减少远景重复纹样、颗粒和细碎物件。保留本套光色与画风，人物、关键道具和字边保持清晰。'
 
 
 def _size(width,height,label):
@@ -149,7 +150,7 @@ def _allowed_text(value):
     return {key:text for key,text in value.items() if text}
 
 
-def repair_prompt(allowed_text,background_plan):
+def repair_prompt(allowed_text,background_plan,*,simple_background=False):
     value=_checked_plan(background_plan);text=_allowed_text(allowed_text)
     x1,y1,x2,y2=value['source_safe_area']
     canvas_instruction=('参考图1为完整模型画幅，场景连续画满四边，不添加外框、定位线或白色辅助边带。'
@@ -158,8 +159,14 @@ def repair_prompt(allowed_text,background_plan):
     button='按钮文字逐字保留：'+json.dumps(text['cta'],ensure_ascii=False)+'。' if text.get('cta') else '本张无独立按钮，不添加按钮或按钮文案。'
     breathing=('成品范围内仍保留四周额外的自然背景间距，人物头发、脸手、关键物件与文案均不贴边；'
                '沿用草稿已留出的安全余量，不把主体或文字重新放大去填满边缘。')
+    extension='在成品范围内自然延展参考图2已有的场景结构，延续空间透视、光线、色彩、材质'
+    if not simple_background:
+        extension+='与细节密度'
+    extension+='，修复原图边缘和扩展区的接缝。'
+    if simple_background:
+        extension+=SIMPLE_BACKGROUND_PROMPT
     return ('参考图1锁定最终构图、主体的缩小比例与位置；参考图2提供原始人物、场景和文字细节，不照搬其满幅构图。'+canvas_instruction+
-        '在成品范围内自然延展参考图2已有的场景结构，延续空间透视、光线、色彩、材质与细节密度，修复原图边缘和扩展区的接缝。'
+        extension+
         '草稿中的单色色条、渐变色块、拼接直线都只是待补全区域，必须替换为连贯自然的场景，不能保留为背景条带。'
         '保持参考图1中已经缩小的主体位置与大小，完整保留人物脸、头发、手、动作、关键物件和确认文案，不重新放大人物，不裁掉主体或文字。'+breathing+
         '保持人物身份、整体画风与主题，允许少量细节重绘；不要添新人物、新广告文案、Logo、品牌标准字、角标、圆角或遮罩。'
@@ -199,7 +206,17 @@ def crop_ai_result(provider_native_png,target_png,background_plan,target_width=N
         full_source_preserved_by='model_instruction_and_user_review',content_detection='not_performed')
 
 
-def prepare_job(run,source_path,raw_output,target_width,target_height,allowed_text=None):
+def reuse_key(source_sha256,background_plan,allowed_text,*,simple_background=False):
+    identity=dict(source_sha256=source_sha256,target_aspect_ratio=background_plan['target_aspect_ratio'],
+        aspect_ratio=background_plan['aspect_ratio'],allowed_text=_allowed_text(allowed_text),helper_version=VERSION,
+        model=background_plan['model'])
+    if simple_background:
+        # Keep the exact identity of earlier requests that used the standard prompt.
+        identity['simple_background']=True
+    return hashlib.sha256(json.dumps(identity,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
+
+def prepare_job(run,source_path,raw_output,target_width,target_height,allowed_text=None,*,simple_background=False):
     source=Path(source_path);output=Path(raw_output)
     if not source.is_absolute() or not output.is_absolute():raise UserError('背景修补来源与输出必须是冻结的绝对路径')
     if source.resolve()==output.resolve():raise UserError('背景修补不能覆盖来源图片')
@@ -216,9 +233,8 @@ def prepare_job(run,source_path,raw_output,target_width,target_height,allowed_te
     bindings=[dict(slot=1,kind='adaptation_canvas',path=guide['path'],sha256=guide['sha256'],purpose=guide_purpose),
               dict(slot=2,kind='source_picture',path=str(source),sha256=_sha(source),purpose=SOURCE_PURPOSE)]
     return dict(kind='background_expansion',model=background_plan['model'],aspect_ratio=background_plan['aspect_ratio'],
-        prompt=repair_prompt(text,background_plan),output=str(output),simulation=mode=='simulation',allowed_text=text,
+        prompt=repair_prompt(text,background_plan,simple_background=simple_background),output=str(output),simulation=mode=='simulation',allowed_text=text,
         reference_bindings=bindings,background_plan=background_plan,stop_marker=run.get('stop_marker'),
         source_sha256=bindings[1]['sha256'],guide_sha256=guide['sha256'],
         content_safe_area=list(background_plan['final_crop_box']),
-        reuse_key=hashlib.sha256(json.dumps(dict(source_sha256=bindings[1]['sha256'],target_aspect_ratio=background_plan['target_aspect_ratio'],
-            aspect_ratio=background_plan['aspect_ratio'],allowed_text=text,helper_version=VERSION,model=background_plan['model']),sort_keys=True,ensure_ascii=False).encode()).hexdigest())
+        reuse_key=reuse_key(bindings[1]['sha256'],background_plan,text,simple_background=simple_background))

@@ -175,6 +175,11 @@ def test_same_source_and_exact_target_ratio_can_share_model_repair_across_pixel_
     other_ratio=background.prepare_job(run,source,tmp_path/'three.png',1200,350,{'t1':'原文'})
     other_text=background.prepare_job(run,source,tmp_path/'four.png',1400,340,{'t1':'新文'})
     assert other_ratio['reuse_key']!=first['reuse_key'] and other_text['reuse_key']!=first['reuse_key']
+    simple=background.prepare_job(run,source,tmp_path/'five.png',1400,340,{'t1':'原文'},simple_background=True)
+    simple_large=background.prepare_job(run,source,tmp_path/'six.png',2800,680,{'t1':'原文'},simple_background=True)
+    assert simple['reuse_key']!=first['reuse_key'] and simple['reuse_key']==simple_large['reuse_key']
+    assert first['guide_sha256']==simple['guide_sha256']
+    assert '减少远景重复纹样' in simple['prompt'] and '减少远景重复纹样' not in first['prompt']
 
 
 def test_no_padding_and_threshold_checks_are_geometry_only_and_do_not_claim_content_detection():

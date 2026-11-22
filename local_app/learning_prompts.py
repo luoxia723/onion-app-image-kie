@@ -12,6 +12,7 @@ from fractions import Fraction
 from scripts.image_quality import tight_png_budget
 from scripts.kie_model import aspect_ratios, normalize_model
 from .config import ROOT, UserError
+from .learning_background import SIMPLE_BACKGROUND_PROMPT
 from .learning_pipeline import BASELINE_ID, CONTENT_BY_ID, DEFAULT_CTA
 from .learning_sizing import content_size
 
@@ -304,7 +305,7 @@ def build(plan,model=None):
         if mask_zones:prompt+='\n底部只延续背景，关键信息留在上述范围内；不要自行画灰层。'
         if texts['feature_note']:prompt+='\n补充画面要求：'+_quoted(texts['feature_note'])+'。排字仍以给定正文和按钮规则为准。'
         if any(_tight_png_budget(CONTENT_BY_ID[pid]) for pid in pids):
-            prompt+='\n用简洁连续的大色面组织背景，减少远景重复纹样、颗粒和细碎物件。保留本套光色与画风，人物、关键道具和字边保持清晰。'
+            prompt+='\n'+SIMPLE_BACKGROUND_PROMPT
         prompt+='\n'+_reference_prompt(reference_bindings)
         regeneration_prompt=prompt
         if reuse_baseline:
@@ -338,10 +339,13 @@ def build(plan,model=None):
             loss=100*(1-(crop[2]-crop[0])*(crop[3]-crop[1]))
             has_side_panel=content_size(rule)[0]!=rule['target_width']
             needs_background=not has_side_panel and loss>NATURAL_BACKGROUND_THRESHOLD_PERCENT+1e-8
-            if needs_background:background_requests.add((mid,str(Fraction(rule['target_width'],rule['target_height']))))
+            simple_background=_tight_png_budget(rule)
+            if needs_background:
+                background_requests.add((mid,str(Fraction(rule['target_width'],rule['target_height'])),simple_background))
             mappings.append(dict(output_id=o['id'],placement_id=pid,master_id=mid,group_id=group['id'],aspect_ratio=ratio,
                 crop_box=crops[pid],target_width=rule['target_width'],target_height=rule['target_height'],output_format='PNG',
                 **({'artwork_width':rule['artwork_width']} if has_side_panel else {}),
+                simple_background=simple_background,
                 requires_image_model_call=needs_background,processing_kind='natural_background_then_export' if needs_background else 'local_export',
                 sizing_policy='fixed_crop' if has_side_panel else 'natural_if_needed',natural_background_threshold_percent=NATURAL_BACKGROUND_THRESHOLD_PERCENT,
                 background_image_required=needs_background,logo_required=rule['modules']['logo'],

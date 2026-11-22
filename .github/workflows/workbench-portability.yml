@@ -2,9 +2,9 @@ name: Workbench portability
 on:
   workflow_dispatch:
   push:
-    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tools/learning-png/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
   pull_request:
-    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
+    paths: ['bootstrap.py', 'run.py', 'requirements*.txt', 'local_app/**', 'frontend/**', 'scripts/**', 'tools/learning-png/**', 'config/**', 'assets/**', 'tests_local/**', 'tests_frontend/**', 'tests/**', 'references/**', 'README.md', 'AGENTS.md', '本机工作台说明.md', '.env.example', '.gitignore', 'conftest.py', 'pytest.ini', '.github/workflows/workbench-portability.yml']
 permissions:
   contents: read
 jobs:
@@ -44,5 +44,10 @@ jobs:
         run: .venv/bin/python scripts/build_workbench_bundle.py --check
       - name: Install test dependencies
         run: .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Build the optional PNG palette helper
+        run: |
+          rustup toolchain install 1.92.0 --profile minimal
+          rustup run 1.92.0 cargo build --release --locked --manifest-path tools/learning-png/Cargo.toml
+          echo "$GITHUB_WORKSPACE/tools/learning-png/target/release" >> "$GITHUB_PATH"
       - name: All offline behavior, history, transport and frontend checks
         run: .venv/bin/python scripts/check_workbench.py --suite all
