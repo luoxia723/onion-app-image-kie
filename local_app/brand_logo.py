@@ -134,7 +134,7 @@ def composite(source,target,snapshot,override_id=None):
     with Image.open(source) as original:
         image=original.convert('RGBA')
     if image.size!=(snapshot['target_width'],snapshot['target_height']):raise UserError('Logo底图尺寸与冻结版位不一致')
-    aid=''
+    aid='';pixel_box=None
     if snapshot['enabled']:
         aid,record,path=_checked_asset(snapshot,override_id)
         with Image.open(path) as original:mark=original.convert('RGBA')
@@ -144,8 +144,9 @@ def composite(source,target,snapshot,override_id=None):
         x=round(snapshot['template']['x']*image.width);y=round(snapshot['template']['y']*image.height)
         if x<0 or y<0 or x+width>image.width or y+height>image.height:raise UserError('Logo位置超过图片边界')
         image.alpha_composite(mark,(x,y))
+        pixel_box=[x,y,width,height]
     Path(target).parent.mkdir(parents=True,exist_ok=True);image.save(target,'PNG')
-    return dict(asset_id=aid,sha256=digest(target),logo_applied=bool(aid))
+    return dict(asset_id=aid,sha256=digest(target),logo_applied=bool(aid),pixel_box=pixel_box)
 
 
 def render_delivery(base,target,placement,snapshot,override_id=None):
@@ -159,7 +160,8 @@ def render_delivery(base,target,placement,snapshot,override_id=None):
         else:
             from image_compress import compress
             limit=(placement.get('max_file_size_kb') or 200)-(1/1024 if placement.get('file_size_operator')=='lt' else 0)
-            compress(str(intermediate),str(target),limit,placement['target_width'],placement['target_height']);encoding={}
+            compress(str(intermediate),str(target),limit,placement['target_width'],placement['target_height'],
+                     pixel_box=metadata['pixel_box']);encoding={}
     finally:intermediate.unlink(missing_ok=True)
     metadata.update(sha256=digest(target),encoding=encoding)
     return metadata

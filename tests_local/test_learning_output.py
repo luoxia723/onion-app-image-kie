@@ -168,3 +168,33 @@ def test_transparent_textured_png_can_use_palette_without_shrinking_or_losing_ro
         assert image.format=='PNG' and image.size==(484,580)
         rgba=image.convert('RGBA');assert rgba.getpixel((0,0))[3]==0
         assert rgba.getpixel((242,290))[3]==255
+
+
+def test_pngquant_candidates_keep_original_alpha_after_rgb_quantization(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from local_app import learning_output
+    image = Image.new('RGBA', (32, 16), '#4b83de')
+    alpha = Image.new('L', image.size)
+    alpha.putdata([value for y in range(image.height) for value in [0, 64, 192]+[255]*29])
+    image.putalpha(alpha)
+    monkeypatch.setattr(learning_output.shutil, 'which', lambda _: 'pngquant')
+    dithers = []
+
+    def encode(argv, **options):
+        dithers.append(next(arg for arg in argv if arg.startswith('--floyd=')))
+        with Image.open(argv[-1]) as source:
+            assert source.mode == 'RGB'
+            indexed = source.quantize(colors=4)
+            indexed.save(argv[argv.index('--output')+1], 'PNG')
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(learning_output.subprocess, 'run', encode)
+    candidates = list(learning_output._pngquant_candidates(
+        image.convert('RGB'), learning_output._AlphaPalette(image), None, 2048, tmp_path))
+    assert set(dithers) == {'--floyd=0', '--floyd=0.35', '--floyd=1'}
+    assert len(candidates) == 3
+    from io import BytesIO
+    for _, data, _, _, _ in candidates:
+        with Image.open(BytesIO(data)) as output:
+            assert output.size == image.size and output.format == 'PNG'
+            assert output.convert('RGBA').getchannel('A').tobytes() == alpha.tobytes()

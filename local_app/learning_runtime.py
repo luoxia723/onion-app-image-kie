@@ -563,6 +563,7 @@ class LearningRuntime:
         if result['format'] == 'PNG':
             compression['compression'] = {key: result[key] for key in
                                           ('bytes', 'pixel_lossless', 'palette_colors', 'alpha_palette_quantized')}
+            compression['compression'].update({key: result[key] for key in ('compressor','dither') if key in result})
         with self.engine.lock:
             if not self._closed:
                 output.update(status='done',path=str(path),sha256=result['sha256'],baseline_version=baseline_version,

@@ -8,9 +8,11 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 
-from PIL import Image, ImageChops, ImageDraw, ImageStat
+from PIL import Image, ImageChops, ImageDraw
 
+from scripts.image_quality import EncodingQuality, logo_bounds
 from .config import UserError
 from . import learning_logo, learning_mask
 from .learning_pipeline import CONTENT_BY_ID
@@ -36,27 +38,72 @@ def _indexed_picture(image,logo,snapshot,*,colors=256,brand_colors=128):
     return indexed.point([i if i<colors else colors-1 for i in range(256)])
 
 
-def _indexed_transparent_picture(image,logo,snapshot,max_colors):
-    """Keep the rounded alpha mask exact; reserve palette entries for its fringe.
+class _AlphaPalette:
+    """Reserve each alpha value, independently of the opaque artwork palette."""
 
-    Only subpixel fringe colors are averaged. Opaque art uses median-cut and a
-    dedicated brand palette, avoiding coarse octree bands over the whole image.
-    """
-    alpha=image.getchannel('A');levels=[i for i,n in enumerate(alpha.histogram()) if n and i<255]
-    if len(levels)>192:
-        return None
-    colors=min(max_colors,256-len(levels));picture=_indexed_picture(image.convert('RGB'),logo,snapshot,colors=colors,brand_colors=min(48,colors//3))
-    samples={a:[0,0,0,0] for a in levels};pixels=image.tobytes()
-    for r,g,b,a in zip(pixels[0::4],pixels[1::4],pixels[2::4],pixels[3::4]):
-        if a<255:
-            sums=samples[a];sums[0]+=r;sums[1]+=g;sums[2]+=b;sums[3]+=1
-    fringe={a:colors+i for i,a in enumerate(levels)}
-    palette=picture.getpalette()[:colors*3]
-    for a in levels:palette.extend(round(v/samples[a][3]) for v in samples[a][:3])
-    result=Image.new('P',image.size);result.putpalette(palette+[0]*(768-len(palette)))
-    result.putdata([i if a==255 else fringe[a] for i,a in zip(picture.tobytes(),alpha.tobytes())])
-    result.info['transparency']=bytes([255]*colors+levels)
-    return result
+    def __init__(self, image):
+        alpha = image.getchannel('A')
+        self.alpha = alpha.tobytes()
+        self.levels = [level for level, count in enumerate(alpha.histogram()) if count and level < 255]
+        self.max_colors = 256 - len(self.levels)
+        samples = {level: [0, 0, 0, 0] for level in self.levels}
+        for r, g, b, a in image.get_flattened_data():
+            if a < 255:
+                totals = samples[a]
+                totals[0] += r
+                totals[1] += g
+                totals[2] += b
+                totals[3] += 1
+        self.fringe_colors = [round(value / samples[a][3]) for a in self.levels for value in samples[a][:3]]
+
+    def apply(self, indexed):
+        indices = indexed.tobytes()
+        colors = max(indices) + 1
+        if colors > self.max_colors:
+            raise ValueError('No palette space left for original alpha values')
+        fringe = {a: colors + i for i, a in enumerate(self.levels)}
+        mapped = bytes(i if a == 255 else fringe[a] for i, a in zip(indices, self.alpha))
+        result = Image.frombytes('P', indexed.size, mapped)
+        result.putpalette(indexed.getpalette()[:colors*3] + self.fringe_colors)
+        result.info['transparency'] = bytes([255]*colors + self.levels)
+        return result
+
+
+class _LogoPalette:
+    """Keep a small set of brand colors for the opaque pixels of the Logo."""
+
+    def __init__(self, image, logo, snapshot):
+        x, y, width, height = logo['pixel_box']
+        with Image.open(snapshot['assets'][logo['logo_asset_id']]['path']) as original:
+            mark = original.convert('RGBA').resize((width, height), Image.Resampling.LANCZOS)
+        opaque = [(index, pixel[:3]) for index, pixel in enumerate(mark.get_flattened_data()) if pixel[3] == 255]
+        self.indices = []
+        self.colors = []
+        if not opaque:
+            return
+        samples = Image.new('RGB', (len(opaque), 1))
+        samples.putdata([color for _, color in opaque])
+        palette = samples.quantize(colors=min(24, len(opaque)), method=Image.Quantize.MEDIANCUT)
+        self.colors = palette.getpalette()[:(max(palette.tobytes()) + 1)*3]
+        self.indices = [((y + offset // width)*image.width+x+offset % width, index)
+                        for (offset, _), index in zip(opaque, palette.tobytes())]
+
+    @property
+    def size(self):
+        return len(self.colors) // 3
+
+    def apply(self, picture):
+        if not self.colors:
+            return picture
+        indices = bytearray(picture.tobytes())
+        offset = max(indices) + 1
+        if offset + self.size > 256:
+            raise ValueError('No palette space left for Logo colors')
+        for position, index in self.indices:
+            indices[position] = offset + index
+        result = Image.frombytes('P', picture.size, bytes(indices))
+        result.putpalette(picture.getpalette()[:offset*3] + self.colors)
+        return result
 
 
 def _indexed_rgba_fallback(image):
@@ -88,6 +135,8 @@ def _exact_palette(image):
     indices = {pixel: index for index, pixel in enumerate(colors)}
     indexed = Image.frombytes('P', image.size, bytes(indices[pixel] for pixel in image.get_flattened_data()))
     indexed.putpalette([channel for color in colors for channel in color[:3]])
+    if image.info.get('icc_profile'):
+        indexed.info['icc_profile'] = image.info['icc_profile']
     if image.mode == 'RGBA':
         indexed.info['transparency'] = bytes(color[3] for color in colors).rstrip(b'\xff')
     bits = next(depth for depth in (1, 2, 4, 8) if len(colors) <= 2**depth)
@@ -108,12 +157,65 @@ def _optimize_png(data, image, folder):
         if len(candidate) < len(data):
             with Image.open(BytesIO(candidate)) as decoded:
                 if (decoded.format == 'PNG' and decoded.size == image.size
-                        and decoded.convert(image.mode).tobytes() == image.tobytes()
-                        and (image.mode == 'RGBA' or decoded.convert('RGBA').getchannel('A').getextrema() == (255, 255))):
+                        and decoded.info.get('icc_profile') == image.info.get('icc_profile')
+                        and decoded.convert('RGBA').tobytes() == image.convert('RGBA').tobytes()):
                     return candidate
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
     return data
+
+
+_COLOR_BUDGETS = (16, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128, 144, 160, 192, 224, 256)
+
+
+def _pngquant_candidates(rgb, alpha, brand, limit, folder):
+    executable = shutil.which('pngquant')
+    # pngquant's input decoder may transform custom color profiles. Preserve
+    # the profile with the Pillow path for those images.
+    if executable is None or rgb.info.get('icc_profile'):
+        return
+    source = folder / 'quantization-source.png'
+    rgb.save(source, 'PNG', compress_level=1)
+    maximum = (alpha.max_colors if alpha else 256) - (brand.size if brand else 0)
+    levels = sorted({min(maximum, budget) for budget in _COLOR_BUDGETS})
+    levels = [budget for budget in levels if budget >= 16]
+    deadline = time.monotonic() + 8
+    env = dict(os.environ, RAYON_NUM_THREADS='1')
+    for dither in ('0', '0.35', '1'):
+        low, high = 0, len(levels) - 1
+        index = high
+        while low <= high:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            colors = levels[index]
+            target = folder / 'quantization-result.png'
+            target.unlink(missing_ok=True)
+            try:
+                subprocess.run([executable, '--speed', '4', '--floyd='+dither, '--output', str(target),
+                                str(colors), '--', str(source)], check=True, env=env,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=min(remaining, 2))
+                with Image.open(target) as decoded:
+                    if decoded.format != 'PNG' or decoded.mode != 'P' or decoded.size != rgb.size:
+                        return
+                    picture = decoded.copy()
+                data = target.read_bytes()
+                if brand:
+                    picture = brand.apply(picture)
+                if alpha:
+                    picture = alpha.apply(picture)
+                if alpha or brand:
+                    data = _png_bytes(picture)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                return
+            if limit < len(data) <= limit * 1.12:
+                data = _optimize_png(data, picture, folder)
+            if len(data) <= limit:
+                yield picture, data, colors, 'pngquant', float(dither)
+                low = index + 1
+            else:
+                high = index - 1
+            index = (low + high) // 2
 
 
 def _encode_png(image, logo, snapshot, limit, folder):
@@ -128,46 +230,43 @@ def _encode_png(image, logo, snapshot, limit, folder):
         return data, dict(pixel_lossless=True, palette_colors=colors, alpha_palette_quantized=False,
                           encoding_method='indexed' if colors is not None else 'truecolor')
 
-    alpha = image.mode == 'RGBA'
+    alpha = _AlphaPalette(image) if image.mode == 'RGBA' else None
+    rgb = image.convert('RGB')
+    maximum = alpha.max_colors if alpha else 256
     candidates = []
-    for color_budget in (256, 224, 192, 160, 128, 112, 96, 80, 64, 48, 32, 16):
-        picture = (_indexed_transparent_picture(image, logo, snapshot, color_budget) if alpha else
-                   _indexed_picture(image, logo, snapshot, colors=color_budget, brand_colors=min(48, color_budget//3)))
-        if picture is None:
-            break
-        encoded = _png_bytes(picture)
+    for color_budget in sorted({min(maximum, budget) for budget in _COLOR_BUDGETS}, reverse=True):
+        if color_budget < 16:
+            continue
+        picture = _indexed_picture(rgb, logo, snapshot, colors=color_budget, brand_colors=min(48, color_budget//3))
+        if alpha:
+            picture = alpha.apply(picture)
+        encoded = _png_bytes(picture, icc_profile=image.info.get('icc_profile'))
         if len(encoded) <= limit:
-            candidates.append((picture, encoded, color_budget))
+            candidates.append((picture, encoded, color_budget, 'pillow', 0))
             break
-    if alpha:
-        # Alpha-preserving indexing may leave too few colors for the picture.
-        # Compare its best fitting result with the existing octree fallback.
-        for budget in (None, 256, 128, 64, 32, 16):
+    brand = _LogoPalette(rgb, logo, snapshot) if logo.get('logo_applied') else None
+    candidates.extend(_pngquant_candidates(rgb, alpha, brand, limit, folder))
+    quality = EncodingQuality(image, logo_bounds(logo.get('pixel_box')))
+    if alpha and not candidates:
+        # Exact fringe levels may exhaust the palette. Preserve the fully
+        # opaque and transparent silhouette even for a reduced fringe.
+        for budget in (None, 256, 128, 64, 32, 16, 8, 4):
             candidate = image
             if budget is not None:
                 candidate = image.convert('RGB').quantize(colors=budget).convert('RGBA')
                 candidate.putalpha(image.getchannel('A'))
             picture = _indexed_rgba_fallback(candidate)
-            encoded = _png_bytes(picture)
-            if len(encoded) <= limit:
-                candidates.append((picture, encoded, budget))
+            encoded = _png_bytes(picture, icc_profile=image.info.get('icc_profile'))
+            if len(encoded) <= limit and quality.alpha_status(picture)[0]:
+                candidates.append((picture, encoded, budget, 'pillow-octree', 0))
                 break
     if not candidates:
         raise UserError('图片已达到精确尺寸，但超过该版位PNG大小限制，请压缩或简化画面；不会缩小交付尺寸')
 
-    reference = image.convert('RGBA')
-    neutral = Image.new('RGBA', image.size, (128, 128, 128, 255))
-    visible = Image.alpha_composite(neutral, reference).convert('RGB')
-    def error(candidate):
-        rendered = candidate[0].convert('RGBA')
-        composite = Image.alpha_composite(neutral, rendered).convert('RGB')
-        rgb_error = ImageStat.Stat(ImageChops.difference(visible, composite)).sum2
-        alpha_error = ImageStat.Stat(ImageChops.difference(reference.getchannel('A'), rendered.getchannel('A'))).sum2
-        return sum(rgb_error) + sum(alpha_error)
-    picture, data, color_budget = min(candidates, key=error)
-    alpha_quantized = picture.convert('RGBA').getchannel('A').tobytes() != reference.getchannel('A').tobytes()
+    picture, data, color_budget, method, dither = min(candidates, key=lambda item: (quality.loss(item[0]), len(item[1])))
+    alpha_quantized = not quality.alpha_status(picture)[1]
     return data, dict(pixel_lossless=False, palette_colors=len(picture.getcolors()), picture_palette_colors=color_budget,
-                      alpha_palette_quantized=alpha_quantized, encoding_method='indexed')
+                      alpha_palette_quantized=alpha_quantized, encoding_method='indexed', compressor=method, dither=dither)
 
 
 def _add_right_panel(artwork, target, width):
@@ -258,7 +357,7 @@ def _export_jpeg(source,target,pid,snapshot,row,crop_box,protected_regions,polic
             with Image.open(folder/'logo.png') as image:image.convert('RGB').save(final,'JPEG',quality=95,optimize=True)
         else:
             budget=limit-(1/1024 if row.get('file_size_operator')=='lt' else 0)
-            compress(str(folder/'logo.png'),str(final),budget,width,height)
+            compress(str(folder/'logo.png'),str(final),budget,width,height,pixel_box=logo.get('pixel_box'))
         with Image.open(final) as checked:
             if checked.format!='JPEG' or checked.size!=(width,height) or checked.mode!='RGB':raise UserError('母版JPEG交付规格不符')
             checked.verify()

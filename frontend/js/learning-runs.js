@@ -258,7 +258,10 @@ function viewLearningProcessing(row){
  const panel=sizing.right_panel;
  if(panel)labels.push('左侧主画面 '+panel.artwork_width+'px','右侧纯色 '+panel.fill_width+'px');
  const compression=row.processing?.compression;
- if(compression)labels.push(compression.pixel_lossless?'PNG 无损编码':'PNG 已减色',Number((compression.bytes/1024).toFixed(1))+' KiB');
+ if(compression){
+  labels.push(compression.pixel_lossless?'PNG 无损编码':compression.compressor==='pngquant'?'PNG 感知减色':'PNG 调色板减色',Number((compression.bytes/1024).toFixed(1))+' KiB');
+  if(compression.alpha_palette_quantized)labels.push('半透明边缘已量化');
+ }
  const crop=percentage(sizing.crop_percent),padding=percentage(sizing.padding_percent);
  if(crop!==null&&!repaired)labels.push((sharedCanvas?'母版裁切 ':'裁切 ')+crop);if(padding!==null)labels.push((repaired||sharedCanvas?'后处理补边 ':'补背景 ')+padding);
  if(sizing.seam_review_required===true)labels.push('接缝待目视查看');
