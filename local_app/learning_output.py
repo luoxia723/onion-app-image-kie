@@ -39,31 +39,59 @@ def _indexed_picture(image,logo,snapshot,*,colors=256,brand_colors=128):
 
 
 class _AlphaPalette:
-    """Reserve each alpha value, independently of the opaque artwork palette."""
+    """Reserve the original alpha coverage and keep local colors on rounded edges."""
 
-    def __init__(self, image):
+    def __init__(self, image, *, local_edge_colors=False):
         alpha = image.getchannel('A')
         self.alpha = alpha.tobytes()
-        self.levels = [level for level, count in enumerate(alpha.histogram()) if count and level < 255]
-        self.max_colors = 256 - len(self.levels)
-        samples = {level: [0, 0, 0, 0] for level in self.levels}
-        for r, g, b, a in image.get_flattened_data():
-            if a < 255:
+        levels = [level for level, count in enumerate(alpha.histogram()) if count and level < 255]
+        samples = {level: [0, 0, 0, 0] for level in levels}
+        edges = {level: [] for level in levels if local_edge_colors and level > 0}
+        for position, (r, g, b, a) in enumerate(image.get_flattened_data()):
+            if a in edges:
+                edges[a].append((position, (r, g, b)))
+            elif a < 255:
                 totals = samples[a]
                 totals[0] += r
                 totals[1] += g
                 totals[2] += b
                 totals[3] += 1
-        self.fringe_colors = [round(value / samples[a][3]) for a in self.levels for value in samples[a][:3]]
+        self.levels = []
+        self.fringe_colors = []
+        self.fringe_defaults = {}
+        self.edge_entries = {}
+        for level in levels:
+            start = len(self.levels)
+            self.fringe_defaults[level] = start
+            if level in edges:
+                points = edges[level]
+                strip = Image.new('RGB', (len(points), 1))
+                strip.putdata([color for _, color in points])
+                # At higher coverage, one color shared by all four corners can
+                # draw a colored rim. Two colors retain local edge contrast.
+                palette = strip.quantize(colors=min(len(points), 2 if level >= 64 else 1),
+                                         method=Image.Quantize.MEDIANCUT)
+                indices = palette.tobytes()
+                count = max(indices) + 1
+                self.levels.extend([level] * count)
+                self.fringe_colors.extend(palette.getpalette()[:3 * count])
+                self.edge_entries.update((pos, start + index) for (pos, _), index in zip(points, indices) if index)
+            else:
+                r, g, b, count = samples[level]
+                self.levels.append(level)
+                self.fringe_colors.extend([0, 0, 0] if local_edge_colors else [round(value / count) for value in (r, g, b)])
+        self.max_colors = 256 - len(self.levels)
 
     def apply(self, indexed):
         indices = indexed.tobytes()
         colors = max(indices) + 1
         if colors > self.max_colors:
             raise ValueError('No palette space left for original alpha values')
-        fringe = {a: colors + i for i, a in enumerate(self.levels)}
-        mapped = bytes(i if a == 255 else fringe[a] for i, a in zip(indices, self.alpha))
-        result = Image.frombytes('P', indexed.size, mapped)
+        fringe = {a: colors + i for a, i in self.fringe_defaults.items()}
+        mapped = bytearray(i if a == 255 else fringe[a] for i, a in zip(indices, self.alpha))
+        for position, index in self.edge_entries.items():
+            mapped[position] = colors + index
+        result = Image.frombytes('P', indexed.size, bytes(mapped))
         result.putpalette(indexed.getpalette()[:colors*3] + self.fringe_colors)
         result.info['transparency'] = bytes([255]*colors + self.levels)
         return result
@@ -275,7 +303,7 @@ def _joint_png_candidates(rgb, alpha, brand, limit, folder):
                 yield picture, data, len(used), 'zenquant', None
 
 
-def _encode_png(image, logo, snapshot, limit, folder):
+def _encode_png(image, logo, snapshot, limit, folder, *, local_edge_colors=False):
     data = _png_bytes(image)
     exact = _exact_palette(image) if limit is not None else None
     colors = None
@@ -287,7 +315,7 @@ def _encode_png(image, logo, snapshot, limit, folder):
         return data, dict(pixel_lossless=True, palette_colors=colors, alpha_palette_quantized=False,
                           encoding_method='indexed' if colors is not None else 'truecolor')
 
-    alpha = _AlphaPalette(image) if image.mode == 'RGBA' else None
+    alpha = _AlphaPalette(image, local_edge_colors=local_edge_colors) if image.mode == 'RGBA' else None
     rgb = image.convert('RGB')
     maximum = alpha.max_colors if alpha else 256
     candidates = []
@@ -377,16 +405,21 @@ def export_output(source,target,placement_id,logo_snapshot,*,mask_snapshot=None,
         logo=learning_logo.composite(folder/'masked.png',folder/'logo.png',placement_id,logo_snapshot)
         with Image.open(folder/'logo.png') as opened:image=opened.convert('RGBA')
         radius=row['corner_radius'];limit=row.get('max_file_size_kb')
+        local_edge_colors=False
         if radius:
             scale=4
             alpha=Image.new('L',(width*scale,height*scale),0)
             ImageDraw.Draw(alpha).rounded_rectangle((0,0,width*scale-1,height*scale-1),radius=radius*scale,fill=255)
-            alpha=alpha.resize((width,height),Image.Resampling.LANCZOS)
-            image.putalpha(ImageChops.multiply(image.getchannel('A'),alpha))
+            # Area sampling keeps the curve antialiased without the alpha
+            # overshoot and ghost pixels produced by a sharpening filter.
+            alpha=alpha.resize((width,height),Image.Resampling.BOX)
+            original_alpha=image.getchannel('A')
+            local_edge_colors=original_alpha.getextrema()==(255,255)
+            image.putalpha(ImageChops.multiply(original_alpha,alpha))
         if image.getchannel('A').getextrema()==(255,255):
             image=image.convert('RGB')
         max_bytes = (limit*1024 - (1 if row.get('file_size_operator')=='lt' else 0)) if limit is not None else None
-        data, encoding = _encode_png(image, logo, logo_snapshot, max_bytes, folder)
+        data, encoding = _encode_png(image, logo, logo_snapshot, max_bytes, folder, local_edge_colors=local_edge_colors)
         finished=folder/'finished.png'
         finished.write_bytes(data)
         size=len(data)

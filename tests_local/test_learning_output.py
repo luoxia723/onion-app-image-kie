@@ -40,6 +40,40 @@ def test_deferred_featured_card_keeps_only_logo_and_rounded_alpha(tmp_path):
     assert not result['badge_applied'] and not result['feature_label_drawn']
 
 
+def test_rounded_card_has_one_clean_alpha_transition(tmp_path):
+    pid = 'learning-dsl-rounded-card-484x580'
+    logo, mask = frozen(tmp_path, pid)
+    source, target = tmp_path / 'source.png', tmp_path / 'card.png'
+    Image.new('RGB', (484, 580), '#efb973').save(source)
+
+    export_output(source, target, pid, logo, mask_snapshot=mask)
+
+    with Image.open(target) as card:
+        alpha = card.convert('RGBA').getchannel('A')
+    # From outside the arc toward the opaque area, coverage can only increase.
+    for y in range(45):
+        row = [alpha.getpixel((x, y)) for x in range(46)]
+        assert row == sorted(row)
+    assert alpha.crop((0, 0, 44, 44)).tobytes() == alpha.crop((440, 0, 484, 44)).transpose(
+        Image.Transpose.FLIP_LEFT_RIGHT).tobytes()
+    assert alpha.getpixel((44, 0)) == alpha.getpixel((0, 44)) == 255
+    assert target.stat().st_size < 100 * 1024
+
+
+def test_same_coverage_can_retain_different_rounded_edge_colors():
+    from local_app.learning_output import _AlphaPalette
+
+    red, blue = (232, 72, 48, 191), (45, 104, 207, 191)
+    image = Image.new('RGBA', (6, 1))
+    image.putdata([red, red, blue, blue, (100, 120, 140, 255), (0, 0, 0, 0)])
+    indexed = Image.new('P', image.size)
+    indexed.putpalette([100, 120, 140])
+
+    result = _AlphaPalette(image, local_edge_colors=True).apply(indexed).convert('RGBA')
+
+    assert result.tobytes() == image.tobytes()
+
+
 def test_export_refuses_unsafe_crop_without_replacing_existing_output(tmp_path):
     pid='learning-baidu-1200x400';logo,mask=frozen(tmp_path,pid)
     source=tmp_path/'source.png';target=tmp_path/'output.png';Image.new('RGB',(1000,1000),'white').save(source)
