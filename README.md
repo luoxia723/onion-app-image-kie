@@ -86,7 +86,7 @@ Logo 模板包含应用商店、信息流和学习机，支持渠道筛选、版
 ## 已知边界
 
 - 精确宽高和文件大小由代码核验；人物、文字、道具是否完整仍需看图，不把尺寸通过当作视觉审核通过。
-- 学习机 PNG 优先无损编码，全彩超限时按限制择优减色。可按需安装 [pngquant](https://pngquant.org/) 和 [OxiPNG](https://github.com/oxipng/oxipng) 并加入本机 `PATH`。JPG 会在同一体积上限内比较几种色度采样。 [查看格式与画质规则](references/export-rules.md)
+- 学习机 PNG 优先无损编码，全彩超限时按限制择优减色。可按需把 [pngquant](https://pngquant.org/)、[OxiPNG](https://github.com/oxipng/oxipng) 和[联合量化工具](tools/learning-png/README.md)加入本机 `PATH`，供应用比较更多达标候选。JPG 会按限额比较几种色度采样，优化编码失败时尝试标准编码。 [查看格式与画质规则](references/export-rules.md)
 - 图片模型当前执行 1K 请求，后处理输出对应版位精确像素；导出像素大于原生图片不代表新增了同等细节。
 - 普通任务的“模拟预览”只替代图片生成，**画面规划仍调用模型**；只有学习机“本机演练”全程离线。
 - 网页可关闭后再回来，生成期间请保持启动窗口和本机服务运行。

@@ -259,7 +259,8 @@ function viewLearningProcessing(row){
  if(panel)labels.push('左侧主画面 '+panel.artwork_width+'px','右侧纯色 '+panel.fill_width+'px');
  const compression=row.processing?.compression;
  if(compression){
-  labels.push(compression.pixel_lossless?'PNG 无损编码':compression.compressor==='pngquant'?'PNG 感知减色':'PNG 调色板减色',Number((compression.bytes/1024).toFixed(1))+' KiB');
+  const perceptual = ['pngquant', 'zenquant'].includes(compression.compressor);
+  labels.push(compression.pixel_lossless?'PNG 无损编码':perceptual?'PNG 感知减色':'PNG 调色板减色',Number((compression.bytes/1024).toFixed(1))+' KiB');
   if(compression.alpha_palette_quantized)labels.push('半透明边缘已量化');
  }
  const crop=percentage(sizing.crop_percent),padding=percentage(sizing.padding_percent);

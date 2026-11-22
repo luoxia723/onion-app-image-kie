@@ -9,6 +9,7 @@ import copy
 import json
 from fractions import Fraction
 
+from scripts.image_quality import tight_png_budget
 from scripts.kie_model import aspect_ratios, normalize_model
 from .config import ROOT, UserError
 from .learning_pipeline import BASELINE_ID, CONTENT_BY_ID, DEFAULT_CTA
@@ -224,6 +225,14 @@ def _mask_zones(plan,pids,crops):
     return zones
 
 
+def _tight_png_budget(rule):
+    limit = rule.get('max_file_size_kb')
+    if not limit:
+        return False
+    byte_limit = limit * 1024 - (rule.get('file_size_operator') == 'lt')
+    return tight_png_budget(rule['target_width'], rule['target_height'], byte_limit)
+
+
 def _scene_contract(texts,style,identity):
     fields=['communication_goal','visible_evidence','subjects','moment','interactions','camera','composition','lighting_materials']
     return dict(status='prepared_for_runtime',execution_enabled=False,runtime_available=True,
@@ -294,6 +303,8 @@ def build(plan,model=None):
         if brand_space:prompt+='\n'+brand_space
         if mask_zones:prompt+='\n底部只延续背景，关键信息留在上述范围内；不要自行画灰层。'
         if texts['feature_note']:prompt+='\n补充画面要求：'+_quoted(texts['feature_note'])+'。排字仍以给定正文和按钮规则为准。'
+        if any(_tight_png_budget(CONTENT_BY_ID[pid]) for pid in pids):
+            prompt+='\n用简洁连续的大色面组织背景，减少远景重复纹样、颗粒和细碎物件。保留本套光色与画风，人物、关键道具和字边保持清晰。'
         prompt+='\n'+_reference_prompt(reference_bindings)
         regeneration_prompt=prompt
         if reuse_baseline:

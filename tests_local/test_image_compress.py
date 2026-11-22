@@ -20,3 +20,32 @@ def test_jpeg_uses_budget_to_retain_color_edges(tmp_path):
         old_error = sum(ImageStat.Stat(ImageChops.difference(original, old)).mean)
         assert new_error < old_error / 2
     assert target.stat().st_size < 80*1024
+
+
+def test_jpeg_retries_failed_optimized_encoding_within_budget(tmp_path, monkeypatch):
+    from io import BytesIO
+
+    source = tmp_path / 'source.png'
+    target = tmp_path / 'delivery.jpg'
+    Image.new('RGB', (480, 320), '#eb6934').save(source, 'PNG')
+    original_save = Image.Image.save
+    attempted = []
+
+    def save(image, path, format=None, **options):
+        if format == 'JPEG' and isinstance(path, BytesIO):
+            attempted.append((options['quality'], options['subsampling'], options['optimize']))
+            if options['optimize']:
+                path.write(b'partial bytes')
+                raise OSError('broken data stream when writing image file')
+        return original_save(image, path, format, **options)
+
+    monkeypatch.setattr(Image.Image, 'save', save)
+    compress(str(source), str(target), 100-1/1024, 480, 320)
+
+    assert attempted and len(attempted) % 2 == 0
+    for first, retry in zip(attempted[::2], attempted[1::2]):
+        assert first[:2] == retry[:2] and first[2] and not retry[2]
+    assert target.stat().st_size < 100*1024
+    with Image.open(target) as result:
+        assert result.format == 'JPEG' and result.size == (480, 320)
+        assert max(abs(a-b) for a, b in zip(result.getpixel((240, 160)), (235, 105, 52))) <= 2

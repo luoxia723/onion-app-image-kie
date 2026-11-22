@@ -68,6 +68,18 @@ def test_exact_group_frames_and_common_safe_area_are_stable_for_subset():
         assert safe[0]>=x1 and safe[1]>=y1 and safe[2]<=x2 and safe[3]<=y2
 
 
+def test_tight_png_master_and_redraw_use_simpler_background_without_changing_geometry():
+    tight = compiled(pids=['learning-dsl-resource-1280x348'])
+    control = compiled(pids=['learning-youxuepai-logo-1400x340'])
+    master, other = tight['masters'][0], control['masters'][0]
+    instruction = '减少远景重复纹样、颗粒和细碎物件'
+    assert instruction in master['prompt'] and instruction in master['single_regeneration_prompt']
+    assert instruction not in other['prompt'] and instruction not in tight['baseline']['prompt']
+    assert master['aspect_ratio'] == other['aspect_ratio'] == '3:1'
+    assert master['shared_safe_area'] == other['shared_safe_area']
+    assert tight['counts']['image_model_master_calls'] == control['counts']['image_model_master_calls'] == 1
+
+
 def test_white_lists_separate_semantic_theme_from_printed_text():
     result=compiled(cta='点击体验')
     baseline=result['baseline']['prompt']

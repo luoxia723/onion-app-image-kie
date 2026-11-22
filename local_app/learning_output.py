@@ -12,7 +12,7 @@ import time
 
 from PIL import Image, ImageChops, ImageDraw
 
-from scripts.image_quality import EncodingQuality, logo_bounds
+from scripts.image_quality import EncodingQuality, logo_bounds, tight_png_budget
 from .config import UserError
 from . import learning_logo, learning_mask
 from .learning_pipeline import CONTENT_BY_ID
@@ -143,16 +143,19 @@ def _exact_palette(image):
     return _png_bytes(indexed, bits=bits), len(colors)
 
 
-def _optimize_png(data, image, folder):
+def _optimize_png(data, image, folder, *, zopfli=False, timeout=3):
     """Use OxiPNG when installed, and accept only exactly equivalent pixels."""
     executable = shutil.which('oxipng')
     if executable is None:
         return data
     path = folder / 'lossless.png'
     path.write_bytes(data)
+    args = [executable, '-o', '3' if zopfli else '2', '--threads', '1']
+    if zopfli:
+        args.append('-Z')
     try:
-        subprocess.run([executable, '-o', '2', '--threads', '1', str(path)],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+        subprocess.run([*args, str(path)], check=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=timeout)
         candidate = path.read_bytes()
         if len(candidate) < len(data):
             with Image.open(BytesIO(candidate)) as decoded:
@@ -218,6 +221,60 @@ def _pngquant_candidates(rgb, alpha, brand, limit, folder):
             index = (low + high) // 2
 
 
+def _joint_png_candidates(rgb, alpha, brand, limit, folder):
+    """Try joint palette and scanline optimization on a tightly budgeted export."""
+    executable = shutil.which('onion-learning-png')
+    if executable is None or rgb.info.get('icc_profile'):
+        return
+    maximum = (alpha.max_colors if alpha else 256) - (brand.size if brand else 0)
+    if maximum < 16:
+        return
+    source = folder / 'quantization-source.rgb'
+    source.write_bytes(rgb.tobytes())
+    deadline = time.monotonic() + 8
+    env = dict(os.environ, RAYON_NUM_THREADS='1')
+    width, height = rgb.size
+    budgets = dict.fromkeys(min(maximum, n) for n in (256, 208, 192, 160, 112, 80, 48))
+    for budget in budgets:
+        for mode in ('min', 'joint'):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            try:
+                raw = subprocess.run([executable, str(source), str(width), str(height), str(budget), mode],
+                                     check=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                     timeout=min(remaining, 3)).stdout
+            except (OSError, subprocess.CalledProcessError):
+                return
+            except subprocess.TimeoutExpired:
+                continue
+            size = int.from_bytes(raw[:2], 'little')
+            start = 2 + 3 * size
+            if not 1 <= size <= 256 or len(raw) != start + width * height:
+                return
+            indices = raw[start:]
+            used = sorted(set(indices))
+            if used[-1] >= size or len(used) > maximum:
+                continue
+            picture = Image.frombytes('P', rgb.size, indices)
+            picture.putpalette(raw[2:start])
+            if used[-1] + 1 != len(used):
+                picture = picture.remap_palette(used)
+            if brand:
+                picture = brand.apply(picture)
+            if alpha:
+                picture = alpha.apply(picture)
+            data = _png_bytes(picture)
+            remaining = deadline - time.monotonic()
+            if limit < len(data) <= limit * 1.12 and remaining > 0:
+                data = _optimize_png(data, picture, folder, timeout=min(remaining, 3))
+                remaining = deadline - time.monotonic()
+                if limit < len(data) <= limit * 1.015 and remaining > 0:
+                    data = _optimize_png(data, picture, folder, zopfli=True, timeout=min(remaining, 2))
+            if len(data) <= limit:
+                yield picture, data, len(used), 'zenquant', None
+
+
 def _encode_png(image, logo, snapshot, limit, folder):
     data = _png_bytes(image)
     exact = _exact_palette(image) if limit is not None else None
@@ -246,6 +303,8 @@ def _encode_png(image, logo, snapshot, limit, folder):
             break
     brand = _LogoPalette(rgb, logo, snapshot) if logo.get('logo_applied') else None
     candidates.extend(_pngquant_candidates(rgb, alpha, brand, limit, folder))
+    if not candidates or tight_png_budget(image.width, image.height, limit):
+        candidates.extend(_joint_png_candidates(rgb, alpha, brand, limit, folder))
     quality = EncodingQuality(image, logo_bounds(logo.get('pixel_box')))
     if alpha and not candidates:
         # Exact fringe levels may exhaust the palette. Preserve the fully

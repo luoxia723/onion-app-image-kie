@@ -50,16 +50,18 @@ def test_export_refuses_unsafe_crop_without_replacing_existing_output(tmp_path):
     assert not list(tmp_path.glob('.learning-export-*'))
 
 
-def test_current_png_size_limit_does_not_shrink_pixels_or_replace_previous_output(tmp_path):
+def test_impossible_png_size_limit_does_not_shrink_pixels_or_replace_previous_output(tmp_path):
     import random
+    from local_app.learning_pipeline import CONTENT_BY_ID
+
     pid='learning-dsl-resource-484x580';logo,mask=frozen(tmp_path,pid)
     source=tmp_path/'source.png';target=tmp_path/'output.png'
-    # An actual high-entropy PNG exceeds this placement's 100KB limit, without
-    # weakening the configured limit or replacing the compressor with a mock.
+    # Keep the failure case stable as additional encoders improve compression.
+    spec = {**CONTENT_BY_ID[pid], 'max_file_size_kb': 1}
     Image.frombytes('RGB',(484,580),random.Random(7).randbytes(484*580*3)).save(source)
     before=source.read_bytes();target.write_bytes(b'previous exported version')
     with pytest.raises(UserError,match='超过.*PNG大小限制'):
-        export_output(source,target,pid,logo,mask_snapshot=mask)
+        export_output(source,target,pid,logo,mask_snapshot=mask,placement_snapshot=spec)
     assert source.read_bytes()==before
     assert target.read_bytes()==b'previous exported version'
     assert not list(tmp_path.glob('.learning-export-*'))
@@ -198,3 +200,38 @@ def test_pngquant_candidates_keep_original_alpha_after_rgb_quantization(tmp_path
         with Image.open(BytesIO(data)) as output:
             assert output.size == image.size and output.format == 'PNG'
             assert output.convert('RGBA').getchannel('A').tobytes() == alpha.tobytes()
+
+
+def test_joint_png_compacts_palette_and_preserves_transparency(tmp_path, monkeypatch):
+    from io import BytesIO
+    from types import SimpleNamespace
+
+    from local_app import learning_output
+
+    image = Image.new('RGBA', (32, 16), '#2077c8')
+    alpha = Image.new('L', image.size, 255)
+    alpha.putpixel((0, 0), 0)
+    alpha.putpixel((1, 0), 80)
+    image.putalpha(alpha)
+    monkeypatch.setattr(learning_output.shutil, 'which',
+                        lambda program: program if program == 'onion-learning-png' else None)
+    attempts = []
+
+    def encode(argv, **options):
+        from pathlib import Path
+
+        assert Path(argv[1]).read_bytes() == image.convert('RGB').tobytes()
+        assert argv[2:4] == ['32', '16'] and argv[-1] in ('min', 'joint')
+        attempts.append(argv[0])
+        return SimpleNamespace(stdout=b'\x00\x01' + bytes([32, 119, 200]) * 256 + b'\xff' * 512)
+
+    monkeypatch.setattr(learning_output.subprocess, 'run', encode)
+    candidates = list(learning_output._joint_png_candidates(
+        image.convert('RGB'), learning_output._AlphaPalette(image), None, 2048, tmp_path))
+
+    assert attempts and candidates
+    for _, data, colors, compressor, _ in candidates:
+        with Image.open(BytesIO(data)) as output:
+            assert output.size == image.size and output.format == 'PNG' and len(data) <= 2048
+            assert output.convert('RGBA').tobytes() == image.tobytes()
+        assert colors == 1 and compressor == 'zenquant'

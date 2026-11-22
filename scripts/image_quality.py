@@ -2,6 +2,11 @@
 from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 
+def tight_png_budget(width, height, byte_limit):
+    """Flag a PNG budget of at most 0.4 bytes per pixel."""
+    return byte_limit is not None and byte_limit * 5 <= 2 * width * height
+
+
 def _detail(rgb):
     luminance = rgb.convert('L')
     return ImageChops.subtract(luminance, luminance.filter(ImageFilter.GaussianBlur(1)), offset=128)

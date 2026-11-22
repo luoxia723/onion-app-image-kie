@@ -59,7 +59,13 @@ def _jpeg_candidate(image, max_bytes, subsampling):
     """Find the highest fitting quality in this sampling mode."""
     def encode(quality):
         output = BytesIO()
-        image.save(output, 'JPEG', quality=quality, optimize=True, subsampling=subsampling)
+        try:
+            image.save(output, 'JPEG', quality=quality, optimize=True, subsampling=subsampling)
+        except OSError:
+            # libjpeg's optimized pass can fail for a valid, detailed image.
+            # Retry the same quality and sampling without the entropy optimizer.
+            output = BytesIO()
+            image.save(output, 'JPEG', quality=quality, optimize=False, subsampling=subsampling)
         return output.getvalue()
 
     low, high = 25, 95
