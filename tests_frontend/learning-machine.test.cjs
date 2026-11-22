@@ -131,7 +131,7 @@ test('当前44版位配置和16组固定模板联动，区分复用母版并安�
  const {ctx,run}=setup();ctx.currentConfig=currentLearningConfig();
  run('installLearningMachineConfig(currentConfig);selectLearningPlacements(true)');
  assert.equal(run('S.draft.pids.length'),44);assert.equal(run('totalOf(S.draft)'),45);
- assert.equal(run('PLACEMENTS.filter(p=>p.logo_policy==="required").length'),36);
+ assert.equal(run('PLACEMENTS.filter(p=>p.logo_policy==="required").length'),35);
  assert.equal(run('PLACEMENTS.filter(p=>p.cta_policy==="required").length'),14);
  assert(run('PLACEMENTS.every(p=>!p.content_modules.feature_label&&!p.content_modules.badge&&!p.content_modules.extra_heading&&!p.content_modules.extra_description)'));
  const maskConfig=JSON.parse(fs.readFileSync(path.join(root,'config/learning-machine-mask-templates.json')));

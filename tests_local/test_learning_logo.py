@@ -27,7 +27,7 @@ def update(row, **changes):
 def test_registry_defaults_fixed_presence_and_transparency(settings):
     config = logos.config(settings)
     assert config['revision'] == 0 and len(config['placements']) == 44
-    assert sum(p['logo_required'] for p in config['placements']) == 36
+    assert sum(p['logo_required'] for p in config['placements']) == 35
     assert len(config['logo_assets']) == 2
     assert {a['id'] for a in config['logo_assets']} == logos.ASSET_IDS
     for p in config['placements']:
@@ -39,6 +39,19 @@ def test_registry_defaults_fixed_presence_and_transparency(settings):
             assert image.format == 'PNG'
             assert image.size == (asset['width'], asset['height'])
             assert image.convert('RGBA').getchannel('A').getextrema() == (0, 255)
+
+
+def test_retired_1400p_logo_template_does_not_block_existing_settings(settings):
+    pid='learning-youxuepai-logo-1400x640'
+    state={'schema_version':1,'revision':2,'templates':{pid:{
+        'asset_id':'learning.logo.black','x':.025,'y':.035,'width':.14,
+    }}}
+    logos._write_state(settings,state)
+    config=logos.config(settings)
+    row=next(p for p in config['placements'] if p['id']==pid)
+    assert config['revision']==2 and row['logo_template'] is None
+    assert not row['logo_required'] and not row['content_modules']['cta']
+    assert logos._load_state(settings)==state
 
 
 def test_default_logos_stay_near_upper_left_and_both_export_variants_fit(settings,tmp_path):

@@ -131,7 +131,7 @@ async function packageLearningRun(){
 }
 function learningExportLogoValue(run=LEARNING_RUNS.current){return run?canonicalLogoVariant(S.learningExportLogoByRun?.[run.id]):''}
 function learningLogoRefreshPending(output){return output.logo_refresh_pending===true&&['failed','interrupted'].includes(output.status)}
-function learningRunLogoOutputsReady(run){const outputs=run.outputs||[],known=outputs.filter(output=>output.logo_required===true||learningLogoRefreshPending(output));return known.length?known.every(output=>output.status==='done'||learningLogoRefreshPending(output)):outputs.some(output=>typeof output.logo_required!=='boolean')&&learningRunOutputsReady(run)}
+function learningRunLogoOutputsReady(run){const outputs=run.outputs||[],known=outputs.filter(output=>output.logo_refresh_supported!==false&&(output.logo_required===true||learningLogoRefreshPending(output)));return known.length?known.every(output=>output.status==='done'||learningLogoRefreshPending(output)):outputs.some(output=>typeof output.logo_required!=='boolean')&&learningRunOutputsReady(run)}
 function setLearningExportLogo(value){
  const run=LEARNING_RUNS.current,selected=value?canonicalLogoVariant(value):'';if(!run||LEARNING_RUNS.actionBusy||value&&!selected)return;
  S.learningExportLogoByRun=S.learningExportLogoByRun||{};S.learningExportLogoByRun[run.id]=selected;render();
@@ -254,7 +254,11 @@ function viewLearningProcessing(row){
  if(repaired)labels.push('AI扩展背景','最终精确裁切适配');
  else if(sharedCanvas)labels.push('从生成的共用母版裁出');
  else if(sizing.method==='contain_full_source_color_gradient')labels.push('等比保全原图');
- else if(sizing.method==='fixed_crop_resize')labels.push('本机轻量裁切适配');
+ else if(sizing.method==='fixed_crop_resize'&&!sizing.right_panel)labels.push('本机裁切适配');
+ const panel=sizing.right_panel;
+ if(panel)labels.push('左侧主画面 '+panel.artwork_width+'px','右侧纯色 '+panel.fill_width+'px');
+ const compression=row.processing?.compression;
+ if(compression)labels.push(compression.pixel_lossless?'PNG 无损编码':'PNG 已减色',Number((compression.bytes/1024).toFixed(1))+' KiB');
  const crop=percentage(sizing.crop_percent),padding=percentage(sizing.padding_percent);
  if(crop!==null&&!repaired)labels.push((sharedCanvas?'母版裁切 ':'裁切 ')+crop);if(padding!==null)labels.push((repaired||sharedCanvas?'后处理补边 ':'补背景 ')+padding);
  if(sizing.seam_review_required===true)labels.push('接缝待目视查看');

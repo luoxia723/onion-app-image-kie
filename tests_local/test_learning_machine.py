@@ -17,6 +17,7 @@ NO_LOGO_IDS={
  'learning-bbg-cover-216x260','learning-bbg-cover-300x360','learning-bbg-cover-400x480',
  'learning-bbg-no-logo-banner-1280x362','learning-seewo-1400x520',
  'learning-youxuepai-cover-400x480','learning-youxuepai-masked-840x404','learning-youxuepai-unmasked-840x404',
+ 'learning-youxuepai-logo-1400x640',
 }
 CTA_IDS={
  'learning-baidu-512x512','learning-baidu-1200x400','learning-zuoyebang-446x446','learning-zuoyebang-632x354',
@@ -37,7 +38,7 @@ def test_current_catalog_has_44_fixed_placements_not_sample_gated_alternatives()
  assert len(LEARNING)==44 and not any(p['category']=='学习机' for p in UNAVAILABLE_PLACEMENTS)
  assert len({p['platform'] for p in LEARNING})==10
  assert sum(p['image_count'] for p in LEARNING)==45
- assert sum(p['logo_required'] for p in LEARNING)==36 and sum(p['cta_required'] for p in LEARNING)==14
+ assert sum(p['logo_required'] for p in LEARNING)==35 and sum(p['cta_required'] for p in LEARNING)==14
  assert {p['id'] for p in LEARNING if not p['logo_required']}==NO_LOGO_IDS
  assert {p['id'] for p in LEARNING if p['cta_required']}==CTA_IDS
  assert {p['id'] for p in LEARNING if not p['content_modules']['main_copy']}==PURE_IDS

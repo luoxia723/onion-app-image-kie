@@ -25,6 +25,7 @@ CONTENT_PATH = ROOT / 'config/learning-machine-content-rules.json'
 DEFAULTS_PATH = ROOT / 'config/learning-machine-logo-templates.json'
 STATE_NAME = 'learning-machine-logo-templates.json'
 ASSET_IDS = frozenset(('learning.logo.black', 'learning.logo.white-app'))
+RETIRED_LOGO_PLACEMENTS = frozenset(('learning-youxuepai-logo-1400x640',))
 _LOCK = threading.RLock()
 
 
@@ -159,6 +160,8 @@ def _resolved(settings):
     defaults = _defaults()
     placements = _placements()
     state = _load_state(settings)
+    state['templates'] = {pid: value for pid, value in state['templates'].items()
+                          if pid not in RETIRED_LOGO_PLACEMENTS}
     templates = {}
     for pid, placement in placements.items():
         if not placement['modules']['logo']:

@@ -220,13 +220,6 @@
       "width": 0.14,
       "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
     },
-    "learning-youxuepai-logo-1400x640": {
-      "asset_id": "learning.logo.black",
-      "x": 0.025,
-      "y": 0.035,
-      "width": 0.14,
-      "basis": "用户确认：独立Logo图层靠近左上角；按横幅/横图/卡片分别保持清晰且适度的大小"
-    },
     "learning-youxuepai-logo-1400x340": {
       "asset_id": "learning.logo.black",
       "x": 0.02,

@@ -20,6 +20,7 @@ import zipfile
 from PIL import Image
 
 from .config import UserError
+from .learning_logo import RETIRED_LOGO_PLACEMENTS
 
 PREFIX='learning-run:'
 INDEX='learning-runs-index'
@@ -128,6 +129,8 @@ class LearningRuntime:
             if mapping:result['aspect_ratio']=mapping['aspect_ratio']
             if spec:
                 result.update(logo_required=bool(spec['modules']['logo']),cta_required=bool(spec['modules']['cta']),main_copy_required=bool(spec['modules']['main_copy']))
+                if row['placement_id'] in RETIRED_LOGO_PLACEMENTS:
+                    result['logo_refresh_supported']=False
                 result['cta_text']=(mapping.get('allowed_text',{}).get('cta',run['params'].get('cta','')) if mapping else run['params'].get('cta','')) if result['cta_required'] else ''
             if row.get('background_repair_pending'):
                 request=row.get('background_request') or {}
@@ -556,6 +559,10 @@ class LearningRuntime:
             result=export_output(source,path,output['placement_id'],logo_snapshot,mask_snapshot=run['mask_snapshot'],
                                  crop_box=crop_box,placement_snapshot=placement,sizing_policy=policy)
             raw_sha256=_digest(source)
+        compression = {}
+        if result['format'] == 'PNG':
+            compression['compression'] = {key: result[key] for key in
+                                          ('bytes', 'pixel_lossless', 'palette_colors', 'alpha_palette_quantized')}
         with self.engine.lock:
             if not self._closed:
                 output.update(status='done',path=str(path),sha256=result['sha256'],baseline_version=baseline_version,
@@ -564,7 +571,7 @@ class LearningRuntime:
                               provider_task_id=master.get('provider_task_id'),
                               provider_original_path=master.get('provider_original_path'),provider_original_sha256=master.get('provider_original_sha256'),
                               sizing_policy=output.get('sizing_policy',mapping.get('sizing_policy')) or result['sizing']['sizing_policy'],
-                              processing={**copy.deepcopy(result['sizing']),**copy.deepcopy(output.get('background_processing') or {}),**({'method':'shared_canvas_crop','source_box_scope':'generated_shared_canvas','full_source_preserved':False,'cv_detection_performed':False,'background_fill':'model_full_canvas','visual_review_required':True} if run.get('kind')=='shared_canvas_adaptation' else {})},
+                              processing={**copy.deepcopy(result['sizing']),**compression,**copy.deepcopy(output.get('background_processing') or {}),**({'method':'shared_canvas_crop','source_box_scope':'generated_shared_canvas','full_source_preserved':False,'cv_detection_performed':False,'background_fill':'model_full_canvas','visual_review_required':True} if run.get('kind')=='shared_canvas_adaptation' else {})},
                               logo_template=copy.deepcopy(logo_snapshot['placements'][output['placement_id']]['logo_template']),
                               source_master_id=master['id'],source_master_version=master['version'],error='',query_required=False)
                 self._save(run)
@@ -735,6 +742,8 @@ class LearningRuntime:
                     or len(ids)!=len(set(ids))):raise UserError('请选择本批次需要背景处理的图片')
             targets=[available[oid] for oid in ids]
             for row in targets:
+                if run['placement_snapshots'][row['placement_id']].get('artwork_width'):
+                    raise UserError('该版位右侧为固定纯色区域，请使用重出本图调整主画面',409)
                 request=row.get('background_request') or {}
                 if request.get('kind')=='ai':
                     operation=run.get('background_operations',{}).get(request.get('operation_id'),{})
@@ -914,7 +923,7 @@ class LearningRuntime:
         """Re-export existing raw pixels with current logo templates; no models."""
         with self.engine.lock:
             run=self._run(rid)
-            available={pid for pid,spec in run['placement_snapshots'].items() if spec['modules']['logo']}
+            available={pid for pid,spec in run['placement_snapshots'].items() if spec['modules']['logo'] and pid not in RETIRED_LOGO_PLACEMENTS}
             ids=sorted(available) if placement_ids is None else placement_ids
             if (not isinstance(ids,list) or not ids or any(not isinstance(pid,str) or pid not in available for pid in ids)
                     or len(ids)!=len(set(ids))):raise UserError('请选择本批次已有Logo的版位')

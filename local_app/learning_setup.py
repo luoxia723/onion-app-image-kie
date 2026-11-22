@@ -40,7 +40,8 @@ def public_config(engine):
             if recovered:
                 placements=recovered.get('placements',{})
                 if not isinstance(placements,dict):raise UserError('学习机Logo配置快照不完整')
-                templates=[{'placement_id':pid,**row['logo_template']} for pid,row in placements.items() if row.get('logo_required')]
+                templates=[{'placement_id':pid,**row['logo_template']} for pid,row in placements.items()
+                           if row.get('logo_required') and pid not in learning_logo.RETIRED_LOGO_PLACEMENTS]
                 learning_logo.save_templates(engine.settings,{'revision':0,'templates':templates})
         base = learning_pipeline.public_contract()
         logos = learning_logo.config(engine.settings)

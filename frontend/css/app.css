@@ -468,6 +468,7 @@ summary::marker{color:#7e8c9e}
 .learning-output-heading h3{font-size:14px}
 .learning-output-heading>span{font-size:11px;color:#7d899f}
 .learning-output-image{max-height:340px;background:#f5f7fb;border-radius:7px;overflow:hidden;width:100%;min-height:85px}
+.learning-output-image .learning-image-button img{object-fit:scale-down}
 .learning-output-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .learning-output-actions>label{font-size:12px;display:flex;gap:8px;align-items:center;margin-right:auto}
 .learning-output-actions select{font-size:11px;min-height:30px;padding:3px 8px}

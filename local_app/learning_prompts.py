@@ -12,6 +12,7 @@ from fractions import Fraction
 from scripts.kie_model import aspect_ratios, normalize_model
 from .config import ROOT, UserError
 from .learning_pipeline import BASELINE_ID, CONTENT_BY_ID, DEFAULT_CTA
+from .learning_sizing import content_size
 
 GROUPS_PATH = ROOT/'config/learning-machine-master-groups.json'
 NATURAL_BACKGROUND_THRESHOLD_PERCENT = 8
@@ -271,7 +272,7 @@ def build(plan,model=None):
         if not pids:continue
         ratio=group['aspect_ratio'];mode=group['content_mode'];mid='learning-master-'+group['id']
         reuse_baseline=bool(group.get('reuse_baseline'))
-        crops={pid:_crop(ratio,CONTENT_BY_ID[pid]['target_width'],CONTENT_BY_ID[pid]['target_height']) for pid in group['placement_ids']}
+        crops={pid:_crop(ratio,*content_size(CONTENT_BY_ID[pid])) for pid in group['placement_ids']}
         shared=_intersection(list(crops.values()))
         mask_zones=_mask_zones(plan,group['placement_ids'],crops)
         mask_safe=list(shared)
@@ -302,6 +303,7 @@ def build(plan,model=None):
         for pid,box in crops.items():
             rule=CONTENT_BY_ID[pid]
             crop_records.append(dict(placement_id=pid,crop_box=box,target_width=rule['target_width'],target_height=rule['target_height'],selected=pid in pids,
+                                     **({'artwork_width':rule['artwork_width']} if 'artwork_width' in rule else {}),
                                      crop_percent=round((1-(box[2]-box[0])*(box[3]-box[1]))*100,6)))
         masters.append(dict(id=mid,group_id=group['id'],aspect_ratio=ratio,layout=group['layout'],content_mode=mode,
             prompt=prompt,prompt_contract_version=2,allowed_text=allowed,placement_ids=pids,full_group_placement_ids=list(group['placement_ids']),
@@ -323,12 +325,14 @@ def build(plan,model=None):
             pid=o['placement_id'];rule=CONTENT_BY_ID[pid]
             crop=crops[pid]
             loss=100*(1-(crop[2]-crop[0])*(crop[3]-crop[1]))
-            needs_background=loss>NATURAL_BACKGROUND_THRESHOLD_PERCENT+1e-8
+            has_side_panel=content_size(rule)[0]!=rule['target_width']
+            needs_background=not has_side_panel and loss>NATURAL_BACKGROUND_THRESHOLD_PERCENT+1e-8
             if needs_background:background_requests.add((mid,str(Fraction(rule['target_width'],rule['target_height']))))
             mappings.append(dict(output_id=o['id'],placement_id=pid,master_id=mid,group_id=group['id'],aspect_ratio=ratio,
                 crop_box=crops[pid],target_width=rule['target_width'],target_height=rule['target_height'],output_format='PNG',
+                **({'artwork_width':rule['artwork_width']} if has_side_panel else {}),
                 requires_image_model_call=needs_background,processing_kind='natural_background_then_export' if needs_background else 'local_export',
-                sizing_policy='natural_if_needed',natural_background_threshold_percent=NATURAL_BACKGROUND_THRESHOLD_PERCENT,
+                sizing_policy='fixed_crop' if has_side_panel else 'natural_if_needed',natural_background_threshold_percent=NATURAL_BACKGROUND_THRESHOLD_PERCENT,
                 background_image_required=needs_background,logo_required=rule['modules']['logo'],
                 mask=copy.deepcopy(rule['mask']),corner_radius=copy.deepcopy(rule['corner_radius']),
                 mask_template=next((copy.deepcopy(z['preset']) for z in mask_zones if z['placement_id']==pid),{'enabled':False})))

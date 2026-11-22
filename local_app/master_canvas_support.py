@@ -147,6 +147,7 @@ def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
     from . import master_canvas,brand_logo,learning_logo,learning_mask
     from .planning import BY_ID
     from .learning_pipeline import CONTENT_BY_ID
+    from .learning_sizing import content_size
     frozen=freeze_sources(engine,params,run_dir,source_runtime=source_runtime);original=frozen.pop('source_params');sources=frozen['sources']
     learning=params.get('target_kind',params['source']['kind'])=='learning'
     if params.get('target_kind',params['source']['kind']) not in ('ordinary','learning'):raise UserError('目标渠道类型不正确')
@@ -170,11 +171,12 @@ def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
                 logo=p.get('logo_policy')=='required' or p.get('logo_policy')!='forbidden' and not original.get('noLogo',False))
             p.setdefault('corner_radius',0);p.setdefault('mask',False)
         placements[pid]=p
+        content_width,content_height=content_size(p)
         for index in range(1,p['image_count']+1):
             source_index=1 if learning else index;source=sources[source_index-1]
             allowed=_target_copy(normalized,p,source_index,count,learning)
             targets.append(dict(id=pid+'::'+str(index),placement_id=pid,image_index=index,
-                target_width=p['target_width'],target_height=p['target_height'],source_index=source_index,
+                target_width=content_width,target_height=content_height,source_index=source_index,
                 image_form='单图' if count==1 else '双图' if count==2 else '三图',
                 source_key=source['sha256'],allowed_text=allowed,content_signature=allowed,
                 visible_box=[0,0,1,1-masks[pid]['height_fraction']] if masks[pid]['enabled'] else [0,0,1,1]))
@@ -197,6 +199,7 @@ def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
     for o in geometry['outputs']:
         t=target_map[o['output_id']];p=placements[t['placement_id']]
         outputs.append({**o,**{k:t[k] for k in ('placement_id','image_index','allowed_text')},
+            'target_width':p['target_width'],'target_height':p['target_height'],
             'platform':p['platform'],'name':p['name'],'sizing_policy':'fixed_crop','output_format':p['output_format']})
     masters=[]
     for group in geometry['groups']:

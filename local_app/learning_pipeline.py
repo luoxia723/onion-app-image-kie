@@ -38,6 +38,7 @@ def placement_contracts():
             cta_required=modules['cta'], logo_policy='required' if modules['logo'] else 'forbidden',
             cta_policy='required' if modules['cta'] else 'forbidden', content_modules=modules,
             corner_radius=p['corner_radius'], mask=p['mask'], max_file_size_kb=p['max_file_size_kb'],
+            **({'artwork_width':p['artwork_width']} if 'artwork_width' in p else {}),
             file_size_operator=p['file_size_operator'],
             rule_summary=p['category_label']+' · '+('有Logo' if modules['logo'] else '无Logo')+' · PNG'))
     return result

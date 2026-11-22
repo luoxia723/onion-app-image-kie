@@ -6,10 +6,10 @@ GitHub默认分支提供可直接下载的完整源码。分发范围为应用�
 
 1. 在仓库运行`python scripts/build_workbench_bundle.py --check`。它检查Git索引中的本地数据路径、实际本机Key、常见凭据格式、私钥、一次性登录链接和非空示例Key；输出只包含文件名，不打印凭据。不能将此检查视为对任意秘密的自动证明，提交前仍检查暂存文件范围。
 2. 执行`python scripts/check_workbench.py --suite all`，确认当前、历史、回环HTTP传输与前端检查通过。
-3. 生成源码包到仓库之外：`python scripts/build_workbench_bundle.py --output-dir <发布目录>`。从ZIP或tar.gz解压到新的中文／空格路径，不复制原项目`.env`、`.venv`和`.onion-local`。
-4. 在解压目录运行`python bootstrap.py --install-only`及新环境的`python run.py --help`，证明运行只需Pillow，开发机残留OpenCV或NumPy不能掩盖缺依赖问题。
+3. 改动涉及安装、依赖或默认配置时，从待发布提交检出到新的中文／空格路径，在独立目录验收。
+4. 在独立目录运行`python bootstrap.py --install-only`及新环境的`python run.py --help`，验证只安装运行依赖即可启动。
 5. 使用临时状态目录、空env和独立端口启动，验证界面、内置素材、学习机离线预览、Key保存与接口脱敏。只填写明显的测试Key，不测试外部连接、不提交真实图片；结束后停止该验收服务。
-6. 检查暂存差异，提交并正常推送；远程领先时先核对变更，不覆盖历史。推送后核对远端SHA，并查看该SHA对应的GitHub Actions结果。
+6. 检查暂存差异并提交到 GitHub。推送后核对远端 SHA 和对应的 GitHub Actions 结果。发布交付以仓库提交为准。
 
 ## 默认服务与旧配置
 

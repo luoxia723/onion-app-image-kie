@@ -62,7 +62,8 @@ def test_exact_group_frames_and_common_safe_area_are_stable_for_subset():
         x1,y1,x2,y2=row['crop_box']
         source=next(m for m in full['masters'] if m['id']==row['master_id'])
         sw,sh=map(int,source['aspect_ratio'].split(':'))
-        assert (x2-x1)*sw/((y2-y1)*sh)==pytest.approx(row['target_width']/row['target_height'])
+        artwork_width=644 if row['placement_id']=='learning-youxuepai-unmasked-840x404' else row['target_width']
+        assert (x2-x1)*sw/((y2-y1)*sh)==pytest.approx(artwork_width/row['target_height'])
         safe=source['shared_safe_area']
         assert safe[0]>=x1 and safe[1]>=y1 and safe[2]<=x2 and safe[3]<=y2
 
@@ -144,7 +145,8 @@ def test_content_safe_area_insets_crop_and_mask_edges_and_exports_preserve_unkno
         assert safe[0]>frame[0] and safe[1]>frame[1]
         assert safe[2]<frame[2] and safe[3]<frame[3]
         assert entry['content_margin_fraction']==.04
-    assert all(o['sizing_policy']=='natural_if_needed' for o in result['outputs'])
+    assert {o['placement_id'] for o in result['outputs'] if o['sizing_policy']=='fixed_crop'}=={'learning-youxuepai-unmasked-840x404'}
+    assert not next(o for o in result['outputs'] if o['sizing_policy']=='fixed_crop')['background_image_required']
     assert all(o['natural_background_threshold_percent']==8 for o in result['outputs'])
     cta=next(m for m in result['masters'] if m['group_id']=='D6')
     assert '按钮外框、投影' in cta['prompt']

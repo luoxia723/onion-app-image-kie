@@ -77,7 +77,7 @@ def test_export_uses_frozen_mask_instead_of_later_preset_edits(tmp_path,monkeypa
 
 
 def test_all_compiled_fixed_ratio_crops_export_to_exact_delivery_pixels(tmp_path):
-    from local_app.learning_pipeline import preview
+    from local_app.learning_pipeline import CONTENT_BY_ID, preview
     from local_app.learning_prompts import build
     from local_app.learning_sizing import export_exact
     from kie_model import GPT_IMAGE_26_FLARE
@@ -89,10 +89,45 @@ def test_all_compiled_fixed_ratio_crops_export_to_exact_delivery_pixels(tmp_path
             a,b=map(int,ratio.split(':'));sources[ratio]=tmp_path/(ratio.replace(':','-')+'.png')
             Image.new('RGB',(a*32,b*32),'white').save(sources[ratio])
         target=tmp_path/(output['output_id'].replace('::','-')+'.png')
-        result=export_exact(sources[ratio],target,output['target_width'],output['target_height'],crop_box=output['crop_box'])
-        with Image.open(target) as image:assert image.size==(output['target_width'],output['target_height'])
+        spec=CONTENT_BY_ID[output['placement_id']]
+        width,height=output['target_width'],output['target_height']
+        result=export_exact(sources[ratio],target,spec.get('artwork_width',width),height,crop_box=output['crop_box'])
+        with Image.open(target) as image:assert image.size==(spec.get('artwork_width',width),height)
         assert result['exact_size_verified']
     assert len(plan['outputs'])==45
+
+
+def test_unmasked_banner_has_exact_solid_right_panel_and_preserves_left_artwork(tmp_path):
+    from PIL import ImageDraw
+    pid='learning-youxuepai-unmasked-840x404';logo,mask=frozen(tmp_path,pid)
+    source=tmp_path/'art.png';target=tmp_path/'banner.png'
+    art=Image.new('RGB',(644,404),'#89cbd4')
+    ImageDraw.Draw(art).rectangle((60,60,590,320),fill='#fff5cf')
+    art.save(source)
+    result=export_output(source,target,pid,logo,mask_snapshot=mask)
+    with Image.open(target) as image:
+        assert image.size==(840,404)
+        assert image.crop((0,0,644,404)).convert('RGB').tobytes()==art.tobytes()
+        right=image.crop((644,0,840,404))
+        assert right.getcolors()==[(196*404,tuple(result['sizing']['right_panel']['fill_rgb']))]
+    assert not result['logo']['logo_applied'] and not result['mask']['mask_applied']
+
+
+def test_limited_png_uses_exact_palette_before_color_reduction(tmp_path):
+    import random
+    from local_app.learning_pipeline import CONTENT_BY_ID
+    pid='learning-bbg-cover-216x260';logo,mask=frozen(tmp_path,pid)
+    palette=[(16,68,220),(197,54,21),(9,212,87),(221,212,211)]
+    image=Image.new('RGB',(216,260))
+    image.putdata(random.Random(19).choices(palette,k=image.width*image.height))
+    source=tmp_path/'source.png';target=tmp_path/'export.png'
+    image.save(source,optimize=True)
+    assert source.stat().st_size>18*1024
+    spec={**CONTENT_BY_ID[pid],'max_file_size_kb':18,'file_size_operator':'lt'}
+    result=export_output(source,target,pid,logo,mask_snapshot=mask,placement_snapshot=spec)
+    with Image.open(target) as output:
+        assert output.convert('RGB').tobytes()==image.tobytes()
+    assert result['palette_colors']==4 and result['pixel_lossless'] and result['bytes']<18*1024
 
 
 def test_indexed_byte_limit_keeps_size_and_prioritizes_logo_colors(tmp_path):

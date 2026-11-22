@@ -1512,6 +1512,7 @@
       "name": "横幅（无遮罩）",
       "target_width": 840,
       "target_height": 404,
+      "artwork_width": 644,
       "image_count": 1,
       "output_format": "PNG",
       "category": "plain",
@@ -1601,7 +1602,7 @@
     {
       "id": "learning-youxuepai-logo-1400x640",
       "platform": "优学派",
-      "name": "广告图（有Logo）",
+      "name": "广告图（无Logo、无按钮）",
       "target_width": 1400,
       "target_height": 640,
       "image_count": 1,
@@ -1612,7 +1613,7 @@
         "feature_label": false,
         "main_copy": true,
         "cta": false,
-        "logo": true,
+        "logo": false,
         "badge": false,
         "extra_heading": false,
         "extra_description": false

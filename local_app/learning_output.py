@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import hashlib
+from io import BytesIO
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 from .config import UserError
 from . import learning_logo, learning_mask
 from .learning_pipeline import CONTENT_BY_ID
-from .learning_sizing import export_exact
+from .learning_sizing import content_size, export_exact
 
 
 def _indexed_picture(image,logo,snapshot,*,colors=256,brand_colors=128):
@@ -33,7 +36,7 @@ def _indexed_picture(image,logo,snapshot,*,colors=256,brand_colors=128):
     return indexed.point([i if i<colors else colors-1 for i in range(256)])
 
 
-def _indexed_transparent_picture(image,logo,snapshot):
+def _indexed_transparent_picture(image,logo,snapshot,max_colors):
     """Keep the rounded alpha mask exact; reserve palette entries for its fringe.
 
     Only subpixel fringe colors are averaged. Opaque art uses median-cut and a
@@ -42,7 +45,7 @@ def _indexed_transparent_picture(image,logo,snapshot):
     alpha=image.getchannel('A');levels=[i for i,n in enumerate(alpha.histogram()) if n and i<255]
     if len(levels)>192:
         return None
-    colors=min(192,256-len(levels));picture=_indexed_picture(image.convert('RGB'),logo,snapshot,colors=colors,brand_colors=min(48,colors//3))
+    colors=min(max_colors,256-len(levels));picture=_indexed_picture(image.convert('RGB'),logo,snapshot,colors=colors,brand_colors=min(48,colors//3))
     samples={a:[0,0,0,0] for a in levels};pixels=image.tobytes()
     for r,g,b,a in zip(pixels[0::4],pixels[1::4],pixels[2::4],pixels[3::4]):
         if a<255:
@@ -71,6 +74,119 @@ def _indexed_rgba_fallback(image):
     return result
 
 
+def _png_bytes(image, **options):
+    buffer = BytesIO()
+    image.save(buffer, 'PNG', optimize=True, **options)
+    return buffer.getvalue()
+
+
+def _exact_palette(image):
+    counts = image.getcolors(maxcolors=256)
+    if counts is None:
+        return None
+    colors = [pixel for _, pixel in counts]
+    indices = {pixel: index for index, pixel in enumerate(colors)}
+    indexed = Image.frombytes('P', image.size, bytes(indices[pixel] for pixel in image.get_flattened_data()))
+    indexed.putpalette([channel for color in colors for channel in color[:3]])
+    if image.mode == 'RGBA':
+        indexed.info['transparency'] = bytes(color[3] for color in colors).rstrip(b'\xff')
+    bits = next(depth for depth in (1, 2, 4, 8) if len(colors) <= 2**depth)
+    return _png_bytes(indexed, bits=bits), len(colors)
+
+
+def _optimize_png(data, image, folder):
+    """Use OxiPNG when installed, and accept only exactly equivalent pixels."""
+    executable = shutil.which('oxipng')
+    if executable is None:
+        return data
+    path = folder / 'lossless.png'
+    path.write_bytes(data)
+    try:
+        subprocess.run([executable, '-o', '2', '--threads', '1', str(path)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+        candidate = path.read_bytes()
+        if len(candidate) < len(data):
+            with Image.open(BytesIO(candidate)) as decoded:
+                if (decoded.format == 'PNG' and decoded.size == image.size
+                        and decoded.convert(image.mode).tobytes() == image.tobytes()
+                        and (image.mode == 'RGBA' or decoded.convert('RGBA').getchannel('A').getextrema() == (255, 255))):
+                    return candidate
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return data
+
+
+def _encode_png(image, logo, snapshot, limit, folder):
+    data = _png_bytes(image)
+    exact = _exact_palette(image) if limit is not None else None
+    colors = None
+    if exact and len(exact[0]) < len(data):
+        data, colors = exact
+    if limit is not None and len(data) > limit:
+        data = _optimize_png(data, image, folder)
+    if limit is None or len(data) <= limit:
+        return data, dict(pixel_lossless=True, palette_colors=colors, alpha_palette_quantized=False,
+                          encoding_method='indexed' if colors is not None else 'truecolor')
+
+    alpha = image.mode == 'RGBA'
+    candidates = []
+    for color_budget in (256, 224, 192, 160, 128, 112, 96, 80, 64, 48, 32, 16):
+        picture = (_indexed_transparent_picture(image, logo, snapshot, color_budget) if alpha else
+                   _indexed_picture(image, logo, snapshot, colors=color_budget, brand_colors=min(48, color_budget//3)))
+        if picture is None:
+            break
+        encoded = _png_bytes(picture)
+        if len(encoded) <= limit:
+            candidates.append((picture, encoded, color_budget))
+            break
+    if alpha:
+        # Alpha-preserving indexing may leave too few colors for the picture.
+        # Compare its best fitting result with the existing octree fallback.
+        for budget in (None, 256, 128, 64, 32, 16):
+            candidate = image
+            if budget is not None:
+                candidate = image.convert('RGB').quantize(colors=budget).convert('RGBA')
+                candidate.putalpha(image.getchannel('A'))
+            picture = _indexed_rgba_fallback(candidate)
+            encoded = _png_bytes(picture)
+            if len(encoded) <= limit:
+                candidates.append((picture, encoded, budget))
+                break
+    if not candidates:
+        raise UserError('图片已达到精确尺寸，但超过该版位PNG大小限制，请压缩或简化画面；不会缩小交付尺寸')
+
+    reference = image.convert('RGBA')
+    neutral = Image.new('RGBA', image.size, (128, 128, 128, 255))
+    visible = Image.alpha_composite(neutral, reference).convert('RGB')
+    def error(candidate):
+        rendered = candidate[0].convert('RGBA')
+        composite = Image.alpha_composite(neutral, rendered).convert('RGB')
+        rgb_error = ImageStat.Stat(ImageChops.difference(visible, composite)).sum2
+        alpha_error = ImageStat.Stat(ImageChops.difference(reference.getchannel('A'), rendered.getchannel('A'))).sum2
+        return sum(rgb_error) + sum(alpha_error)
+    picture, data, color_budget = min(candidates, key=error)
+    alpha_quantized = picture.convert('RGBA').getchannel('A').tobytes() != reference.getchannel('A').tobytes()
+    return data, dict(pixel_lossless=False, palette_colors=len(picture.getcolors()), picture_palette_colors=color_budget,
+                      alpha_palette_quantized=alpha_quantized, encoding_method='indexed')
+
+
+def _add_right_panel(artwork, target, width):
+    with Image.open(artwork) as opened:
+        image = opened.convert('RGBA')
+    # Use the dominant color near the join and keep it dark enough for the
+    # white app label that the device draws over the panel.
+    edge_width = max(1, image.width // 12)
+    edge = image.crop((image.width-edge_width, 0, image.width, image.height)).convert('RGB').quantize(colors=8)
+    palette_index = max(edge.getcolors())[1]
+    rgb = edge.getpalette()[palette_index*3:palette_index*3+3]
+    luma = sum(channel*weight for channel, weight in zip(rgb, (.2126, .7152, .0722)))
+    color = tuple(round(channel*min(1, 110/max(1, luma))) for channel in rgb)
+    canvas = Image.new('RGBA', (width, image.height), (*color, 255))
+    canvas.paste(image, (0, 0))
+    canvas.save(target, 'PNG')
+    return {'artwork_width': image.width, 'fill_width': width-image.width, 'fill_rgb': list(color)}
+
+
 def export_output(source,target,placement_id,logo_snapshot,*,mask_snapshot=None,placement_snapshot=None,crop_box=None,protected_regions=(),sizing_policy=None):
     """Size → gray gradient → logo → rounded alpha, atomically saved as PNG.
 
@@ -92,57 +208,38 @@ def export_output(source,target,placement_id,logo_snapshot,*,mask_snapshot=None,
     target.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.learning-export-',dir=target.parent) as folder:
         folder=Path(folder)
-        sizing=export_exact(source,folder/'sized.png',width,height,crop_box=crop_box,protected_regions=protected_regions,sizing_policy=sizing_policy)
-        mask=learning_mask.apply_mask(folder/'sized.png',folder/'masked.png',placement_id,template=template,expected_size=(width,height))
-        with Image.open(folder/'masked.png') as opened:background=opened.convert('RGBA')
+        artwork_width, _ = content_size(row)
+        exact_path = folder/'sized.png'
+        sizing=export_exact(source,exact_path,artwork_width,height,crop_box=crop_box,protected_regions=protected_regions,sizing_policy=sizing_policy)
+        if artwork_width < width:
+            panel_path = folder/'with-panel.png'
+            sizing.update(width=width, right_panel=_add_right_panel(exact_path, panel_path, width))
+            exact_path = panel_path
+        mask=learning_mask.apply_mask(exact_path,folder/'masked.png',placement_id,template=template,expected_size=(width,height))
+        logo=learning_logo.composite(folder/'masked.png',folder/'logo.png',placement_id,logo_snapshot)
+        with Image.open(folder/'logo.png') as opened:image=opened.convert('RGBA')
         radius=row['corner_radius'];limit=row.get('max_file_size_kb')
-        # Try true-color encoding first. Opaque deliveries may use an indexed
-        # PNG when RGB storage still exceeds a channel's byte budget; the
-        # original layer assets remain unchanged and all dimensions stay exact.
-        for colors in (None,256,128,64,32,16):
-            image=background.copy()
-            if colors:
-                image=background.convert('RGB').quantize(colors=colors,method=Image.Quantize.MEDIANCUT).convert('RGBA')
-                image.putalpha(background.getchannel('A'))
-            image.save(folder/'compressed.png','PNG',optimize=True)
-            logo=learning_logo.composite(folder/'compressed.png',folder/'logo.png',placement_id,logo_snapshot)
-            with Image.open(folder/'logo.png') as opened:image=opened.convert('RGBA')
-            if radius:
-                scale=4
-                alpha=Image.new('L',(width*scale,height*scale),0)
-                ImageDraw.Draw(alpha).rounded_rectangle((0,0,width*scale-1,height*scale-1),radius=radius*scale,fill=255)
-                alpha=alpha.resize((width,height),Image.Resampling.LANCZOS)
-                image.putalpha(ImageChops.multiply(image.getchannel('A'),alpha))
-            finished=folder/'finished.png'
-            encoded=image.convert('RGB') if image.getchannel('A').getextrema()==(255,255) else image
-            encoded.save(finished,'PNG',optimize=True)
-            indexed_colors=None
-            alpha_quantized=False
-            size=finished.stat().st_size
-            if (limit is not None
-                    and (size>limit*1024 or size==limit*1024 and row.get('file_size_operator')=='lt')):
-                candidates=[(lambda:_indexed_picture(encoded,logo,logo_snapshot),False)] if encoded.mode=='RGB' else [
-                    (lambda:_indexed_transparent_picture(encoded,logo,logo_snapshot),False),
-                    (lambda:_indexed_rgba_fallback(encoded),True)]
-                for encode,quantized_alpha in candidates:
-                    indexed=encode()
-                    if indexed is None:continue
-                    alternative=folder/'indexed.png';indexed.save(alternative,'PNG',optimize=True)
-                    if alternative.stat().st_size<size:
-                        os.replace(alternative,finished);size=finished.stat().st_size;indexed_colors=256;alpha_quantized=quantized_alpha
-                    if size<limit*1024 or size==limit*1024 and row.get('file_size_operator')!='lt':break
-            if limit is None or size<limit*1024 or size==limit*1024 and row.get('file_size_operator')!='lt':break
-        else:raise UserError('图片已达到精确尺寸，但超过该版位PNG大小限制，请压缩或简化画面；不会缩小交付尺寸')
+        if radius:
+            scale=4
+            alpha=Image.new('L',(width*scale,height*scale),0)
+            ImageDraw.Draw(alpha).rounded_rectangle((0,0,width*scale-1,height*scale-1),radius=radius*scale,fill=255)
+            alpha=alpha.resize((width,height),Image.Resampling.LANCZOS)
+            image.putalpha(ImageChops.multiply(image.getchannel('A'),alpha))
+        if image.getchannel('A').getextrema()==(255,255):
+            image=image.convert('RGB')
+        max_bytes = (limit*1024 - (1 if row.get('file_size_operator')=='lt' else 0)) if limit is not None else None
+        data, encoding = _encode_png(image, logo, logo_snapshot, max_bytes, folder)
+        finished=folder/'finished.png'
+        finished.write_bytes(data)
+        size=len(data)
         with Image.open(finished) as checked:
             if checked.format!='PNG' or checked.size!=(width,height):raise UserError('导出图片尺寸核验失败')
             checked.verify()
-        digest=hashlib.sha256(finished.read_bytes()).hexdigest()
+        digest=hashlib.sha256(data).hexdigest()
         os.replace(finished,target)
     return dict(path=str(target),placement_id=placement_id,width=width,height=height,format='PNG',bytes=size,
                 sha256=digest,exact_size_verified=True,crop_box=sizing['crop_box'],sizing={k:v for k,v in sizing.items() if k!='path'},mask=mask,logo=logo,
-                corner_radius=radius,palette_colors=indexed_colors or colors,picture_palette_colors=colors,
-                encoding_method='indexed' if indexed_colors else 'truecolor',badge_applied=False,feature_label_drawn=False,
-                alpha_palette_quantized=alpha_quantized,
+                corner_radius=radius,badge_applied=False,feature_label_drawn=False,**encoding,
                 processing_order=['exact_contain_and_resize' if sizing['sizing_policy']=='preserve_source' else 'exact_crop_and_resize',
                                   'bottom_gray_mask','placement_logo','rounded_corners'])
 

@@ -14,7 +14,7 @@ def test_all_44_placements_have_fixed_content_rules_and_45_deliverables():
     records=pipeline.placement_contracts()
     assert len(records)==44
     assert sum(p['image_count'] for p in records)==45
-    assert sum(p['logo_required'] for p in records)==36
+    assert sum(p['logo_required'] for p in records)==35
     assert sum(p['cta_required'] for p in records)==14
     assert all(p['category']=='学习机' and p['enabled'] for p in records)
     assert all(p['target_width']>0 and p['target_height']>0 and p['output_format']=='PNG' for p in records)

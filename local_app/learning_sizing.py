@@ -13,6 +13,15 @@ from .config import UserError
 from kie_model import aspect_ratios, normalize_model
 
 
+def content_size(placement):
+    """Size of the artwork before the optional solid right panel is added."""
+    width, height = placement['target_width'], placement['target_height']
+    artwork_width = placement.get('artwork_width', width)
+    if type(artwork_width) is not int or not 0 < artwork_width <= width:
+        raise UserError('版位主画面宽度不正确')
+    return artwork_width, height
+
+
 def plan(width, height, model=None, *, aspect_ratio=None):
     if type(width) is not int or type(height) is not int or min(width, height) <= 0:
         raise UserError('目标图片宽高必须是正整数')
@@ -110,7 +119,9 @@ def export_exact(source, target, width, height, *, crop_box=None, protected_regi
         metadata['requested_crop_box']=list(crop_box)
     else:
         pixels=[x1*sw,y1*sh,x2*sw,y2*sh]
-        result=image.transform((width,height),Image.Transform.EXTENT,pixels,Image.Resampling.BICUBIC)
+        # Resize directly from the frozen source window. Lanczos widens its
+        # sampling window on downscale, so fine patterns do not alias as easily.
+        result=image.resize((width,height),Image.Resampling.LANCZOS,box=pixels)
         metadata=dict(source_box=list(crop_box),crop_box=list(crop_box),crop_percent=100*(1-(x2-x1)*(y2-y1)),
             padding_percent=0.0,method='fixed_crop_resize',sizing_policy='fixed_crop',
             full_source_preserved=list(crop_box)==[0,0,1,1],content_detection='not_performed',

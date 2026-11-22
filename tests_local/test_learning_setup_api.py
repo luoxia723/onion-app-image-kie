@@ -48,7 +48,7 @@ def test_config_assets_and_only_one_pipeline_are_available_without_keys(api):
     engine,request=api;status,cfg=request('/api/learning-machine/config')
     assert status==200 and cfg['pipeline']=='baseline_then_suite'
     assert len(cfg['placements'])==44 and sum(p['image_count'] for p in cfg['placements'])==45
-    assert sum(p['logo_required'] for p in cfg['placements'])==36
+    assert sum(p['logo_required'] for p in cfg['placements'])==35
     assert sum(p['cta_required'] for p in cfg['placements'])==14
     assert cfg['execution']['enabled'] is False and not engine.tasks
     assert cfg['offline_prompt_preview_ready'] is True
