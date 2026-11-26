@@ -77,10 +77,12 @@ def validate(pr, output, *, existing_references=()):
     if not isinstance(counts,dict) or any(pid not in ids or type(n) is not int or not 1<=n<=20 for pid,n in counts.items()):
         raise UserError('各版位套数请填写 1–20 的整数')
     ps = [BY_ID[i] for i in ids]
+    from . import ximalaya
+    ximalaya.validate(pr)
     learning_source.validate(pr,ps)
     from .learning_delivery import require_confirmed_sample
     for placement in ps:require_confirmed_sample(placement)
-    if pr.get('noLogo') and any(p.get('logo_policy')=='required' for p in ps):
+    if pr.get('noLogo') and any(p.get('logo_policy')=='required' and p['id'] not in ximalaya.placements(pr) for p in ps):
         raise UserError('所选版位要求使用 Logo，请选择 Logo 或移除该版位')
     from .brand_logo import normalize_id
     normalize_id(pr.get('logo_asset_id'))
@@ -152,6 +154,10 @@ def normalize_form(pr):
     form=BY_ID[value['pids'][0]]['image_form']
     active={'单图':{'t1','t2'},'双图':{'s1','s2'},'三图':{'s1','s2','s3'}}[form]
     value['image_form']=form
+    from . import ximalaya
+    selected=ximalaya.placements(value)
+    if selected:
+        value['pids']=[pid for pid in value['pids'] if pid not in selected]+list(selected)
     for key in ('t1','t2','s1','s2','s3'):
         value[key]=value.get(key,'') if key in active else ''
     return value
@@ -167,6 +173,11 @@ def copy_signature(pr):
     import hashlib
     keys=['channel','image_form','t1','t2','s1','s2','s3','cta','feature_label','extra_heading','extra_description','feature_note','ip','style','font','noLogo','logo_asset_id','facts_version','product_facts','image_model','canvas_protocol']
     value={k:pr.get(k) or '' for k in keys}
+    if pr.get('ximalaya_suite'):
+        from . import ximalaya
+        value['ximalaya_suite']=True
+        selected=ximalaya.placements(pr)
+        if selected!=ximalaya.PLACEMENTS:value['ximalaya_placements']=selected
     value['learning_mode']=pr.get('learning_mode','generate')
     if learning_source.uploaded(pr):
         source=pr.get('learning_source') or {}
@@ -197,7 +208,10 @@ def ip_role(asset_id):
 
 
 def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,assignments=None,pairs=None,round_id=None,placements_override=None,brand_logo_templates=None):
+    from . import ximalaya
     pr=learning_source.freeze(pr,cache)
+    ximalaya_pids=ximalaya.placements(pr)
+    ximalaya_root=ximalaya_pids[0] if ximalaya_pids else None
     from_upload=learning_source.uploaded(pr)
     image_model=normalize_model(pr.get('image_model',MODEL))
     plans=pr.get('visual_concepts')
@@ -206,6 +220,9 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
     cache=Path(cache);cache.mkdir(parents=True,exist_ok=True)
     rid=round_id or uuid.uuid4().hex
     pairs=pairs or requested_pairs(pr)
+    if ximalaya_pids:
+        pairs=[pair for pair in pairs if pair[0] not in ximalaya_pids]+sorted(
+            (pair for pair in pairs if pair[0] in ximalaya_pids),key=lambda pair:(pair[1],ximalaya_pids.index(pair[0])))
     metadata=copy.deepcopy(assignments or {})
     reference=next((x for x in pr.get('references',[]) if x.get('purpose')=='style'),None)
     style_choice=pr.get('style','random')
@@ -238,6 +255,9 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
     for pid,n in pairs:
         key=suite_key(pid,n)
         if key in metadata or str(n) in metadata: continue
+        if pid in ximalaya_pids and pid!=ximalaya_root:
+            metadata[key]=copy.deepcopy(metadata[suite_key(ximalaya_root,n)])
+            continue
         if (placements_override or BY_ID)[pid].get('learning_rule'):
             shared=next((m for k,m in metadata.items() if k.endswith('::'+str(n)) and k.split('::')[0] in learning_workflow.RULES),None)
             if shared is not None:
@@ -305,7 +325,13 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
         if not p.get('learning_rule'):
             from .natural_canvas import plan as canvas_plan,PROTOCOL
             canvas=canvas_plan(p,image_model)
-            brand_layer=freeze_logo(p,pr.get('logo_asset_id'),cache,enabled=not pr.get('noLogo') and p.get('logo_policy')!='forbidden',generation_crop=canvas['group']['targets'][0]['crop_box'])
+            forced_logo=pid in ximalaya_pids and p.get('logo_policy')=='required'
+            if forced_logo and (template:=p.get('brand_logo_template')):
+                from .brand_logo import default_template
+                template.update(x=(1-template['width'])/2,y=min(template['y'],default_template(p)['y']))
+            brand_layer=freeze_logo(p,None if pid in ximalaya_pids else pr.get('logo_asset_id'),cache,
+                                   enabled=forced_logo or not pr.get('noLogo') and p.get('logo_policy')!='forbidden',
+                                   generation_crop=canvas['group']['targets'][0]['crop_box'])
         logo_asset=next(a for a in ASSETS if a['asset_id']==(pr.get('logo_asset_id') or 'logo.onion.standard.001') and a['kind']=='logo') if brand_layer is None else None
         logo='不用' if brand_layer is not None or pr.get('noLogo') or p.get('logo_policy')=='forbidden' else logo_asset['display_name']
         cfg=dict(request_id=task_id+'-'+pid+'-'+str(n),placements=[p],sets=1,
@@ -316,6 +342,8 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
             visual_style_mode='coordinated',visual_direction={'style_id':meta['style_id']},
             art_direction_required=True,learner_story_required=True,visual_concepts=[])
         if brand_layer is not None:cfg['brand_logo_layer']=copy.deepcopy(brand_layer)
+        if pid in ximalaya_pids and pid!=ximalaya_root:
+            cfg.update(ximalaya_variant=True,font_reference_enabled=False)
         if canvas:
             cfg['natural_canvas_plan']=canvas
             pr['canvas_protocol']=PROTOCOL
@@ -356,6 +384,7 @@ def make_round(pr,task_id,cache,concurrency,simulation,*,defer_planning=False,as
         concurrency=concurrency,simulation=simulation,set_metadata=metadata,planning_source='codex_skill',planning_status='queued',
         planning_targets=[pid+'::'+str(n) for pid,n in pairs],stop_marker=str(cache/'STOP'),copy_signature=copy_signature(pr))
     learning_workflow.bind(r)
+    ximalaya.bind(r)
     if brand_logo_templates is not None:r['brand_logo_templates']=copy.deepcopy(brand_logo_templates)
     if any(s.get('natural_canvas_plan') for s in slots):r['natural_canvas_version']=1
     from .scene_planner import rules_text

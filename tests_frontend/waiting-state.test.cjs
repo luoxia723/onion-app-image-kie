@@ -45,11 +45,11 @@ test('连接失效时不继续承诺任务正在后台执行',()=>{
  assert(!html.includes('wait-spinner'));
  assert(!html.includes('后台会继续'));
 });
-test('图 1 与分支明确显示不同重出范围，未知任务只恢复查询',()=>{
+test('图 1 与分支明确显示不同重出范围，有原任务号时只恢复查询',()=>{
  const ctx=setup();ctx.round.planning_status='done';ctx.round.slots.forEach(s=>s.state='done');
  let retry=vm.runInContext('imageRetry(R(),R().slots[0])',ctx);assert.equal(retry.label,'重出图 1 及后续图');
  retry=vm.runInContext('imageRetry(R(),R().slots[1])',ctx);assert.equal(retry.label,'重出本张');assert(retry.note.includes('继续引用'));
- ctx.round.slots[1].state='failed';ctx.round.slots[1].reason_code='timeout';
+ ctx.round.slots[1].state='failed';ctx.round.slots[1].kie_recovery_action='resume';
  const html=vm.runInContext('cellHtml(R(),R().slots[1],132)',ctx);assert(html.includes('resumeImage'));assert(!html.includes('onclick="redo('));
  retry=vm.runInContext('imageRetry(R(),R().slots[1])',ctx);assert.equal(retry.label,'恢复查询');
 });

@@ -39,7 +39,8 @@ def wait_done(e,tid):
         time.sleep(.05)
     raise AssertionError('generation did not finish')
 
-def test_end_to_end_dependency_prompt_versions_and_zip(engine):
+def test_end_to_end_dependency_prompt_versions_and_zip(engine,monkeypatch):
+    from local_app import delivery, server
     e=engine;p=params(True)
     t=e.create(p,'idempotency-1');tid=t['id']
     assert e.create(p,'idempotency-1')['id']==tid
@@ -60,9 +61,29 @@ def test_end_to_end_dependency_prompt_versions_and_zip(engine):
             assert Path(s['jpeg']).stat().st_size<spec['max_file_size_kb']*1024
     e.mutate(tid,'adopt',{'set':1,'adopted':True})
     assert e.package_preview(tid,0)['next_version']=='v001'
+    verify=delivery.verify_delivery_file
+    checked=[]
+    def count_checks(slot,placement):
+        checked.append(slot['id'])
+        return verify(slot,placement)
+    monkeypatch.setattr(delivery,'verify_delivery_file',count_checks)
     first=e.package(tid,0)
+    assert set(checked)=={slot['id'] for slot in r['slots'] if slot['set']==1} and len(checked)==3
     assert e.package(tid,0)['id']==first['id']
     assert e.package_preview(tid,0)=={'next_version':None,'package_id':first['id']}
+    verify_archive=server.verify_saved_package
+    def check_download(stream,*args):
+        assert not e.lock._is_owned()
+        assert stream.readable()
+        return verify_archive(stream,*args)
+    monkeypatch.setattr(server,'verify_saved_package',check_download)
+    srv=ThreadingHTTPServer(('127.0.0.1',0),Handler);srv.engine=e
+    thread=threading.Thread(target=srv.serve_forever,daemon=True);thread.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_port}/api/tasks/{tid}/packages/{first['id']}",timeout=5) as response:
+            assert response.read()==Path(first['path']).read_bytes()
+    finally:
+        srv.shutdown();srv.server_close();thread.join(3)
     with zipfile.ZipFile(first['path']) as z:
         names=z.namelist()
         assert len([n for n in names if n.endswith('.jpg')])==3

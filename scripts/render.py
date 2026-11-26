@@ -6,9 +6,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import ipaddress
 import json
 import mimetypes
-import os
 from pathlib import Path
 import re
 import sys
@@ -17,165 +17,55 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
-from contextlib import contextmanager
+from contextlib import nullcontext
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from logo_reference import logo_prompt_rule, validate_asset_reference_bindings, validate_logo_prompt_rule  # noqa: E402
-from kie_model import MODEL, RESOLUTION, ASPECT_RATIOS, ESTIMATED_CREDITS_PER_IMAGE, normalize_resolution, nearest_aspect_ratio, geometry_report, cover_crop_report  # noqa: E402
+from kie_model import MODEL, RESOLUTION, normalize_resolution, nearest_aspect_ratio  # noqa: E402
 
 
 DEFAULT_API_BASE = "https://api.kie.ai"
-DEFAULT_UPLOAD_BASE = "https://kieai.redpandaai.co"
-RESOLUTION_CHOICES = {RESOLUTION}
-LEGACY_QUALITY_CHOICES = {"low", "medium", "high"}
-ENV_FILE = Path.home() / ".config" / "onion-app-image-kie" / ".env"
-SIZE_RE = re.compile(r"^([1-9]\d*)x([1-9]\d*)$")
-MAX_REFERENCE_IMAGES = 8
 MAX_REFERENCE_BYTES = 10 * 1024 * 1024
-DEFAULT_POLL_TIMEOUT = 240
-
+QUERY_RETRY_DELAYS = (5, 15, 30, 60)
 
 
 class KieError(Exception):
     def __init__(self, message: str, exit_code: int = 3, *, uncertain_submit: bool = False,
                  http_status: int | None = None, provider_code: int | None = None,
-                 provider_task_id: str | None = None):
+                 provider_task_id: str | None = None, transport_error: str | None = None,
+                 transport_errno: int | None = None):
         super().__init__(message)
         self.exit_code = exit_code
         self.uncertain_submit = uncertain_submit
         self.http_status = http_status
         self.provider_code = provider_code
         self.provider_task_id = provider_task_id
+        self.transport_error = transport_error
+        self.transport_errno = transport_errno
 
 
 class GenerationTimeout(KieError):
     """The provider confirmed this task is still pending at its deadline."""
 
 
+def definite_rejection_code(error):
+    for field in ('http_status','provider_code'):
+        code=error.get(field) if isinstance(error,dict) else getattr(error,field,None)
+        if type(code) is int and code in (400,401,402,403,404,413,415,422,429,433):return code
+    return None
+
+
 def log(level: str, message: str) -> None:
     print(f"[{level}] {message}", file=sys.stderr)
-
-
-def load_dotenv_if_exists(path: Path) -> bool:
-    """Load KEY=VALUE lines without overriding existing environment values."""
-    path = Path(path).expanduser()
-    if not path.is_file():
-        return False
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("\"'")
-        if not key or key in os.environ:
-            continue
-        lowered = value.lower()
-        if "你的" in value or "占位" in value or lowered in {"sk-xxx", "sk-your-key", "your-key"}:
-            continue
-        os.environ[key] = value
-    return True
-
-
-def autoload_dotenv() -> None:
-    load_dotenv_if_exists(ENV_FILE)
-
-
-def find_project_root(start: Path) -> Path:
-    return Path(os.environ.get("ONION_IMAGE_WORKSPACE", Path.cwd())).expanduser().resolve()
-
-
-def resolve_reference_path(path: str | Path, project_root: Path, skill_dir: Path) -> Path:
-    p = Path(path).expanduser()
-    if p.is_absolute():
-        return p.resolve()
-    candidates = [(Path.cwd() / p).resolve(), (project_root / p).resolve(), (skill_dir / p).resolve()]
-    path_text = str(path)
-    if path_text.startswith("Skills/03_内容生成相关/onion-app-image/"):
-        candidates.append((project_root / p).resolve())
-    if path_text.startswith(".agents/skills/onion-app-image/"):
-        candidates.append((project_root / p).resolve())
-    if path_text.startswith("assets/"):
-        candidates.append((skill_dir / p).resolve())
-    if path_text.startswith("shared/assets/"):
-        candidates.append((skill_dir / Path(path_text.removeprefix("shared/assets/"))).resolve())
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return candidates[-1]
-
-
-def normalize_reference_item(item: object, index: int) -> dict[str, Any]:
-    if isinstance(item, str):
-        return {"path": item, "label": f"参考图{index}", "role": "参考图", "asset_id": None, "strict_label": False}
-    if isinstance(item, dict):
-        path = item.get("path") or item.get("file") or item.get("src")
-        if not path or not str(path).strip():
-            raise ValueError(f"reference_images[{index - 1}] must include path")
-        label = str(item.get("label") or f"参考图{index}").strip()
-        if not label:
-            raise ValueError(f"reference_images[{index - 1}] label must not be empty")
-        return {
-            "path": str(path),
-            "label": label,
-            "role": str(item.get("role") or item.get("prompt_role") or "参考图").strip(),
-            "asset_id": item.get("asset_id"),
-            "strict_label": bool(item.get("label")),
-        }
-    raise ValueError(f"reference_images[{index - 1}] must be a string path or object")
-
-
-def normalize_reference_items(items: list[object]) -> list[dict[str, Any]]:
-    if len(items) > MAX_REFERENCE_IMAGES:
-        raise ValueError(f"reference_images supports at most {MAX_REFERENCE_IMAGES} files")
-    normalized = [normalize_reference_item(item, index) for index, item in enumerate(items, start=1)]
-    labels = [item["label"] for item in normalized]
-    duplicates = sorted({label for label in labels if labels.count(label) > 1})
-    if duplicates:
-        raise ValueError("duplicate reference labels: " + ", ".join(duplicates))
-    return normalized
 
 
 def validate_reference_labels(prompt: str, reference_items: list[dict[str, Any]]) -> None:
     missing = [item["label"] for item in reference_items if item.get("strict_label") and item["label"] not in prompt]
     if missing:
         raise ValueError("prompt must mention every explicitly labeled reference image: " + ", ".join(missing))
-
-
-def validate_size_label(size: str) -> str:
-    normalized = str(size or "").strip().lower()
-    match = SIZE_RE.match(normalized)
-    if not match:
-        raise ValueError("size must be formatted as WIDTHxHEIGHT, for example 1568x672")
-    return f"{int(match.group(1))}x{int(match.group(2))}"
-
-
-def validate_legacy_quality(value: str | None) -> str | None:
-    if value is None or not str(value).strip():
-        return None
-    quality = str(value).strip().lower()
-    if quality not in LEGACY_QUALITY_CHOICES:
-        raise ValueError(f"legacy quality must be one of {', '.join(sorted(LEGACY_QUALITY_CHOICES))}")
-    return quality
-
-
-def generation_geometry(explicit_size: str, requested_ratio: str) -> tuple[str, str]:
-    if explicit_size:
-        size_label = validate_size_label(explicit_size)
-        width, height = (int(part) for part in size_label.split("x", 1))
-        selected = nearest_aspect_ratio(width, height)
-        if requested_ratio and requested_ratio != selected:
-            raise ValueError(f"aspect_ratio conflicts with target size; expected {selected}")
-        return size_label, selected
-    if requested_ratio not in ASPECT_RATIOS:
-        raise ValueError(
-            f"aspect_ratio must be one of {', '.join(sorted(ASPECT_RATIOS))}, or pass --size WIDTHxHEIGHT"
-        )
-    # KIE returns the actual pixel dimensions; 1K is a tier, not exact dimensions.
-    return "", requested_ratio
 
 
 def json_request(url: str, api_key: str, payload: dict[str, Any] | None = None, *, method: str = "POST") -> urllib.request.Request:
@@ -264,6 +154,21 @@ def _raise_for_api_code(body: dict[str, Any], operation: str) -> None:
     raise KieError(f"{operation} failed ({numeric}): {message}", 3, **metadata)
 
 
+def _open_kie_json(req: urllib.request.Request, timeout: float):
+    target = urllib.parse.urlsplit(req.full_url)
+    if target.scheme == 'https' and target.netloc.lower() in ('api.kie.ai', 'api.kie.ai:443'):
+        proxy = urllib.request.getproxies().get('https', '')
+        try:
+            host = urllib.parse.urlsplit(proxy if '://' in proxy else '//' + proxy).hostname
+            loopback = host == 'localhost' or bool(host and ipaddress.ip_address(host).is_loopback)
+        except ValueError:
+            loopback = False
+        if loopback:
+            # Route before sending. An ambiguous paid POST cannot be replayed via another path.
+            return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
 def request_json(
     req: urllib.request.Request,
     retries: int = 3,
@@ -279,7 +184,7 @@ def request_json(
             remaining = retry_deadline - time.monotonic() if retry_deadline is not None else request_timeout
             if remaining <= 0:
                 raise KieError(f"{operation} exceeded its query time budget", 3)
-            with urllib.request.urlopen(req, timeout=min(request_timeout, remaining)) as resp:
+            with _open_kie_json(req, timeout=min(request_timeout, remaining)) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
             if not isinstance(body, dict):
                 raise KieError(f"{operation} returned non-object JSON", 3)
@@ -302,16 +207,20 @@ def request_json(
                 time.sleep(min(wait, max(0, retry_deadline - time.monotonic())) if retry_deadline is not None else wait)
                 continue
             raise KieError(f"{operation} failed: HTTP {exc.code}: {raw[:500]}", 3, **metadata)
-        except (urllib.error.URLError, TimeoutError) as exc:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             if retry_network and attempt < retries:
                 wait = waits[min(attempt - 1, len(waits) - 1)]
                 log("WARN", f"{operation} network error; retrying in {wait}s ({attempt}/{retries})")
                 time.sleep(min(wait, max(0, retry_deadline - time.monotonic())) if retry_deadline is not None else wait)
                 continue
+            reason = getattr(exc, 'reason', exc)
+            errno = getattr(reason, 'errno', None)
             raise KieError(
                 f"{operation} network error: {exc}",
                 3,
                 uncertain_submit=not retry_network,
+                transport_error=type(reason).__name__,
+                transport_errno=errno if type(errno) is int else None,
             )
         except json.JSONDecodeError as exc:
             raise KieError(f"{operation} returned invalid JSON: {exc}", 3)
@@ -370,14 +279,26 @@ def load_output_state(output: Path) -> dict[str, Any]:
                 or any(not isinstance(old, dict) or not old.get("task_id") or not old.get("timeout_confirmed")
                        or old.get("fingerprint") != state.get("fingerprint") for old in history)):
             raise KieError("invalid timeout restart journal; refusing a new task", 1)
-    if state and state.get("status") == "restart_ready":
-        if count != 1:
-            raise KieError("invalid timeout restart journal; refusing a new task", 1)
-    elif state and state.get("status") == "rate_limited" and not state.get("task_id"):
+    if state and state.get("status") == "rate_limited" and not state.get("task_id"):
         return {}
-    elif state and not state.get("task_id"):
+    elif state and not state.get("task_id") and not confirmed_unaccepted(state):
         raise KieError(f"previous KIE task submission was uncertain; refusing to create a duplicate for {output}", 3)
     return state
+
+
+def submission_unverified(state):
+    return not state.get('task_id') and state.get('status') in ('submitting','submit_uncertain')
+
+
+def confirmed_unaccepted(state):
+    return (state.get('status')=='confirmed_unaccepted' and not state.get('task_id')
+            and type((state.get('reconciliation') or {}).get('confirmed_unaccepted_at')) in (int,float))
+
+
+def submission_signature(model, task_input):
+    identity = [model,task_input.get('prompt'),task_input.get('aspect_ratio'),task_input.get('resolution'),
+                task_input.get('input_urls') or task_input.get('image_input')]
+    return hashlib.sha256(json.dumps(identity,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 
 UPLOAD_CACHE: dict[str, str] = {}
@@ -493,63 +414,84 @@ def poll_task(
         time.sleep(min(poll_delay(elapsed), max(0.0, timeout_seconds - elapsed)))
 
 
-def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths, fingerprint, state_path, state, aspect_ratio, resolution, *, request_fn=None, upload_fn=None):
-    """Resume one active task, replacing only a confirmed timeout within its saved cap."""
+def obtain_result(args, api_base, upload_base, api_key, prompt, reference_paths, fingerprint, state_path, state, aspect_ratio, resolution, *, request_fn=None, upload_fn=None, submission_guard=None):
+    """Create once or recover the same task by its recorded ID."""
     request=request_fn or request_json
     upload=upload_fn or upload_references
+    guard=submission_guard or nullcontext
     from kie_model import provider_aspect_ratios
     model=getattr(args,"image_model",MODEL)
     if aspect_ratio not in provider_aspect_ratios(model):
         raise ValueError("unsupported model 1K aspect_ratio")
-    limit = getattr(args, "max_timeout_restarts", 0)
-    if type(limit) is not int or limit not in (0, 1):
-        raise ValueError("max_timeout_restarts must be 0 or 1")
-    while True:
-        task_id = str(state.get("task_id") or "")
-        if not task_id:
-            if state and (state.get("status") != "restart_ready" or limit < state.get("timeout_restarts", 0)):
-                raise KieError("submission or restart is not authorized; retain the task state", 3)
-            cache_path = getattr(args, "upload_cache", None)
-            cache = json.loads(Path(cache_path).read_text()) if cache_path and Path(cache_path).is_file() else None
-            urls = (upload(upload_base, api_key, reference_paths, args.retries, cache=cache)
-                    if cache is not None else upload(upload_base, api_key, reference_paths, args.retries))
+    task_id = str(state.get("task_id") or "")
+    if not task_id:
+        if state and not confirmed_unaccepted(state):
+            raise KieError("submission is not authorized; retain the task state", 3)
+        cache_path = getattr(args, "upload_cache", None)
+        cache = json.loads(Path(cache_path).read_text()) if cache_path and Path(cache_path).is_file() else None
+        urls = (upload(upload_base, api_key, reference_paths, args.retries, cache=cache)
+                if cache is not None else upload(upload_base, api_key, reference_paths, args.retries))
+        create_request=build_create_request(api_base,api_key,prompt,aspect_ratio,resolution,urls,**({'model':model} if model!=MODEL else {}))
+        with guard():
+            request_body=json.loads(create_request.data)
+            reconciliation=state.get('reconciliation')
             state = {"provider": "kie", "fingerprint": fingerprint, "model": model,
                      "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "submitting",
                      "submitted_at": time.time(), "attempt_history": state.get("attempt_history", []),
-                     "timeout_restarts": state.get("timeout_restarts", 0)}
+                     "timeout_restarts": state.get("timeout_restarts", 0),
+                     "submission_signature":submission_signature(model,request_body['input'])}
+            if reconciliation:state['reconciliation']=reconciliation
             atomic_write_json(state_path, state)
             try:
-                created = request(build_create_request(api_base, api_key, prompt, aspect_ratio, resolution, urls, **({"model":model} if model!=MODEL else {})),
-                                       1, operation="create KIE image task", retry_network=False,
-                                       request_timeout=min(30, max(1, args.poll_timeout)))
+                created = request(create_request, 1, operation="create KIE image task", retry_network=False,
+                                  request_timeout=min(30, max(1, args.poll_timeout)))
                 task_id = str((created.get("data") or {}).get("taskId") or "")
                 if not task_id:
                     raise KieError("create KIE image task returned no taskId", 3)
-            except KieError:
-                state["status"] = "submit_uncertain"
+            except KieError as exc:
+                code=definite_rejection_code(exc)
+                if exc.provider_task_id:
+                    state.update(task_id=exc.provider_task_id,status='waiting')
+                elif code is not None and not exc.uncertain_submit:
+                    state.update(status='rate_limited' if code==429 else 'rejected',definite_rejection=True,
+                                 http_status=exc.http_status,provider_code=exc.provider_code)
+                else:
+                    state.update(status='submit_uncertain',http_status=exc.http_status,provider_code=exc.provider_code,
+                                 transport_uncertain=exc.uncertain_submit,transport_error=exc.transport_error,
+                                 transport_errno=exc.transport_errno)
                 atomic_write_json(state_path, state)
                 raise
             state.update(task_id=task_id, status="waiting")
             atomic_write_json(state_path, state)
-        if state.get("result_url"):
-            return state["result_url"], state
-        try:
-            url, _ = poll_task(api_base, api_key, task_id, state_path, state, args.retries, max(1, args.poll_timeout), **({"request_fn":request_fn} if request_fn else {}))
-            return url, state
-        except GenerationTimeout:
-            count = state.get("timeout_restarts", 0)
-            if count >= limit or not state.get("timeout_confirmed"):
-                raise
-            previous = {key: value for key, value in state.items() if key != "attempt_history"}
-            previous.update(abandoned_at=time.time(), cancellation_confirmed=False)
-            state = {"provider": "kie", "fingerprint": fingerprint, "model": model,
-                     "aspect_ratio": aspect_ratio, "resolution": resolution, "status": "restart_ready",
-                     "attempt_history": [*state.get("attempt_history", []), previous], "timeout_restarts": count + 1}
-            atomic_write_json(state_path, state)
-            log("WARN", f"Task {task_id} timed out; starting its one authorized replacement. The old task may still complete and be billed.")
+    if state.get("result_url"):
+        return state["result_url"], state
+    url, _ = poll_task(api_base, api_key, task_id, state_path, state, args.retries, max(1, args.poll_timeout),
+                       **({"request_fn":request_fn} if request_fn else {}))
+    return url, state
 
 
 class ResultLinkExpired(KieError):pass
+
+
+def download_kie_result(url, output, api_base, api_key, task_id):
+    try:
+        return download_image(url,output)
+    except ResultLinkExpired:
+        request=json_request(f"{api_base.rstrip('/')}/api/v1/common/download-url",api_key,{'url':url})
+        try:
+            response=request_json(request,3,operation='refresh KIE result link',
+                                  request_timeout=12,retry_deadline=time.monotonic()+30)
+            fresh=response.get('data')
+            if not isinstance(fresh,str) or urllib.parse.urlsplit(fresh).scheme not in ('http','https'):
+                raise KieError('KIE did not return a temporary download URL')
+            return download_image(fresh,output)
+        except KieError:
+            # Some gateways expose only recordInfo. A fresh result lookup is safe.
+            latest=request_json(build_status_request(api_base,api_key,task_id),1,
+                                operation='refresh original KIE task result',request_timeout=12).get('data') or {}
+            urls=parse_result_urls(latest.get('resultJson')) if latest.get('state')=='success' else []
+            if not urls:raise
+            return download_image(urls[0],output)
 
 
 def download_image(url: str, output_path: str | Path) -> Path:

@@ -27,10 +27,11 @@ def test_worker_manual_prose_passes_without_system_wording(tmp_path,monkeypatch,
     monkeypatch.setattr(worker.render,'validate_logo_prompt_rule',forbidden)
     calls=[]
     def obtain(args,base,upload,key,text,paths,*rest,**kw):
-        calls.append((text,paths,args.max_timeout_restarts,args.poll_timeout));return 'fake-result',{}
+        calls.append((text,paths,args.poll_timeout))
+        return 'fake-result',{'task_id':'same-paid-task','status':'success'}
     monkeypatch.setattr(worker.render,'obtain_result',obtain)
     monkeypatch.setattr(worker.render,'download_image',lambda url,p:Image.new('RGB',(960,540)).save(p))
     assert worker.main()==0
-    assert calls[0][:3]==(prompt,[ref.resolve()],0)
-    assert calls[0][3]>=640 if query_only else calls[0][3]==240
+    assert calls[0][:2]==(prompt,[ref.resolve()])
+    assert calls[0][2]>=640 if query_only else calls[0][2]==240
     assert json.loads(job_path.with_suffix('.result.json').read_text())['ok']

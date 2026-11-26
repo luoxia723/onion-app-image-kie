@@ -6,7 +6,8 @@
     "notes": [
       "IP files are grouped by role slug. stage, variant, and Chinese display names live in this manifest, not in directory layers.",
       "variant uses standard for current normal character images, fullbody for clean full-body standing art, and qstyle-q2/qstyle-q3 for named Q-style variants.",
-      "number is zero-padded 001, 002, 003 for future poses or refreshed assets."
+      "number is zero-padded 001, 002, 003 for future poses or refreshed assets.",
+      "Numbered references with unspecified stages are stored together under assets/ip-roles/additional."
     ]
   },
   "assets": [
@@ -21,10 +22,11 @@
     {
       "asset_id": "logo.onion.app.001",
       "kind": "logo",
-      "display_name": "洋葱学园+APP",
-      "asset_name_zh": "洋葱学园+APP（白字 APP 版·高清深蓝参考底）",
+      "display_name": "洋葱学园反白版",
+      "aliases": ["洋葱学园+APP"],
+      "asset_name_zh": "洋葱学园（白字反白版）",
       "path": "assets/logos/onion-logo-app-001.png",
-      "prompt_role": "品牌 Logo 和 APP 标识参考图"
+      "prompt_role": "品牌白字反白 Logo 参考图"
     },
     {
       "asset_id": "ip.doubao.junior.standard.001",
@@ -239,6 +241,276 @@
       "path": "assets/ip-roles/zhangwuxian/zhangwuxian-teacher-fullbody-001.png",
       "source_note": "Imported from maintainer-provided full-body asset.",
       "prompt_role": "张无限老师全身立绘参考图"
+    },
+    {
+      "asset_id": "ip.role-01.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "角色 01",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/role-01.jpg",
+      "source_name": "20260810-182233.jpg",
+      "prompt_role": "新增 IP 角色 01的角色参考图"
+    },
+    {
+      "asset_id": "ip.role-02.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "角色 02",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/role-02.png",
+      "source_name": "7@3x.png",
+      "prompt_role": "新增 IP 角色 02的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-01.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 01",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-01.png",
+      "source_name": "ip_boy_01.png",
+      "prompt_role": "新增 IP 男生 01的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-02.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 02",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-02.png",
+      "source_name": "ip_boy_02.png",
+      "prompt_role": "新增 IP 男生 02的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-03.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 03",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-03.png",
+      "source_name": "ip_boy_03.png",
+      "prompt_role": "新增 IP 男生 03的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-04.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 04",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-04.png",
+      "source_name": "ip_boy_04.png",
+      "prompt_role": "新增 IP 男生 04的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-05.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 05",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-05.png",
+      "source_name": "ip_boy_05.png",
+      "prompt_role": "新增 IP 男生 05的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-06.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 06",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-06.png",
+      "source_name": "ip_boy_06.png",
+      "prompt_role": "新增 IP 男生 06的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-07.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 07",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-07.png",
+      "source_name": "ip_boy_07.png",
+      "prompt_role": "新增 IP 男生 07的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-08.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 08",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-08.png",
+      "source_name": "ip_boy_08.png",
+      "prompt_role": "新增 IP 男生 08的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-09.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 09",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-09.png",
+      "source_name": "ip_boy_09.png",
+      "prompt_role": "新增 IP 男生 09的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-10.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 10",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-10.png",
+      "source_name": "ip_boy_10.png",
+      "prompt_role": "新增 IP 男生 10的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-11.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 11",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-11.png",
+      "source_name": "ip_boy_11.png",
+      "prompt_role": "新增 IP 男生 11的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-12.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 12",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-12.png",
+      "source_name": "ip_boy_12.png",
+      "prompt_role": "新增 IP 男生 12的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-13.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 13",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-13.png",
+      "source_name": "ip_boy_13.png",
+      "prompt_role": "新增 IP 男生 13的角色参考图"
+    },
+    {
+      "asset_id": "ip.boy-14.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "男生 14",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/boy-14.png",
+      "source_name": "ip_boy_14.png",
+      "prompt_role": "新增 IP 男生 14的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-01.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 01",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-01.png",
+      "source_name": "ip_girl_01.png",
+      "prompt_role": "新增 IP 女生 01的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-02.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 02",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-02.png",
+      "source_name": "ip_girl_02.png",
+      "prompt_role": "新增 IP 女生 02的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-03.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 03",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-03.png",
+      "source_name": "ip_girl_03.png",
+      "prompt_role": "新增 IP 女生 03的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-04.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 04",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-04.png",
+      "source_name": "ip_girl_04.png",
+      "prompt_role": "新增 IP 女生 04的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-05.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 05",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-05.png",
+      "source_name": "ip_girl_05.png",
+      "prompt_role": "新增 IP 女生 05的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-06.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 06",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-06.png",
+      "source_name": "ip_girl_06.png",
+      "prompt_role": "新增 IP 女生 06的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-07.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 07",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-07.png",
+      "source_name": "ip_girl_07.png",
+      "prompt_role": "新增 IP 女生 07的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-08.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 08",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-08.png",
+      "source_name": "ip_girl_08.png",
+      "prompt_role": "新增 IP 女生 08的角色参考图"
+    },
+    {
+      "asset_id": "ip.girl-09.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "女生 09",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/girl-09.png",
+      "source_name": "ip_girl_09.png",
+      "prompt_role": "新增 IP 女生 09的角色参考图"
+    },
+    {
+      "asset_id": "ip.role-03.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "角色 03",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/role-03.png",
+      "source_name": "jimeng-2026-04-14-5718@3x.png",
+      "prompt_role": "新增 IP 角色 03的角色参考图"
+    },
+    {
+      "asset_id": "ip.role-04.unspecified.standard.001",
+      "kind": "ip",
+      "display_name": "角色 04",
+      "stage": "unspecified",
+      "variant": "standard",
+      "path": "assets/ip-roles/additional/role-04.png",
+      "source_name": "蒙版组 932@3x.png",
+      "prompt_role": "新增 IP 角色 04的角色参考图"
     }
   ]
 }

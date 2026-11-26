@@ -42,14 +42,19 @@ def test_full_http_production_confirm_reuse_45_exports_single_versions_and_zip(p
     run=settled(request,rid)
     assert run['status']=='completed',[(o['id'],o.get('error')) for o in run['outputs'] if o['status']!='done']
     assert len(run['outputs'])==45 and len(run['masters'])==16
+    assert sum(row['logo_review_switchable'] for row in run['outputs'])==36
     assert len(list((engine.settings.output/'.cache'/'learning-runs'/rid).rglob('*.simulation.json')))==26
     for output in run['outputs']:
+        assert output['logo_review_switchable']==output['logo_required'],output['placement_id']
         status,raw=request(output['image_url']);assert status==200
         with Image.open(BytesIO(raw)) as image:
             assert image.format=='PNG' and image.size==(output['width'],output['height'])
     double=[o for o in run['outputs'] if o['placement_id']=='learning-youxuepai-double-840x404']
     assert len(double)==2 and double[0]['sha256']==double[1]['sha256']
-    status,package=request(base+'/package','POST',{})
+    reviewed={row['id']:row['version'] for row in run['outputs']}
+    assert request(base+'/package','POST',{})[0]==409
+    assert request(base+'/package','POST',{'reviewed_versions':dict(list(reviewed.items())[1:])})[0]==409
+    status,package=request(base+'/package','POST',{'reviewed_versions':reviewed})
     assert status==200 and package['image_count']==45
     status,zip_bytes=request(package['download_url']);assert status==200
     with zipfile.ZipFile(BytesIO(zip_bytes)) as archive:
@@ -70,6 +75,7 @@ def test_full_http_production_confirm_reuse_45_exports_single_versions_and_zip(p
         if output['id']==target['id']:assert output['version']==versions[output['id']][0]+1
         else:assert (output['version'],output['sha256'])==versions[output['id']]
     assert request(old_image)[0]==200 and request(package['download_url'])[0]==200
+    assert request(base+'/package','POST',{'reviewed_versions':reviewed})[0]==409
     assert len(list((engine.settings.output/'.cache'/'learning-runs'/rid).rglob('*.simulation.json')))==27
     before=copy.deepcopy(run['outputs'])
     assert request(base+'/baseline','POST',{'idempotency_key':'api-next-baseline'})[0]==200
@@ -78,6 +84,59 @@ def test_full_http_production_confirm_reuse_45_exports_single_versions_and_zip(p
     assert run['outputs']==before
     assert request(base+'/confirm','POST',{'baseline_version':1})[0]==409
     assert not engine.tasks
+
+
+@pytest.mark.parametrize('one_frozen_logo',[False,True],ids=['current','one-frozen-logo'])
+def test_learning_acceptance_switches_logo_without_changing_version_or_old_pack(production_learning_api,one_frozen_logo):
+    engine,request=production_learning_api
+    params={'channel':'学习机','t1':'不会的题拍一下','font':'none','ip':'none',
+            'pids':['learning-baidu-512x512','learning-bbg-cover-216x260']}
+    status,run=request('/api/learning-machine/runs','POST',{'params':params,'idempotency_key':'logo-review-create'})
+    assert status==200,run
+    rid=run['id'];base='/api/learning-machine/runs/'+rid
+    assert request(base+'/baseline','POST',{'idempotency_key':'logo-review-baseline'})[0]==200
+    run=settled(request,rid)
+    assert request(base+'/confirm','POST',{'baseline_version':run['baseline']['version']})[0]==200
+    assert request(base+'/expand','POST',{'idempotency_key':'logo-review-expand'})[0]==200
+    run=settled(request,rid)
+    assert run['status']=='completed',run.get('error')
+    row=next(o for o in run['outputs'] if o['logo_required'])
+    no_logo=next(o for o in run['outputs'] if not o['logo_required'])
+    first=row['logo_template']['asset_id']
+    asset='learning.logo.white-app' if first=='learning.logo.black' else 'learning.logo.black'
+    if one_frozen_logo:
+        runtime=engine.learning_runtime
+        with engine.lock:
+            saved=runtime._run(rid)
+            saved['logo_snapshot']['assets'].pop(asset)
+            runtime._save(saved)
+        run=request(base)[1]
+        row=next(o for o in run['outputs'] if o['logo_required'])
+    assert row['logo_review_switchable'] and not no_logo['logo_review_switchable']
+    versions={o['id']:o['version'] for o in run['outputs']}
+    old=request(base+'/package','POST',{'reviewed_versions':versions})[1]
+    old_bytes=request(old['download_url'])[1]
+    original=request(row['image_url'])[1];other=request(no_logo['image_url'])[1]
+    from urllib.parse import quote
+    route=base+'/outputs/'+quote(row['id'],safe='')+'/review-logo'
+    settings={'expected_version':row['version'],'expected_sha256':row['sha256'],'asset_id':asset}
+    status,changed=request(route,'POST',settings)
+    assert status==200,changed
+    active=next(o for o in changed['outputs'] if o['id']==row['id'])
+    image=request(active['image_url'])[1]
+    assert active['version']==row['version'] and active['logo_template']['asset_id']==asset and image!=original
+    assert request(no_logo['image_url'])[1]==other
+    assert request(route,'POST',settings)[0]==409
+    status,pack=request(base+'/package','POST',{'reviewed_versions':versions})
+    assert status==200 and pack['id']!=old['id']
+    with zipfile.ZipFile(BytesIO(request(pack['download_url'])[1])) as archive:
+        manifest=json.loads(archive.read('交付清单.json'))
+        item=next(entry for entry in manifest['images'] if entry['placement_id']==row['placement_id'])
+        assert item['logo_asset_id']==asset and archive.read(item['path'])==image
+    assert request(old['download_url'])[1]==old_bytes
+    status,reverted=request(route,'POST',{**settings,'expected_sha256':active['sha256'],'asset_id':first})
+    assert status==200
+    assert request(next(entry['image_url'] for entry in reverted['outputs'] if entry['id']==row['id']))[1]==original
 
 
 def test_current_runtime_static_and_missing_runs_are_safe(api):

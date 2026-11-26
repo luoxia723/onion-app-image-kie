@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageOps
 
 from kie_model import NANO_BANANA_REPAIR, NANO_REPAIR_SIZES
 from .config import UserError
-from .scene_planner import ApiScenePlanner, PlanningStopped, chat_content
+from .scene_planner import ApiScenePlanner, PlanningRequestError, PlanningStopped, chat_content
 
 MODEL = 'gpt-6-luna'
 TYPOGRAPHY = frozenset(('glyph', 'blur', 'wrong_text', 'missing', 'extra_button'))
@@ -51,9 +51,13 @@ def normalized(text):
     return re.sub(r'\s+', '', unicodedata.normalize('NFKC', text)).replace('。', '.')
 
 
+def _copy_fields(allowed):
+    return (('body', 't1'), ('subtitle', 'subtitle'), ('cta', 'cta')) if 'subtitle' in allowed else (('body', 't1'), ('cta', 'cta'))
+
+
 def text_matches(review, allowed):
     return all(normalized(review[field]) == normalized(allowed.get(key, ''))
-               for field, key in (('body', 't1'), ('cta', 'cta')))
+               for field, key in _copy_fields(allowed))
 
 
 def _image_part(image, size):
@@ -88,7 +92,8 @@ def _parse(response, allowed):
     value = json.loads(chat_content(response))
     if not isinstance(value, dict) or value.get('verdict') not in {'pass', 'repair', 'review'}:
         raise ValueError('invalid verdict')
-    if not all(isinstance(value.get(key), str) and len(value[key]) <= 2000 for key in ('body', 'cta')):
+    fields = [field for field, _ in _copy_fields(allowed)]
+    if not all(isinstance(value.get(key), str) and len(value[key]) <= 2000 for key in fields):
         raise ValueError('invalid reading')
     issues = value.get('issues')
     if not isinstance(issues, list) or len(issues) > 20:
@@ -100,10 +105,10 @@ def _parse(response, allowed):
             raise ValueError('invalid issue')
         clean_issues.append(dict(kind=item['kind'], target=item['target'][:80],
                                  where=item['where'][:180], detail=item['detail'][:300]))
-    result = dict(verdict=value['verdict'], body=value['body'], cta=value['cta'], issues=clean_issues, model=MODEL)
+    result = dict(verdict=value['verdict'], issues=clean_issues, model=MODEL) | {field:value[field] for field in fields}
     if isinstance(value.get('text_boxes'),dict):
         result['text_boxes']={key:box for key,box in value['text_boxes'].items()
-                              if key in ('body','cta') and isinstance(box,list) and len(box)==4
+                              if key in fields and isinstance(box,list) and len(box)==4
                               and all(type(n) in (int,float) and 0<=n<=1000 for n in box)}
     result['text_matches'] = text_matches(result, allowed)
     if result['verdict'] == 'pass' and (not result['text_matches'] or clean_issues):
@@ -111,7 +116,7 @@ def _parse(response, allowed):
     return result
 
 
-def inspect(settings, path, allowed, independent, reference, stopped,*,removed_module=None):
+def inspect(settings, path, allowed, independent, reference, stopped,*,removed_module=None,check_lettering=True):
     planner = ApiScenePlanner(settings, timeout=105)
     if independent:
         # No expected wording or first verdict is shown to the second reader.
@@ -119,6 +124,7 @@ def inspect(settings, path, allowed, independent, reference, stopped,*,removed_m
                      '按字面填色区域数笔画，忽略外圈描边和投影。字形不确定时报告疑点。')
     else:
         expected = {'正文': allowed.get('t1', ''), '按钮': allowed.get('cta', '')}
+        if 'subtitle' in allowed:expected['副标题']=allowed['subtitle']
         direction = '期望文案（空按钮表示不应出现独立按钮）=' + json.dumps(expected, ensure_ascii=False)
     if reference:
         direction += '。最后一张是修复前原图，只用来核对主要人物、动作、道具和画面是否遭到改变，不抄录它的文字。'
@@ -126,6 +132,11 @@ def inspect(settings, path, allowed, independent, reference, stopped,*,removed_m
     try:
         key, base, _ = planner.configuration()
         instructions=INSPECTION
+        if 'subtitle' in allowed:
+            instructions=instructions.replace('verdict、body、cta、issues、text_boxes','verdict、body、subtitle、cta、issues、text_boxes')
+            instructions+=('本任务正文分为主标题和副标题。body只抄录主标题，subtitle只抄录副标题；'
+                           '读取两项的实际文字及标点，缺失填空串。text_boxes也要分别返回body与subtitle矩形。'
+                           '当头部、手、道具或词句贴边或被截、排版拥挤影响投放时报告具体位置。')
         if removed_module:
             instructions+=REMOVAL_COMPOSITION_INSPECTION
             if removed_module=='cta':
@@ -137,14 +148,21 @@ def inspect(settings, path, allowed, independent, reference, stopped,*,removed_m
                        response_format={'type': 'json_object'}, stream=False)
         config=(key,base,MODEL)
         overview=_parse(planner._request(payload,config,stopped),allowed)
-        if allowed and not any(i['kind'] in ('glyph','blur') for i in overview['issues']):
+        if check_lettering and allowed and not any(i['kind'] in ('glyph','blur') for i in overview['issues']):
             _check_lettering(planner,config,overview,path,allowed,independent,stopped)
         return overview
     except PlanningStopped:
         raise
-    except (UserError, OSError, ValueError, KeyError, TypeError):
-        # Vendor payloads, exception text, and credentials are never persisted here.
-        return dict(verdict='unavailable', model=MODEL, issues=[])
+    except UserError as exc:
+        # Use only locally written gateway errors. Provider response bodies stay private.
+        transient=isinstance(exc,PlanningRequestError) and exc.retryable
+        if 'subtitle' in allowed:
+            message='审核接口暂时不可用。' if transient else '审核接口不可用，请检查模型设置与 Key。'
+            return dict(verdict='unavailable',model=MODEL,issues=[],retryable=transient,message=message)
+        return dict(verdict='unavailable',model=MODEL,issues=[])
+    except (OSError, ValueError, KeyError, TypeError):
+        if 'subtitle' in allowed:return dict(verdict='unavailable',model=MODEL,issues=[],retryable=True,message='审核返回的信息不完整。')
+        return dict(verdict='unavailable',model=MODEL,issues=[])
 
 
 def clean(review):
@@ -160,7 +178,7 @@ def focus_targets(allowed, *reviews):
     if len(reviews) != 2 or any(not r or r['verdict'] == 'unavailable' for r in reviews):
         return []
     targets = {}
-    for field, key in (('body', 't1'), ('cta', 'cta')):
+    for field, key in _copy_fields(allowed):
         expected = normalized(allowed.get(key, ''))
         for review in reviews:
             reading = normalized(review[field])
@@ -205,7 +223,7 @@ def _check_lettering(planner,config,overview,path,allowed,independent,stopped):
     """Readability and clean letterforms are separate release conditions."""
     with Image.open(path) as source:
         image=ImageOps.exif_transpose(source).convert('RGB')
-    fields=[field for field,key in (('body','t1'),('cta','cta')) if allowed.get(key) and overview[field]]
+    fields=[field for field,key in _copy_fields(allowed) if allowed.get(key) and overview[field]]
     if not fields:return
 
     def ask(prompt,*pictures):
@@ -222,8 +240,9 @@ def _check_lettering(planner,config,overview,path,allowed,independent,stopped):
     try:
         crops=checked_boxes(boxes)
     except (KeyError,ValueError):
-        boxes=ask('找出整块广告正文和独立按钮文字的外接框，包含全部行和描边。坐标0到1000，图像左上为原点。'
-                  '只返回JSON {"body":[左,上,右,下],"cta":[左,上,右,下]}，没有对应文字用null。',image)
+        fields_text='body 为主标题，subtitle 为副标题，cta 为独立按钮。' if 'subtitle' in allowed else 'body 为广告正文，cta 为独立按钮。'
+        boxes=ask('找出各文字块的外接框，包含全部行和描边。坐标0到1000，图像左上为原点。'+fields_text+
+                  '只返回以这些字段为键的JSON，值为[左,上,右,下]，没有对应文字用null。',image)
         crops=checked_boxes(boxes)
     results=[]
     for field,box in zip(fields,crops):
@@ -239,7 +258,7 @@ def _check_lettering(planner,config,overview,path,allowed,independent,stopped):
                 pictures.append(_zoom(tile))
             direction='图2和图3分别是图1上部和下部的近照。特别核对近照里黑色描边内或字孔中的不规则浅色块。'
         result=ask(LETTERING_INSPECTION+direction,*pictures)
-        proof=dict(body=overview['body'],cta=overview['cta'],verdict=result['verdict'],issues=result['issues'])
+        proof={field:overview[field] for field,_ in _copy_fields(allowed)} | dict(verdict=result['verdict'],issues=result['issues'])
         parsed=_parse({'choices':[{'message':{'content':json.dumps(proof)}}]},allowed)
         if any(i['kind'] not in ('glyph','blur') for i in parsed['issues']):
             raise ValueError('invalid lettering defect')

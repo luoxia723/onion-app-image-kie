@@ -11,10 +11,11 @@ function setup(service=async()=>({items:[],total:0,counts:{},next_cursor:null}))
  run(`PLACEMENTS=catalog;installLearningMachineConfig(config);render=()=>{};softRender=()=>{};toast=()=>{};report=()=>{};persistDraft=async()=>{};persistPromptDraft=async()=>{};request=(...args)=>{calls.push(args);return service(...args)};S.view='tasks'`);
  return {run,context,calls};
 }
-test('固定导航以实际端口标记本机服务，不混放草稿和历史任务',()=>{
+test('侧栏显示实际端口，顶栏显示连接状态',()=>{
  const {run}=setup();const html=run('viewWorkspaceSide()');
  assert.equal((html.match(/data-workspace-nav=/g)||[]).length,5);assert(html.includes('127.0.0.1:9876'));assert(!html.includes('draft-list'));
- run('S.connectionLost=true');assert(run('viewWorkspaceSide()').includes('本机服务未连接'));
+ assert(run('viewWorkspaceTopbar()').includes('本机服务已连接'));
+ run('S.connectionLost=true');assert(run('viewWorkspaceTopbar()').includes('无法连接本机服务'));
 });
 test('Logo模板入口列出应用商店、信息流和学习机，不只显示学习机模板',()=>{
  const {run}=setup();run('S.view="learning-logo"');const html=run('viewLearningLogoConfig()');
@@ -30,8 +31,8 @@ test('普通渠道Logo模板可筛选并保存位置，沿用独立修订且不�
  const put=calls.find(c=>c[1]==='PUT');assert.equal(put[0],'/logo-templates');assert.equal(put[2].revision,3);assert.equal(put[2].templates.length,19);
  assert.equal(put[2].templates.find(p=>p.placement_id==='weibo-current-single-1280x720').x,.07);
  assert.equal(run('JSON.stringify(LEARNING_MACHINE.templates)'),original);assert.equal(run('ORDINARY_LOGOS.revision'),4);assert.equal(run('PLACEMENTS.filter(p=>p.category==="信息流").length'),8);
- run('S.draft.channel="信息流";S.draft.pids=["weibo-current-single-1280x720"];setLogoSelection("learning.logo.black");setLogoSelection("template");S.visualOpen=true');
- assert.equal(run('S.draft.noLogo'),false);assert.equal(run('S.draft.logo_asset_id'),undefined);assert.match(run('viewVisualOptions(S.draft)'),/value="template" selected>按版位模板/);
+ run('S.draft.channel="信息流";S.draft.pids=["weibo-current-single-1280x720"];S.draft.logo_asset_id="learning.logo.black";setLogoSelection("auto");S.visualOpen=true');
+ assert.equal(run('S.draft.noLogo'),false);assert.equal(run('S.draft.logo_asset_id'),undefined);assert.match(run('viewVisualOptions(S.draft)'),/value="auto" selected>添加 Logo/);
 });
 test('Logo版位列表按八条翻页，渠道和搜索重置页码且保留编辑参数',()=>{
  const {run,context}=setup();const list={innerHTML:''};context.document.getElementById=id=>id==='learning-logo-directory-list'?list:null;

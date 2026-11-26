@@ -19,14 +19,14 @@
     },
     {
       "id": "learning.logo.white-app",
-      "label": "白字 APP 版",
+      "label": "白字反白版",
       "path": "assets/logos/learning-logo-white-app.png",
-      "width": 1412,
-      "height": 396,
-      "sha256": "4c7dd60a0a00ed5d8e4a70d83ba85729d86c8719ae9e1ab782931cef3536409d",
+      "width": 1799,
+      "height": 402,
+      "sha256": "e86b2ca2b534b51b8cf78db0b3d349ea85d03d0a71a1a32a2d647e1a904ce315",
       "source_path": "assets/logos/onion-logo-app-001.png",
-      "source_sha256": "35ba4b2fc718003244b844373bc3cb89da015d206babc2a36c1fa938fb1fa387",
-      "preparation": "原始深蓝底素材确定性去底；保留彩色IP与APP，不是黑字版同款反色",
+      "source_sha256": "50904480e3ad05ac9cc50bbc6b673079ed48a1a7acb70383f8815e36cbca310d",
+      "preparation": "用户提供的原始透明反白素材裁掉外围空白",
       "ai_generated": false
     }
   ],
@@ -278,5 +278,5 @@
     }
   },
   "source_content_version": 2,
-  "white_asset_note": "白版沿用原始白字APP组合，与黑字标准版不同；不冒称同款反色。"
+  "white_asset_note": "白字反白版使用用户提供的无 APP 标识原图，保留原始笔画和透明度。"
 }

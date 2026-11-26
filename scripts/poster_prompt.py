@@ -20,6 +20,10 @@ def compose(config,direction,slot,references):
     scene=direction['base_prompt_rule'] if slot==1 else direction['slot_prompt_rules'][str(slot)]
     action=(direction.get('learner_story') or {}).get('product_action','')
     if count==1 and action and action not in scene: scene+='。'+action
+    if config.get('ximalaya_variant'):
+        scene=('沿用参考图中同一广告的角色、场景、主要动作、道具、画风、配色和字形。'
+               '按目标画幅重新安排人物与文字，可调整机位、断行、字号与位置。留足边距，背景自然延伸到四边。'
+               '完整保留主标题、副标题和已列出的按钮文案，避免背景或人物盖住文字。')
     sections=[('任务',task_rule(config)),('画面描述',scene)]
     copy=[]
     learning=config.get('learning_copy')

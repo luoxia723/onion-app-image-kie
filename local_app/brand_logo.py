@@ -16,11 +16,13 @@ import uuid
 from PIL import Image
 
 from .config import ROOT, UserError
+from .logo_contrast import choose_variant
 
 CONFIG=ROOT/'config/learning-machine-logo-templates.json'
 ALIASES={'logo.onion.standard.001':'learning.logo.black','logo.onion.app.002':'learning.logo.white-app',
          'logo.onion.app.001':'learning.logo.white-app'}
 DEFAULT='learning.logo.black'
+REVIEW_LOGO_IDS=frozenset((DEFAULT,'learning.logo.white-app'))
 NEUTRAL_ROLE='只定比例，不提供人物、内容或画风；纯白是代码画幅辅助，不是用户参考或品牌素材'
 
 
@@ -78,7 +80,7 @@ def freeze(placement,selected_id,cache,*,enabled=True,generation_crop=None):
         frozen[aid]={k:record[k] for k in ('id','width','height','sha256')}|{'path':str(target)}
     w,h=placement['target_width'],placement['target_height']
     # One fixed rectangle comfortably fits both registered variants, without
-    # stretching either or allowing the taller APP mark to leave the canvas.
+    # stretching either or allowing a taller mark to leave the canvas.
     template=default_template(placement)
     if configured:
         from .logo_templates import _template
@@ -86,7 +88,7 @@ def freeze(placement,selected_id,cache,*,enabled=True,generation_crop=None):
         position=template['position'] if all(abs(geometry[k]-template[k])<1e-9 for k in geometry) else '指定品牌位置'
         template={**geometry,'position':position}
     result=dict(version=1,kind='code_layer',model_draws_logo=False,enabled=bool(enabled),
-        selected_asset_id=selected,assets=frozen,target_width=w,target_height=h,
+        selected_asset_id=selected,auto_variant=not bool(selected_id),assets=frozen,target_width=w,target_height=h,
         template=template,
         placement_id=placement['id'],source_contract='model_generated_without_logo')
     if generation_crop is not None:
@@ -136,15 +138,24 @@ def composite(source,target,snapshot,override_id=None):
     if image.size!=(snapshot['target_width'],snapshot['target_height']):raise UserError('Logo底图尺寸与冻结版位不一致')
     aid='';pixel_box=None
     if snapshot['enabled']:
-        aid,record,path=_checked_asset(snapshot,override_id)
-        with Image.open(path) as original:mark=original.convert('RGBA')
-        width=max(1,round(image.width*snapshot['template']['width']))
-        height=max(1,round(width*mark.height/mark.width))
-        mark=mark.resize((width,height),Image.Resampling.LANCZOS)
-        x=round(snapshot['template']['x']*image.width);y=round(snapshot['template']['y']*image.height)
-        if x<0 or y<0 or x+width>image.width or y+height>image.height:raise UserError('Logo位置超过图片边界')
+        template=snapshot['template']
+        selected=override_id or snapshot['selected_asset_id']
+        variants=[selected]
+        if not override_id and snapshot.get('auto_variant'):
+            variants.extend(aid for aid in snapshot['assets'] if aid!=selected)
+        width=max(1,round(image.width*template['width']))
+        x=round(template['x']*image.width);y=round(template['y']*image.height)
+        candidates=[]
+        for variant in variants:
+            aid,_,path=_checked_asset(snapshot,variant)
+            with Image.open(path) as original:
+                height=max(1,round(width*original.height/original.width))
+                mark=original.convert('RGBA').resize((width,height),Image.Resampling.LANCZOS)
+            if x<0 or y<0 or x+width>image.width or y+height>image.height:raise UserError('Logo位置超过图片边界')
+            candidates.append((aid,mark,(x,y)))
+        aid,mark,(x,y)=choose_variant(image,candidates)
         image.alpha_composite(mark,(x,y))
-        pixel_box=[x,y,width,height]
+        pixel_box=[x,y,mark.width,mark.height]
     Path(target).parent.mkdir(parents=True,exist_ok=True);image.save(target,'PNG')
     return dict(asset_id=aid,sha256=digest(target),logo_applied=bool(aid),pixel_box=pixel_box)
 
@@ -172,6 +183,49 @@ def switchable(slot):
     return bool(slot.get('state')=='done' and slot.get('delivery_eligible',True)
                 and layer and layer.get('kind')=='code_layer' and layer.get('source_contract')=='model_generated_without_logo'
                 and base and base.get('without_logo') and Path(base['path']).is_file())
+
+
+def review_switchable(slot):
+    layer=slot.get('brand_logo_layer') or {}
+    return bool(layer.get('enabled') and slot.get('delivery_logo_asset_id') in REVIEW_LOGO_IDS
+                and REVIEW_LOGO_IDS<=layer.get('assets',{}).keys() and switchable(slot))
+
+
+def reviewed_image(row,file_key='jpeg'):
+    """Project the selected local rendition without changing the artwork version."""
+    choice=row.get('logo_review')
+    if not choice:return row
+    result={**row,file_key:choice['path'],'sha256':choice['sha256']}
+    if file_key=='jpeg':result['delivery_logo_asset_id']=choice['asset_id']
+    else:result.update(logo_template={**row['logo_template'],'asset_id':choice['asset_id']},logo_asset_sha256=choice['asset_sha256'])
+    return result
+
+
+def review_query(row):
+    choice=row.get('logo_review')
+    return '&review_logo='+choice['sha256'] if choice else ''
+
+
+def review_file(row,selection,file_key='jpeg'):
+    if selection is None:return row[file_key]
+    choice=row.get('logo_review') or {}
+    if not selection or choice.get('sha256')!=selection:
+        raise UserError('Logo 款式已更新，请刷新图片后查看',409)
+    return choice['path']
+
+
+def store_review_logo(path,sha256,asset_id,asset_sha256):
+    """Keep the reviewed bytes independent of any regenerated export cache."""
+    source=Path(path);data=source.read_bytes()
+    if hashlib.sha256(data).hexdigest()!=sha256:raise UserError('Logo 合成文件已变化，请重新切换',409)
+    target=source.with_name('review-'+sha256+source.suffix)
+    if not target.is_file() or digest(target)!=sha256:
+        temporary=target.with_name(target.name+'.'+uuid.uuid4().hex+'.tmp')
+        try:
+            temporary.write_bytes(data)
+            temporary.replace(target)
+        finally:temporary.unlink(missing_ok=True)
+    return {'path':str(target),'sha256':sha256,'asset_id':asset_id,'asset_sha256':asset_sha256}
 
 
 def capability(slots):

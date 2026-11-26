@@ -41,7 +41,7 @@
 - 来源普通图：`{kind:ordinary,task_id,image_ids,atts,use_raw?}`；来源学习机：`{kind:learning,run_id,baseline:true,baseline_version}`或`{kind:learning,run_id,output_ids,versions}`。
 - 批次沿用`/api/learning-machine/runs/{id}`的读取、`expand`、图片和图包路由，内部共用持久化与队列；前端按`kind/target_kind`区分呈现。
 - `POST /api/learning-machine/runs/{id}/masters/{master_id}/regenerate`：提交`idempotency_key`和当前`expected_version`，重新生成整组母版并重新导出该组全部目标；原母版、各输出及旧ZIP保留。状态不明时界面使用原键恢复查询，成功后下一次重试使用新键。仍支持现有单张重出。
-- 图片、回执、Logo素材、规格及裁切计划均按新批次冻结。黑白Logo导出沿用独立图层合同，不再生图。
+- 图片、回执、Logo素材、规格及裁切计划均按新批次冻结。Logo 按各张目标图的落点自动选色，沿用独立图层合同。
 
 ## 验证边界
 

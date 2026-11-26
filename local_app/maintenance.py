@@ -78,7 +78,8 @@ class MaintenanceMixin:
         owners={};protected=set();candidates=[];assigned=set()
         def paths(v):
             return {str(Path(x).resolve()) for x in (v.get('output'),v.get('jpeg'),
-                                                    (v.get('logo_base') or {}).get('path')) if x}
+                                                    (v.get('logo_base') or {}).get('path'),
+                                                    (v.get('logo_review') or {}).get('path')) if x}
         for t in tasks:
             used={(i['id'],i['att']) for p in t['pkgs'] for i in p['images']}
             selected={(sid,att) for versions in (r['adopted_versions'] for r in t['rounds']) for vv in versions.values() for sid,att in vv.items()}
@@ -217,7 +218,7 @@ class MaintenanceMixin:
                             if not v.get('files_cleared') and v['state']=='done':
                                 for key in ('output','jpeg'):
                                     if v.get(key) and not Path(v[key]).is_file():missing.append(v[key])
-                                logo_paths=[(v.get('logo_base') or {}).get('path')]
+                                logo_paths=[(v.get('logo_base') or {}).get('path'),(v.get('logo_review') or {}).get('path')]
                                 logo_paths.extend(a.get('path') for a in (v.get('brand_logo_layer') or {}).get('assets',{}).values())
                                 missing.extend(p for p in logo_paths if p and not Path(p).is_file())
             indexed={str(Path(p['path']).resolve()) for t in tasks for p in t['pkgs']}
@@ -340,7 +341,10 @@ class MaintenanceMixin:
                             r['paused']=True;r['stop_marker']=str(folder/(r['id']+'-STOP'))
                             if r.get('planning_status')=='running':r['planning_status']='queued'
                             for s in r['slots']:
-                                if s['state']=='generating':s.update(state='failed',reason_code='unknown',msg='从备份恢复，请先查询原任务')
+                                if s['state']=='generating':
+                                    if s.get('local_result_sha256') or s.get('ximalaya_review',{}).get('status') in ('pending','export_pending'):
+                                        s['state']='queued';s.pop('resume',None)
+                                    else:s.update(state='failed',reason_code='unknown',msg='从备份恢复，请先查询原任务')
                         for rr in t['rounds']:
                             for ss in rr['slots']:
                                 for vv in [ss,*ss['versions']]:

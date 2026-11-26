@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function setup(){
- const app={innerHTML:''};const ctx=vm.createContext({document:{activeElement:null,querySelector:s=>s==='#app'?app:null,addEventListener(){}},window:{},
+ const app={innerHTML:''};const ctx=vm.createContext({document:{activeElement:null,querySelector:s=>s==='#app'?app:null,querySelectorAll(){return[]},addEventListener(){}},window:{},
   S:{view:'dl',tasks:[],summaries:[],drafts:[],draft:{}},CFG:{},LOGO:{thumb:'logo'},PLACEMENTS:[],
   updTimers(){},task:{id:'task',name:'洋葱一拍',pkg:'APP_旧包名',ri:0,rounds:[{id:'r',params:{pids:[],image_form:'单图'},slots:[],sel:{}}],pkgs:[{id:'package',v:1,zip:'旧文件名.zip',created_at:100,images:[{id:'image',att:2,thumbnail_url:'thumb.png'}]}]}});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/js/views.js'),'utf8'),ctx);

@@ -77,12 +77,15 @@ def main():
         state_path=render.task_state_path(output)
         state=json.loads(state_path.read_text()) if state_path.exists() else {}
         unknown=(bool(state.get('task_id')) and state.get('status')!='fail' and not isinstance(exc,render.GenerationTimeout)) or state.get('status') in ('submitting','submit_uncertain') or (isinstance(exc,render.KieError) and getattr(exc,'uncertain_submit',False))
-        rate_limited=('HTTP 429' in str(exc) or 'failed (429)' in str(exc)) and not state.get('task_id')
+        code=render.definite_rejection_code(exc)
+        rate_limited=code==429 and not state.get('task_id') and not getattr(exc,'uncertain_submit',False)
         if rate_limited:
             state['status']='rate_limited'
             render.atomic_write_json(state_path,state)
         from local_app.kie_client import ImageExecutionBusy
         reason='busy' if isinstance(exc,ImageExecutionBusy) else 'disk_full' if getattr(exc,'status',None)==507 else 'stopped' if str(exc)=='onion_stopped' else 'rate_limited' if rate_limited else 'unknown' if unknown else 'timeout' if isinstance(exc,render.GenerationTimeout) else 'no_image'
+        if state.get('definite_rejection') and not rate_limited:
+            reason='authentication_failed' if code in (401,403) else 'insufficient_credits' if code==402 else 'request_rejected'
         if isinstance(exc,ValueError) and 'prompt' in str(exc).lower(): reason='prompt_rejected'
         # Provider response bodies are deliberately never forwarded or logged.
         render.atomic_write_json(result_file,{'ok':False,'reason':reason,'state':state,'failed_references':failed_references})

@@ -22,6 +22,8 @@ from .scene_planner import ApiScenePlanner, PlanningStopped, chat_content, valid
 import render
 from kie_model import MODELS, NANO_BANANA_REPAIR, NANO_REPAIR_SIZES, aspect_ratios, normalize_model
 
+BASELINE_REFERENCE_NOTE='\n参考图1是本机生成的纯白画幅辅助图，只提供宽高比例，不提供人物、内容或画风；按已确认画面规划完整创作。'
+
 
 class LearningExecutionError(UserError):
     """Safe execution failure; receipts stay on disk for a query-only recovery."""
@@ -271,7 +273,7 @@ class LearningExecutor:
             a,b=map(int,ratio.split(':'));neutral=output.with_suffix('.neutral-reference.png')
             if not neutral.exists():Image.new('RGB',(a*32,b*32),'white').save(neutral,'PNG')
             paths=[neutral]
-            prompt+='\n参考图1是本机生成的纯白画幅辅助图，只提供宽高比例，不提供人物、内容或画风；按已确认画面规划完整创作。'
+            prompt+=BASELINE_REFERENCE_NOTE
             rows=[dict(slot=1,kind='neutral_canvas',purpose='仅确定画幅比例，不提供画风或内容',path=str(neutral))]
         actual_refs=[{**row,'path':str(path),'sha256':_digest(path)} for row,path in zip(rows,paths)]
         audit=dict(actual_prompt=prompt,reference_bindings=actual_refs)
@@ -294,6 +296,11 @@ class LearningExecutor:
             raise LearningExecutionError('已有执行记录无法安全重提，请保留记录并恢复查询',reason_code='unknown',query_required=True,state=_safe_state(old)) from None
         if state and state.get('fingerprint')!=fingerprint:
             raise LearningExecutionError('本版本的提示词或素材已变化，不能覆盖已有执行记录',reason_code='fingerprint_mismatch',query_required=True,state=_safe_state(state))
+        if job.get('query_task_id') and state.get('task_id')!=job['query_task_id']:
+            raise LearningExecutionError('原 KIE 任务回执已变化，请重新核对',reason_code='receipt_changed',query_required=True)
+        if job.get('recover_existing') and not state.get('task_id') and not render.confirmed_unaccepted(state):
+            from .kie_recovery import BLOCKED_RECEIPT_MESSAGE
+            raise LearningExecutionError(BLOCKED_RECEIPT_MESSAGE,reason_code='receipt_missing',query_required=True)
         if state.get('status')=='downloaded' and output.is_file() and _digest(output)==state.get('sha256'):
             for field in ('provider_original_path','provider_original_sha256'):
                 if field in state:audit[field]=state[field]
@@ -302,7 +309,7 @@ class LearningExecutor:
         timeout=job.get('poll_timeout',240)
         if type(timeout) not in (int,float) or not 0<timeout<=3600:raise UserError('图片查询超时配置不正确')
         submitted=state.get('submitted_at');poll_timeout=timeout+(max(0,time.time()-submitted) if type(submitted) in (int,float) else 0)
-        args=SimpleNamespace(image_model=model,retries=1,poll_timeout=poll_timeout,max_timeout_restarts=0)
+        args=SimpleNamespace(image_model=model,retries=1,poll_timeout=poll_timeout)
         deadline=time.monotonic()+timeout
         cache_path=Path(job.get('upload_cache') or output.parent/'reference-upload-cache.json')
         cache_scope=hashlib.sha256((upload_base+'\0'+api_key).encode()).hexdigest()
@@ -357,11 +364,7 @@ class LearningExecutor:
         try:
             url,state=render.obtain_result(args,api_base,upload_base,api_key,prompt,paths,fingerprint,state_path,state,ratio,'1K',request_fn=request,upload_fn=upload)
             _check_stop(stop_event,marker)
-            try:render.download_image(url,output)
-            except render.ResultLinkExpired:
-                state.pop('result_url',None);state['status']='waiting';render.atomic_write_json(state_path,state)
-                url,state=render.obtain_result(args,api_base,upload_base,api_key,prompt,paths,fingerprint,state_path,state,ratio,'1K',request_fn=request,upload_fn=upload)
-                render.download_image(url,output)
+            render.download_kie_result(url,output,api_base,api_key,state['task_id'])
             _check_stop(stop_event,marker)
             with Image.open(output) as image:
                 image.verify();width,height=image.size

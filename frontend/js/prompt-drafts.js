@@ -39,6 +39,7 @@ async function pvRedo(){
  const s=curPvSlot();if(!s||s.is_historical)return;if(R()?.generation_disabled||s.generation_disabled)return toast('此制作流程已停用，请按新规则重新制作');const retry=imageRetry(R(),s);
  if(retry.blocked)return openPv(retry.head.id);
  if(retry.query){await resumeImage(s.id);return closePv()}
+ if(R()?.params?.ximalaya_suite){await action('regenerate',{image_id:s.id,expected_att:s.att});return closePv()}
  if(s.production_mode==='local_resize'){await action('regenerate',{image_id:s.id,expected_att:s.att});return closePv()}
  await persistPromptDraft();await action('regenerate',{image_id:s.id,expected_att:s.att,prompt:$('#pvPrompt').value});S.promptDraft=null;await closePv();
 }

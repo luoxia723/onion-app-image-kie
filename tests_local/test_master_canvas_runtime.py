@@ -47,6 +47,15 @@ def test_one_application_canvas_creates_three_exact_jpegs_and_switchable_logos(e
                 assert item['path'].endswith('.jpg') and bz.read(item['path'])!=wz.read(item['path'])
                 with Image.open(BytesIO(wz.read(item['path']))) as im:assert im.size==(item['width'],item['height'])
         assert task==old and len(executor.jobs)==1
+        row=next(output for output in done['outputs'] if output.get('logo_review_switchable'))
+        first=row['logo_template']['asset_id']
+        choice='learning.logo.black' if first=='learning.logo.white-app' else 'learning.logo.white-app'
+        changed=runtime.review_output_logo(rid,row['id'],{'expected_version':row['version'],'expected_sha256':row['sha256'],'asset_id':choice})
+        active=next(item for item in changed['outputs'] if item['id']==row['id'])
+        assert active['version']==row['version'] and active['logo_template']['asset_id']==choice
+        with Image.open(runtime.image(rid,'output',row['id'],row['version'],active['sha256'])) as reviewed:
+            assert reviewed.format=='JPEG' and reviewed.size==(row['width'],row['height'])
+        assert len(executor.jobs)==1
         with pytest.raises(UserError):runtime.generate_baseline(rid,'cannot-regenerate-source')
     finally:runtime.close()
 

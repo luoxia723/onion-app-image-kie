@@ -44,11 +44,13 @@ test('学习机基准和单图来源锁定当前版本，选择对话框不提�
  execute('closeMasterCanvasDialog();openMasterCanvasFromLearningOutput("one",1)');assert.equal(execute('S.masterCanvasDialog'),null);
  execute('openMasterCanvasFromLearningOutput("one",2)');assert.equal(execute('S.masterCanvasDialog.source.versions.one'),2);assert.equal(execute('S.masterCanvasDialog.targets.length'),44);assert.equal(calls.length,0);
 });
-test('shared运行显示完整来源/文案/裁切计划，隐藏无文案基准动作且沿用图包Logo控件',async()=>{
+test('共用母版显示完整来源、文案和裁切计划，直接保存各图成品',async()=>{
  const calls=[];const {context,execute}=setup(async(path,method,body)=>{calls.push({path,body});return context.run});context.run=sharedRun({outputs:[{id:'target::1',placement_id:'target',platform:'OPPO',name:'冻结目标',width:474,height:768,status:'not_generated',version:0}]});
  execute('installLearningRun(run);S.cur=null;S.view="learning-run"');let html=execute('viewLearningRun()');assert(html.includes('来源图与共用母版'));assert(html.includes('/source1.png'));assert(html.includes('/source2.png'));assert(html.includes('生成共用母版'));assert(html.includes('预计新增2次图片模型调用'));assert(html.includes('第一句 &lt;script&gt;不可执行&lt;/script&gt;'));assert(html.includes('第二句'));assert(html.includes('冻结确认文字')||html.includes('冻结的确认文字'));assert(html.includes('474×768'));assert(!html.includes('<script>'));
  for(const id of ['learning-run-baseline','learning-run-confirm','learning-run-from-baseline'])assert(!html.includes('id="'+id+'"'),id);
- assert(html.includes('id="learning-export-logo"'));assert(!html.includes('历史来源原提示词'));assert(!execute('viewLearningRunHead()').includes('学习机制作'));assert(execute('viewLearningRunList()').includes('母版适配'));
+ assert(!html.includes('id="learning-run-package"'));assert(!html.includes('历史来源原提示词'));assert(!execute('viewLearningRunHead()').includes('学习机制作'));assert(execute('viewLearningRunList()').includes('母版适配'));
+ execute('setLearningStage("results")');html=execute('viewLearningRun()');
+ assert(html.includes('id="learning-run-package"'));assert(!html.includes('id="learning-export-logo"'));
  assert(!html.includes('id="learning-refresh-logos"'));
  await execute('refreshLearningRunLogos()');assert.equal(calls.length,0);
  await execute('learningRunAction("baseline")');await execute('learningRunAction("confirm")');await execute('makeLearningRunFromBaseline()');assert.equal(calls.length,0);

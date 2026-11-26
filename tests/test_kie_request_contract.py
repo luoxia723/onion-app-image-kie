@@ -6,8 +6,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 import render
 
-REFERENCE = Path(__file__).parents[1] / "assets/font-references/字体参考-01.png"
-
 
 def test_request_matches_provider_contract():
     request=render.build_create_request(render.DEFAULT_API_BASE,'fake','prompt','9:16','1K',['https://example.invalid/ref.png'])
@@ -38,5 +36,3 @@ def test_geometry_flags_tall_ximalaya_and_uses_1k_only_ratios():
     assert geometry_report(1200,480)['needs_safe_area']
     assert geometry_report(690,360)['needs_safe_area']
     assert not geometry_report(474,768)['needs_safe_area']
-    with pytest.raises(ValueError,match='conflicts'):
-        render.generation_geometry('720x1559','16:9')

@@ -8,6 +8,7 @@ import re
 import time
 import tempfile
 from .config import UserError
+from . import ximalaya
 
 
 def suite_key(pid,n): return str(pid)+'::'+str(n)
@@ -144,17 +145,21 @@ class StateMixin:
 
     def delivery_state(self,t,r):
         groups={}
-        for s in r['slots']: groups.setdefault(suite_key(s['pid'],s['set']),[]).append(s)
+        for s in r['slots']: groups.setdefault(suite_key(ximalaya.selection_pid(r,s['pid']),s['set']),[]).append(s)
         selected=[(k,groups.get(k,[])) for k,chosen in r['sel'].items() if chosen]
         ready=[];incomplete=[]
         for key,sl in selected:
             expected=r['adopted_versions'].get(key,{})
             count=self.placement(t,r,sl[0])['image_count'] if sl else 0
             complete=bool(sl) and len(sl)==count and sorted(s['idx'] for s in sl)==list(range(1,count+1))
+            selected_placements=ximalaya.placements(r['params'])
+            if selected_placements and key.split('::')[0]==selected_placements[0]:
+                complete=ximalaya.complete(sl,r['simulation'],selected_placements)
             valid=complete and all(s['state']=='done' and expected.get(s['id'])==s['att'] and s.get('delivery_eligible',True)
                       and s.get('jpeg') and Path(s['jpeg']).is_file() for s in sl)
             (ready if valid else incomplete).append((key,sl))
-        images=[s for _,sl in ready for s in sl]
+        from .brand_logo import reviewed_image
+        images=[reviewed_image(s) for _,sl in ready for s in sl]
         ready_fp=content_fingerprint(images) if images else None
         fp=ready_fp if selected and not incomplete else None
         history=next((p for p in t['pkgs'] if p['id']==t.get('last_exported_package_id')),None)
@@ -165,7 +170,7 @@ class StateMixin:
         # the exact exported image bytes and selected registered Logo.
         matching=next((p for p in available if p.get('source_fingerprint',p['fingerprint'])==fp),None) if fp else None
         ready_matching=next((p for p in available if p.get('source_fingerprint',p['fingerprint'])==ready_fp),None) if ready_fp else None
-        coverage={sl[0]['pid'] for _,sl in ready}
+        coverage={s['pid'] for s in images}
         return dict(selected_sets=len(selected),ready_sets=len(ready),incomplete_sets=len(incomplete),
             ready_images=len(images),can_export=bool(selected) and not incomplete,
             can_export_ready=bool(ready),

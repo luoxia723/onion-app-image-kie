@@ -87,6 +87,10 @@ def logo_assets(path: Path = ASSET_MANIFEST) -> list[dict[str, Any]]:
     return [asset for asset in load_asset_manifest(path) if asset.get("kind") == "logo"]
 
 
+def _logo_names(asset):
+    return (str(asset.get("display_name") or ""), *asset.get("aliases", []))
+
+
 def resolve_logo_selection(
     config: dict[str, Any] | None,
     manifest_path: Path = ASSET_MANIFEST,
@@ -110,7 +114,7 @@ def resolve_logo_selection(
     elif submitted_path:
         matches = [asset for asset in assets if str(asset.get("path") or "") == submitted_path]
     elif name:
-        matches = [asset for asset in assets if str(asset.get("display_name") or "") == name]
+        matches = [asset for asset in assets if name in _logo_names(asset)]
 
     if len(matches) != 1:
         raise ValueError("Logo 选择无法唯一匹配 asset-manifest.json")
@@ -119,7 +123,7 @@ def resolve_logo_selection(
     expected_id = str(asset.get("asset_id") or "")
     expected_path = str(asset.get("path") or "")
     expected_name = str(asset.get("display_name") or "")
-    if name and name not in {"不用", "不用 Logo", "无", "none", "None"} and name != expected_name:
+    if name and name not in {"不用", "不用 Logo", "无", "none", "None"} and name not in _logo_names(asset):
         raise ValueError(f"Logo 名称与 asset_id 不匹配：{name} != {expected_name}")
     if submitted_path and submitted_path != expected_path:
         raise ValueError(

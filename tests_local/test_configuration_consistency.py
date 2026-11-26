@@ -210,14 +210,15 @@ def test_adding_a_placement_to_old_round_draws_a_new_style(app):
 @pytest.mark.parametrize('mode',['random','full_random'])
 def test_ip_draw_covers_roles_across_placements(tmp_path,mode):
     from local_app.planning import ip_role
-    pr=params();pr.update(sets=2,ip=mode)
-    pr['pids']=[p['id'] for p in PLACEMENTS if p['image_form']=='单图'][:5]
-    r=make_round(pr,'ip-draw',tmp_path,1,True,defer_planning=True)
     roles={ip_role(a['asset_id']) for a in ASSETS if a['kind']=='ip' and a.get('enabled',True)}
-    assigned=[ip_role(e['config']['ip_asset_id']) for e in r['configs']]
     expected=roles|({''} if mode=='full_random' else set())
-    assert len(expected)==(10 if mode=='full_random' else 9)
-    assert set(assigned)==expected and len(set(assigned[:len(expected)]))==len(expected)
+    ordinary_pids=[p['id'] for p in PLACEMENTS if p['image_form']=='单图' and not p.get('learning_rule')][:5]
+    pr=params();pr.update(sets=len(expected)//len(ordinary_pids)+1,ip=mode,pids=ordinary_pids)
+    r=make_round(pr,'ip-draw',tmp_path,1,True,defer_planning=True)
+    assigned=[ip_role(e['config']['ip_asset_id']) for e in r['configs']]
+    assert len(assigned)>len(expected)
+    assert set(assigned[:len(expected)])==expected
+    assert assigned[-1] in expected
     compile_plans(r,FixturePlanner().plan(r,lambda _:None))
     for slot,entry in zip(r['slots'],r['configs']):
         ip=entry['config']['ip_asset_id']

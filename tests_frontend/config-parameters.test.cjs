@@ -19,7 +19,7 @@ test('提交沿用原接口，channel、默认按钮开关和三种覆盖写入p
     if(url==='/tasks'){submitted=body;return {id:'task',rounds:[{params:body.params,slots:[]}],pkgs:[]}}
     return {revision:2};
   });
-  const ids=placements.filter(p=>p.category==='信息流').slice(0,3).map(p=>p.id);ctx.ids=ids;
+  const ids=placements.filter(p=>p.category==='信息流'&&p.platform!=='喜马拉雅').map(p=>p.id);ctx.ids=ids;
   run('CFG={planningKey:true,simulation:true,imageModel:"model"};S.draftId="draft";loadDraft({...defParams(),channel:"信息流",t1:"标题",t2:"副标题",pids:ids,cta:"立即体验",cta_enabled:false});setCtaOverride(ids[0],"inherit");setCtaOverride(ids[1],"custom","马上听");setCtaOverride(ids[2],"none")');
   await run('startGen()');
   assert.equal(submitted.draft_id,'draft');assert.equal(submitted.params.channel,'信息流');

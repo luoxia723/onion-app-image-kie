@@ -189,14 +189,14 @@ def freeze_adaptation(engine,params,run_dir,*,source_runtime=None):
                 source_key=source['sha256'],allowed_text=allowed,content_signature=allowed,
                 visible_box=[0,0,1,1-masks[pid]['height_fraction']] if masks[pid]['enabled'] else [0,0,1,1]))
     geometry=master_canvas.plan(targets,model)
-    logo=learning_logo.freeze_templates(engine.settings,ids,Path(run_dir)) if learning else dict(schema_version=1,revision=1,assets={},placements={})
+    logo=learning_logo.freeze_templates(engine.settings,ids,Path(run_dir)) if learning else dict(schema_version=1,revision=1,auto_variant=True,assets={},placements={})
     if not learning:
         from .logo_templates import snapshot as logo_template_snapshot
         configured=logo_template_snapshot(engine)
         logo['revision']=configured['revision']
         for pid,p in placements.items():
             if pid in configured['templates']:p['brand_logo_template']=copy.deepcopy(configured['templates'][pid])
-            layer=brand_logo.freeze(p,original.get('logo_asset_id'),run_dir,enabled=p['modules']['logo'])
+            layer=brand_logo.freeze(p,None,run_dir,enabled=p['modules']['logo'])
             template={k:layer['template'][k] for k in ('x','y','width')};template['asset_id']=layer['selected_asset_id']
             logo['placements'][pid]=dict(id=pid,target_width=p['target_width'],target_height=p['target_height'],logo_required=p['modules']['logo'],logo_template=template)
             for aid,asset in layer['assets'].items():

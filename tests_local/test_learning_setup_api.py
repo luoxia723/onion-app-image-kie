@@ -239,6 +239,11 @@ def test_retired_upload_and_old_generation_routes_do_not_call_providers(api,path
     assert status==409 and '基准' in value['message_zh'] and not engine.tasks
 
 
+def test_retired_upload_layout_sample_route_is_gone(api):
+    _,request=api
+    assert request('/api/learning-samples/learning-bbg-cover-400x480')[0]==404
+
+
 def test_preview_uses_registered_reference_not_a_client_local_path(api):
     engine,request=api;data=BytesIO();Image.new('RGB',(16,12),'#56789a').save(data,'PNG')
     raw=data.getvalue();rid=hashlib.sha256(raw).hexdigest();folder=engine.settings.state_dir/'uploads';folder.mkdir(exist_ok=True);(folder/(rid+'.png')).write_bytes(raw)

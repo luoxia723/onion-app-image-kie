@@ -1,11 +1,12 @@
 import copy
 import hashlib
+from io import BytesIO
 import json
 from pathlib import Path
 import socket
 import zipfile
 
-from PIL import Image
+from PIL import Image, ImageDraw
 import pytest
 
 from local_app import brand_logo
@@ -14,6 +15,7 @@ from local_app.engine import Engine
 from local_app.planning import BY_ID,STYLES,bootstrap,compile_plans
 from local_app.quality import verify_saved_package
 from tests_local.fakes import FixturePlanner
+from tests_local.test_learning_setup_api import api
 
 
 @pytest.fixture
@@ -87,6 +89,23 @@ def test_materialization_keeps_exact_unbranded_base_and_independent_logo(engine)
     assert details['logo_switchable'] and 'brand_logo_layer' not in details and 'logo_base' not in details
 
 
+def test_ordinary_automatic_logo_uses_the_wordmark_area_not_the_whole_image(tmp_path):
+    placement=dict(id='contrast-test',target_width=480,target_height=240,output_format='PNG')
+    layer=brand_logo.freeze(placement,None,tmp_path)
+    source=tmp_path/'source.png';target=tmp_path/'result.png'
+    image=Image.new('RGB',(480,240),'#ddd4ac')
+    x=round(layer['template']['x']*480);y=round(layer['template']['y']*240)
+    w=round(layer['template']['width']*480)
+    ImageDraw.Draw(image).rectangle((x+w//4,y,x+w,y+w//4),fill='#20274e')
+    image.save(source)
+    result=brand_logo.render_delivery(source,target,placement,layer)
+    assert result['asset_id']=='learning.logo.white-app'
+    assert result['pixel_box'][:2]==[x,y]
+    with Image.open(target) as rendered:
+        assert rendered.size==(480,240)
+        assert rendered.getpixel((400,180))[:3]==image.getpixel((400,180))
+
+
 def test_export_variant_changes_actual_bytes_and_choice_but_keeps_old_zip_and_artwork(engine):
     task,round=ready(engine);tid=task['id'];slot=round['slots'][0]
     old_slot=copy.deepcopy(slot);black=engine.package(tid,0)
@@ -110,6 +129,37 @@ def test_export_variant_changes_actual_bytes_and_choice_but_keeps_old_zip_and_ar
         assert hashlib.sha256(actual).hexdigest()==manifest['images'][0]['sha256']
         assert actual!=Path(slot['jpeg']).read_bytes()
     verify_saved_package(white['path'],white['fingerprint'],engine.placement_rules(task,round))
+
+def test_review_logo_uses_the_same_bytes_in_preview_and_a_new_zip(api):
+    engine,request=api
+    task,round=ready(engine);slot=round['slots'][0];tid=task['id'];sid=slot['id']
+    base='/api/tasks/'+tid
+    original=Path(slot['jpeg']).read_bytes()
+    old=engine.package(tid,0)
+    old_archive=Path(old['path']).read_bytes()
+    body={'image_id':sid,'expected_att':slot['att'],'expected_sha256':slot['sha256'],'asset_id':'learning.logo.white-app'}
+    status,updated=request(base+'/review-logo','POST',body)
+    assert status==200,updated
+    image=updated['rounds'][0]['slots'][0]
+    status,preview=request(image['image_url'])
+    assert status==200 and preview!=original and image['att']==slot['att']
+    assert Path(slot['jpeg']).read_bytes()==original and image['delivery_logo_asset_id']==body['asset_id']
+    assert request(base+'/review-logo','POST',body)[0]==409
+    status,pkg=request(base+'/packages','POST',{'round':0})
+    assert status==200 and pkg['package_id']!=old['id']
+    status,archive_bytes=request(pkg['download_url'])
+    with zipfile.ZipFile(BytesIO(archive_bytes)) as archive:
+        item=json.loads(archive.read('交付清单.json'))['images'][0]
+        assert status==200 and item['logo_asset_id']==body['asset_id'] and archive.read(item['path'])==preview
+    assert Path(old['path']).read_bytes()==old_archive
+    assert request(updated['pkgs'][0]['images'][0]['thumbnail_url'])[1]==original
+    status,reverted=request(base+'/review-logo','POST',{**body,'asset_id':slot['delivery_logo_asset_id'],'expected_sha256':image['sha256']})
+    assert status==200 and request(reverted['rounds'][0]['slots'][0]['image_url'])[1]==original
+    no_logo_task,no_logo_round=ready(engine,noLogo=True)
+    excluded=no_logo_round['slots'][0]
+    assert not engine.public(no_logo_task)['rounds'][0]['slots'][0]['logo_review_switchable']
+    assert request('/api/tasks/'+no_logo_task['id']+'/review-logo','POST',
+                   {**body,'image_id':excluded['id'],'expected_att':excluded['att'],'expected_sha256':excluded['sha256']})[0]==409
 
 
 @pytest.mark.history

@@ -51,20 +51,24 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(value,dict): raise UserError('请求格式不正确')
         return value
 
-    def file(self,path,download=None):
+    def file(self,path,download=None,*,archive_integrity=None):
         path=Path(path)
-        if not path.is_file(): raise UserError('文件不存在',404)
-        self.send_response(200)
-        self.send_header('Content-Type',mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
-        self.send_header('Content-Length',str(path.stat().st_size))
-        self.send_header('X-Content-Type-Options','nosniff')
-        self.send_header('Cache-Control','no-store')
-        if download:
-            from urllib.parse import quote
-            self.send_header('Content-Disposition',"attachment; filename*=UTF-8''"+quote(download))
-        self.end_headers()
-        with path.open('rb') as f:
-            while block:=f.read(65536): self.wfile.write(block)
+        try:opened=path.open('rb')
+        except (FileNotFoundError,IsADirectoryError):raise UserError('文件不存在',404) from None
+        with opened:
+            if archive_integrity:
+                verify_saved_package(opened,*archive_integrity)
+                opened.seek(0)
+            self.send_response(200)
+            self.send_header('Content-Type',mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
+            self.send_header('Content-Length',str(os.fstat(opened.fileno()).st_size))
+            self.send_header('X-Content-Type-Options','nosniff')
+            self.send_header('Cache-Control','no-store')
+            if download:
+                from urllib.parse import quote
+                self.send_header('Content-Disposition',"attachment; filename*=UTF-8''"+quote(download))
+            self.end_headers()
+            while block:=opened.read(65536): self.wfile.write(block)
 
     def handle_api(self):
         host=self.headers.get('Host','')
@@ -129,6 +133,7 @@ class Handler(BaseHTTPRequestHandler):
             if method=='POST' and action=='baseline':return self.json(runtime.generate_baseline(rid,idempotency_key=body.get('idempotency_key'),resume=body.get('resume',False)))
             if method=='POST' and action=='confirm':return self.json(runtime.confirm_baseline(rid,body.get('baseline_version')))
             if method=='POST' and action=='expand':return self.json(runtime.expand_suite(rid,idempotency_key=body.get('idempotency_key')))
+            if method=='POST' and action=='kie-receipt':return self.json(runtime.reconcile_kie_receipt(rid,body))
             if method=='POST' and action=='from-baseline':
                 if runtime.get(rid)['mode']!='real':
                     raise UserError('请选择正式制作的基准图',409)
@@ -142,7 +147,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(runtime.regenerate_canvas_master(rid,unquote(canvas_retry.group(1)),body.get('idempotency_key'),body.get('expected_version')))
             redraw=re.fullmatch(r'outputs/([^/]+)/regenerate',action or '')
             if method=='POST' and redraw:return self.json(runtime.regenerate_output(rid,unquote(redraw.group(1)),idempotency_key=body.get('idempotency_key'),resume=body.get('resume',False),expected_version=body.get('expected_version')))
-            if method=='POST' and action=='package':return self.json(runtime.package(rid,logo_asset_id=body.get('logo_asset_id')))
+            logo_review=re.fullmatch(r'outputs/([^/]+)/review-logo',action or '')
+            if method=='POST' and logo_review:return self.json(runtime.review_output_logo(rid,unquote(logo_review.group(1)),body))
+            if method=='POST' and action=='package':return self.json(runtime.package(rid,logo_asset_id=body.get('logo_asset_id'),reviewed_versions=body.get('reviewed_versions') or {}))
             visual=re.fullmatch(r'visual/(master|output)/([^/]+)',action or '')
             if method=='POST' and visual:
                 kind,image_id=visual.groups()
@@ -165,7 +172,7 @@ class Handler(BaseHTTPRequestHandler):
             if method=='GET' and picture:
                 version=get('version')
                 if version and not re.fullmatch(r'[1-9]\d*',version):raise UserError('图片版本不正确')
-                return self.file(runtime.image(rid,picture.group(1),unquote(picture.group(2)),int(version) if version else None))
+                return self.file(runtime.image(rid,picture.group(1),unquote(picture.group(2)),int(version) if version else None,get('review_logo',None)))
             package=re.fullmatch(r'packages/([a-f0-9]{32})',action or '')
             if method=='GET' and package:
                 return self.file(runtime.package_file(rid,package.group(1)),download='学习机图包-'+rid[:8]+'.zip')
@@ -241,18 +248,9 @@ class Handler(BaseHTTPRequestHandler):
             uploaded=next((settings.state_dir/'uploads'/(rid+suffix) for suffix in ('.png','.jpg','.webp') if (settings.state_dir/'uploads'/(rid+suffix)).is_file()),None)
             if uploaded is None: raise UserError('参考图不存在',404)
             return self.json(ApiScenePlanner(settings).reference_points(uploaded,body.get('purpose')))
-        if path=='/api/learning-source/copy' and method=='POST':
+        if path in ('/api/learning-source/copy','/api/learning-source/plan') and method=='POST':
             from .learning_setup import generation_unavailable
             generation_unavailable()
-        if path=='/api/learning-source/plan' and method=='POST':
-            from .learning_setup import generation_unavailable
-            generation_unavailable()
-        sample_match=re.fullmatch('/api/learning-samples/([a-z0-9-]+)',path)
-        if sample_match and method=='GET':
-            from .learning_delivery import require_confirmed_sample
-            placement=BY_ID.get(sample_match.group(1))
-            if not placement or placement['category']!='学习机':raise UserError('样图不存在',404)
-            return self.file(require_confirmed_sample(placement))
         uploaded_match=re.fullmatch('/api/uploads/([a-f0-9]{64})',path)
         if uploaded_match and method=='GET':
             from . import learning_source
@@ -266,7 +264,7 @@ class Handler(BaseHTTPRequestHandler):
             if purpose=='uploaded_master':
                 from .learning_setup import generation_unavailable
                 generation_unavailable()
-            if not isinstance(purpose,str) or purpose not in (*REFERENCE_PURPOSES,'uploaded_master','learning_concept') or purpose=='legacy':raise UserError('请选择参考图用途')
+            if not isinstance(purpose,str) or purpose not in (*REFERENCE_PURPOSES,'learning_concept') or purpose=='legacy':raise UserError('请选择参考图用途')
             if len(note)>200: raise UserError('参考图说明最多 200 字')
             try:
                 data=base64.b64decode(body.get('data',''),validate=True)
@@ -287,9 +285,6 @@ class Handler(BaseHTTPRequestHandler):
             result=dict(id=sha,path=str(dest),name=Path(str(body.get('name','参考图片'))).name,note=note,purpose=purpose)
             if purpose=='learning_concept':
                 result.update(width=im.width,height=im.height,thumbnail_url='/api/uploads/'+sha)
-            if purpose=='uploaded_master':
-                from . import learning_source
-                pr={'learning_mode':'upload','learning_source':result};learning_source.registered(pr,settings);result.update(pr['learning_source'])
             return self.json(result)
         if path.startswith('/api/assets/') and method=='GET':
             aid=path.rsplit('/',1)[-1]
@@ -322,18 +317,22 @@ class Handler(BaseHTTPRequestHandler):
                 if kind=='image-details' and method=='GET':return self.json(self.engine.image_details(tid,sid,int(get('v')) if get('v') else None,get('editor')))
                 if kind=='prompt-drafts' and method in ('PUT','DELETE'):return self.json(self.engine.save_prompt_draft(tid,sid,body,discard=method=='DELETE'))
             if action=='rounds' and method=='POST': return self.json(self.engine.create(body.get('params'),body.get('idempotency_key'),tid,draft_id=body.get('draft_id')))
-            if action in ('stop','adopt','adopt-bulk','retry-planning','add-variant','repair-set','regenerate','resume','restore','duplicate','rebrief-round','pause','continue','archive','unarchive') and method=='POST': return self.json(self.engine.mutate(tid,action,body))
+            if action=='attach-kie-receipt' and method=='POST':return self.json(self.engine.attach_kie_receipt(tid,body))
+            if action=='review-logo' and method=='POST':return self.json(self.engine.review_image_logo(tid,body))
+            if action in ('stop','adopt','adopt-bulk','retry-planning','add-variant','repair-set','regenerate','resume','retry-ximalaya-review','retry-image-export','retry-confirmed-submission','restore','duplicate','rebrief-round','pause','continue','archive','unarchive') and method=='POST': return self.json(self.engine.mutate(tid,action,body))
             if action=='package-preview' and method=='GET': return self.json(self.engine.package_preview(tid,int(get('round','0')),get('ready_only')=='1',logo_asset_id=get('logo_asset_id') or None))
             if action=='packages' and method=='POST':
-                p=self.engine.package(tid,body.get('round',0),body.get('ready_only',False),logo_asset_id=body.get('logo_asset_id'))
+                p=self.engine.package(tid,body.get('round',0),body.get('ready_only',False),logo_asset_id=body.get('logo_asset_id'),
+                                     suite_number=body.get('suite_number'),reviewed_versions=body.get('reviewed_versions') or {})
                 return self.json({'package_id':p['id'],'version':f"v{p['v']:03d}",'download_url':f"/api/tasks/{tid}/packages/{p['id']}",'filename':p['zip']})
             if action and action.startswith('packages/') and method=='GET':
                 with self.engine.lock:
                     t=self.engine.task(tid)
                     pkg=next((p for p in t['pkgs'] if p['id']==action.split('/')[-1]),None)
                     if not pkg: raise UserError('图包不存在',404)
-                    verify_saved_package(pkg['path'],pkg['fingerprint'],self.engine.package_rules(t,pkg))
-                    return self.file(pkg['path'],pkg['zip'])
+                    path,name=pkg['path'],pkg['zip']
+                    integrity=(pkg['fingerprint'],self.engine.package_rules(t,pkg))
+                return self.file(path,name,archive_integrity=integrity)
             if action=='open-folder' and method=='POST':
                 t=self.engine.task(tid)
                 p=Path(t.get('task_root',t['output_dir']))
@@ -349,8 +348,11 @@ class Handler(BaseHTTPRequestHandler):
                     chosen=s if version==s['att'] else next((v for v in s['versions'] if v['att']==version),None)
                     if not chosen:raise UserError('图片版本不存在',404)
                     if bits[0]=='images':
-                        if chosen['state']!='done':raise UserError('图片尚未完成',404)
-                        file_path=chosen['output'] if get('raw')=='1' else chosen['jpeg']
+                        review_preview=(get('review')=='1' and get('raw')!='1' and version==s['att'] and s.get('logo_base',{}).get('without_logo')
+                                        and s.get('ximalaya_review',{}).get('status') in ('pending','export_pending','needs_review','rejected','unavailable','export_failed'))
+                        if chosen['state']!='done' and not review_preview:raise UserError('图片尚未完成',404)
+                        from .brand_logo import review_file
+                        file_path=s['logo_base']['path'] if review_preview else chosen['output'] if get('raw')=='1' else review_file(chosen,get('review_logo',None))
                     else:
                         try:ref=chosen['refs'][int(bits[2])]
                         except (ValueError,IndexError):raise UserError('参考图不存在',404)
@@ -358,7 +360,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.file(file_path)
         if method=='GET' and not path.startswith('/api/'):
             name='index.html' if path=='/' else path.lstrip('/')
-            allowed={'index.html','css/app.css','js/views.js','js/learning-machine.js','js/learning-runs.js','js/master-canvases.js','js/drafts.js','js/prompt-drafts.js','js/maintenance.js','js/workspace.js','js/production.js','js/app.js'}
+            allowed={'index.html','css/app.css','css/workbench-ui.css','js/views.js','js/learning-machine.js','js/learning-runs.js','js/master-canvases.js','js/drafts.js','js/prompt-drafts.js','js/maintenance.js','js/workspace.js','js/production.js','js/app.js'}
             if name in allowed: return self.file(ROOT/'frontend'/name)
         raise UserError('文件不存在',404)
 

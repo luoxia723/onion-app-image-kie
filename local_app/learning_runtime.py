@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import copy
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from fractions import Fraction
 import hashlib
@@ -72,6 +72,7 @@ class LearningRuntime:
         self.visual_pool=ThreadPoolExecutor(max_workers=4,thread_name_prefix='learning-visual')
         self._closed=False
         self._threads=set()
+        self._query_retries={}
         self.runs={}
         self.reload()
 
@@ -88,7 +89,7 @@ class LearningRuntime:
                     run.update(busy=False,status='interrupted',error='本机服务已中断，已有图片和版本已保留，请恢复本次操作')
                     if run.get('suite',{}).get('status')=='generating':run['suite']['status']='interrupted'
                     for row in [run.get('baseline',{}),*run.get('masters',[]),*run.get('outputs',[])]:
-                        if row.get('status') in ACTIVE:row.update(status='interrupted',query_required=self._has_receipt(row))
+                        if row.get('status') in ACTIVE:row.update(status='interrupted',query_required=bool(row.get('query_required') or row.get('provider_query_retry') or self._has_receipt(row)))
                     self._save(run)
                 if run.get('create_key') and run['create_key'] not in index['creates']:
                     index['creates'][run['create_key']]={'id':run['id'],'signature':run['create_signature']}
@@ -116,8 +117,82 @@ class LearningRuntime:
         receipt=task_state_path(Path(path))
         try:
             data=json.loads(receipt.read_text())
-            return bool(data.get('task_id') or data.get('status') in ('submitting','submit_uncertain'))
+            return bool(data.get('task_id') or data.get('status') in ('submitting','submit_uncertain','confirmed_unaccepted'))
         except (OSError,ValueError):return False
+
+    def _kie_target(self,run,row):
+        from scripts.render import task_state_path
+        background=row.get('background_request') or {}
+        if row.get('background_repair_pending') and background.get('kind')=='ai':
+            operation=run.get('background_operations',{}).get(background.get('operation_id'),{})
+            job=operation.get('job') or {}
+            if job.get('background_plan',{}).get('version')!=3:return None
+            if not operation.get('result') and job.get('output'):
+                return Path(job['output']),task_state_path(Path(job['output'])),job.get('prompt'),operation
+        repair=(row.get('visual_review') or {}).get('repair') or {}
+        if repair and not repair.get('result') and (repair.get('job') or {}).get('output'):
+            job=repair['job']
+            output=Path(job['output'])
+            return output,Path(repair.get('receipt_path') or task_state_path(output)),job.get('prompt'),row
+        if row.get('raw_path'):
+            output=Path(row['raw_path'])
+            return output,task_state_path(output),row.get('prompt'),row
+        return None
+
+    def reconcile_kie_receipt(self,rid,data):
+        from .kie_recovery import claim_receipt, pending_receipt, verify_task
+        from .learning_executor import BASELINE_REFERENCE_NOTE
+        kind,image_id=data.get('kind'),data.get('image_id')
+        version=data.get('expected_version')
+        action=data.get('action')
+        if (kind not in ('baseline','master','output') or not isinstance(image_id,str)
+                or type(version) is not int or version<1
+                or action not in ('attach','confirm_unaccepted')
+                or action=='confirm_unaccepted' and data.get('confirmed_unaccepted') is not True):
+            raise UserError('请核对图片版本和 KIE 受理情况')
+        key=_key(data.get('idempotency_key'))
+
+        def target():
+            self._maintenance();run=self._run(rid)
+            rows=[run['baseline']] if kind=='baseline' else run[kind+'s']
+            row=next((item for item in rows if item['id']==image_id),None)
+            if (run['mode']!='real' or run['busy'] or not row or row['version']!=version
+                    or row['status'] not in ('failed','interrupted','visual_hold')):
+                raise UserError('图片已更新或正在处理，请刷新后核对',409)
+            if sum(bool(item.get('busy')) for item in self.runs.values())>=MAX_ACTIVE_RUNS:
+                raise UserError('当前制作任务较多，请稍后再接回',429)
+            if kind!='baseline':self._approved(run)
+            if kind=='output' and row.get('background_repair_pending') and not row.get('background_repair_key'):
+                raise UserError('背景操作缺少恢复标识，请先核对备份',409)
+            entry=self._kie_target(run,row)
+            if not entry:raise UserError('没有找到待核对的 KIE 回执',409)
+            output,path,prompt,operation=entry
+            roots=(Path(run['directory']).resolve(),(Path(self.engine.settings.output)/'.restored').resolve())
+            if any(not any(file.resolve().is_relative_to(root) for root in roots) for file in (output,path)):
+                raise UserError('回执文件不属于本工作台批次',409)
+            state=pending_receipt(path)
+            if not state:raise UserError('回执已更新，请刷新后核对',409)
+            if kind=='baseline' and prompt:prompt=(prompt,prompt+BASELINE_REFERENCE_NOTE)
+            return run,row,output,path,prompt,operation,state
+
+        with self.engine.lock:
+            _,_,output,path,prompt,_,pending=target()
+        task_id=verify_task(self.engine.settings,data.get('task_id'),pending,prompt) if action=='attach' else None
+        with self.engine.lock:
+            run,row,current,current_path,_,operation,state=target()
+            if current!=output or current_path!=path or state!=pending:
+                raise UserError('图片回执已更新，请刷新后核对',409)
+            claim_receipt(self.engine,output,path,pending,task_id)
+            row['query_required']=True
+            operation['query_required']=True
+            self._save(run)
+            if kind=='baseline':
+                return self.generate_baseline(rid,key,resume=True)
+            if row.get('background_repair_pending'):
+                return self.repair_backgrounds(rid,row['background_repair_key'],[row['id']])
+            if kind=='master':
+                return self.regenerate_canvas_master(rid,image_id,key,version,_provider_resume=True)
+            return self.regenerate_output(rid,image_id,key,resume=True,expected_version=version)
 
     def _public_row(self,run,row,kind):
         keep=('id','group_id','master_id','placement_id','platform','name','image_index','width','height','version','status',
@@ -150,6 +225,18 @@ class LearningRuntime:
                 'repair_url':self._url(run,'visual-'+kind+'-repair',row['id'],row['version']) if candidate else None,
             }
         result['logo_refresh_pending']=bool(row.get('logo_refresh_source'))
+        target=self._kie_target(run,row) if run['mode']=='real' else None
+        result['kie_recovery_action']=None
+        if target and run.get('busy') and target[3].get('provider_query_retry'):
+            result['provider_query_retry']=target[3]['provider_query_retry']
+        expected=run['mode']=='real' and bool(row.get('query_required'))
+        if row.get('status') in ('failed','interrupted','visual_hold') and (target or expected and not row.get('background_repair_pending')):
+            from .kie_recovery import BLOCKED_RECEIPT_MESSAGE, receipt_recovery_action
+            action=receipt_recovery_action(target[1] if target else None,expected=expected)
+            if action=='reconcile' or expected:
+                result['kie_recovery_action']=action
+                if action=='reconcile':result['submission_unverified']=True
+                if action=='blocked':result['error']=BLOCKED_RECEIPT_MESSAGE
         if kind=='baseline':result['aspect_ratio']=run['compiled']['baseline']['aspect_ratio']
         elif kind=='master':
             spec=next((m for m in run['compiled']['masters'] if m['id']==row['id']),None)
@@ -172,6 +259,13 @@ class LearningRuntime:
         result['image_url']=None
         if row.get('status')=='done' and row.get('sha256'):
             result['image_url']=self._url(run,kind,row['id'],row['version'])
+            if kind=='output':
+                from .brand_logo import review_query, reviewed_image
+                image=reviewed_image(row,'path')
+                result['sha256']=image['sha256']
+                result['logo_template']=copy.deepcopy(image.get('logo_template'))
+                result['logo_review_switchable']=self._logo_review_switchable(run,row)
+                result['image_url']+=review_query(row)
         result['versions']=[self._public_row(run,v,kind) for v in row.get('versions',[])]
         return result
 
@@ -500,10 +594,64 @@ class LearningRuntime:
                     shared_safe_area=entry.get('shared_safe_area'),stop_marker=str(Path(run['directory'])/'STOP'),
                     upload_cache=str(self.engine.settings.state_dir/'learning-reference-upload-cache.json'))
 
-    def _submit_image(self,run,function,*args):
-        submit_for=getattr(self.engine.pool,'submit_for',None)
-        if submit_for is not None:return submit_for('learning:'+run['id'],function,*args)
-        return self.engine.pool.submit(function,*args)
+    def _submit_image(self,run,job,progress,*,start=False):
+        from .learning_executor import LearningExecutionError
+        from .scene_planner import PlanningStopped
+        import render
+        result=Future()
+        receipt=render.task_state_path(Path(job['output']))
+
+        def dispatch(attempt=0,task_id=None,timer=None):
+            with self.engine.lock:
+                if timer:self._query_retries.pop(timer,None)
+                if result.done():return
+                if self._closed:
+                    result.set_exception(PlanningStopped());return
+                request_job={**job,'recover_existing':True} if not job['simulation'] and progress.get('query_required') else job.copy()
+                if task_id:request_job['query_task_id']=task_id
+                def work():
+                    if start:
+                        with self.engine.lock:
+                            if self._closed:raise PlanningStopped()
+                            progress['status']='generating'
+                            self._save(run)
+                    return self.executor.generate_image(request_job,self.stop_event)
+                try:
+                    submit_for=getattr(self.engine.pool,'submit_for',None)
+                    future=submit_for('learning:'+run['id'],work) if submit_for else self.engine.pool.submit(work)
+                except Exception as error:
+                    result.set_exception(error);return
+            future.add_done_callback(lambda ready: finished(ready,attempt))
+
+        def finished(future,attempt):
+            try:
+                value=future.result()
+                error=None
+            except Exception as exc:
+                value=None
+                error=exc
+            with self.engine.lock:
+                if result.done():return
+                if (not self._closed and not job['simulation'] and attempt<len(render.QUERY_RETRY_DELAYS)
+                        and isinstance(error,LearningExecutionError) and error.reason_code=='unknown' and error.query_required):
+                    task_id=error.state.get('task_id')
+                    try:known=bool(task_id and render.load_task_state(receipt).get('task_id')==task_id)
+                    except render.KieError:known=False
+                    if known:
+                        progress['provider_query_retry']=attempt+1
+                        self._save(run)
+                        timer=threading.Timer(render.QUERY_RETRY_DELAYS[attempt],lambda: dispatch(attempt+1,task_id,timer))
+                        timer.daemon=True
+                        self._query_retries[timer]=result
+                        timer.start()
+                        return
+                if progress.pop('provider_query_retry',None):
+                    self._save(run)
+                if error is not None:result.set_exception(error)
+                else:result.set_result(value)
+
+        dispatch()
+        return result
 
     def _failure(self,row,exc):
         if getattr(exc,'reason_code',None)=='rate_limited' and hasattr(self.engine,'note_rate_limit'):
@@ -598,7 +746,7 @@ class LearningRuntime:
             raise UserError('已恢复的修复任务缺少可用回执，请检查备份记录',409)
         if row.get('query_required') and not task_state_path(native).is_file():
             raise UserError('原修复任务回执缺失，请检查备份记录',409)
-        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+        result=self._submit_image(run,job,row).result()
         if (result.get('simulated') is not False or Path(result['source']).resolve()!=native.resolve()
                 or not native.is_file() or _digest(native)!=result.get('sha256')):
             raise UserError('文字修复图校验失败')
@@ -784,7 +932,7 @@ class LearningRuntime:
                     else:entry=baseline['entry']
                     if self.stop_event.is_set():return
                     job=self._job(run,entry,baseline['raw_path'],'baseline')
-                    result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+                    result=self._submit_image(run,job,baseline).result()
                     changes=self._image_result(run,result,baseline['raw_path'],entry['aspect_ratio'])
                     with self.engine.lock:
                         if not self._closed:baseline.update(changes);run['status']='waiting_for_confirmation';self._save(run)
@@ -816,7 +964,7 @@ class LearningRuntime:
         if row.get('version'):row.setdefault('versions',[]).append({k:copy.deepcopy(v) for k,v in row.items() if k!='versions'})
         row.update(version=row.get('version',0)+1,status='queued',error='',query_required=False)
         for key in ('raw_path','path','sha256','raw_sha256','provider_task_id','provider_original_path','provider_original_sha256',
-                    'reason_code','baseline_version','prompt','reference_bindings','source_master_id','source_master_version','reuse_baseline','processing','logo_template','logo_refresh_source',
+                    'reason_code','baseline_version','prompt','reference_bindings','source_master_id','source_master_version','reuse_baseline','processing','logo_template','logo_refresh_source','logo_review',
                     'export_crop_box','background_processing','background_repair_pending','background_repair_key','background_operation_id','background_native_path','background_source','background_original','background_force_ai','visual_review'):
             row.pop(key,None)
         row.pop('background_request',None)
@@ -854,6 +1002,9 @@ class LearningRuntime:
                                  crop_box=crop_box,placement_snapshot=placement,sizing_policy=policy)
             raw_sha256=_digest(source)
         compression = {}
+        logo_template=copy.deepcopy(logo_snapshot['placements'][output['placement_id']]['logo_template'])
+        if result['logo']['logo_applied']:
+            logo_template['asset_id']=result['logo']['logo_asset_id']
         if result['format'] == 'PNG':
             compression['compression'] = {key: result[key] for key in
                                           ('bytes', 'pixel_lossless', 'palette_colors', 'alpha_palette_quantized')}
@@ -867,7 +1018,7 @@ class LearningRuntime:
                               provider_original_path=master.get('provider_original_path'),provider_original_sha256=master.get('provider_original_sha256'),
                               sizing_policy=output.get('sizing_policy',mapping.get('sizing_policy')) or result['sizing']['sizing_policy'],
                               processing={**copy.deepcopy(result['sizing']),**compression,**copy.deepcopy(output.get('background_processing') or {}),**({'method':'shared_canvas_crop','source_box_scope':'generated_shared_canvas','full_source_preserved':False,'cv_detection_performed':False,'background_fill':'model_full_canvas','visual_review_required':True} if run.get('kind')=='shared_canvas_adaptation' else {})},
-                              logo_template=copy.deepcopy(logo_snapshot['placements'][output['placement_id']]['logo_template']),
+                              logo_template=logo_template,
                               source_master_id=master['id'],source_master_version=master['version'],error='',query_required=False)
                 self._save(run)
 
@@ -963,10 +1114,7 @@ class LearningRuntime:
                 with self.engine.lock:
                     operation['job']['output']=str(native)
                     output.update(background_native_path=frozen['output'],raw_path=frozen['output']);self._save(run)
-                def execute(job=frozen,operation=operation):
-                    with self.engine.lock:operation['status']='generating';self._save(run)
-                    return self.executor.generate_image(job,self.stop_event)
-                futures[self._submit_image(run,execute)]=key
+                futures[self._submit_image(run,frozen,operation,start=True)]=key
             except Exception as exc:
                 failures.append(output['id'])
                 with self.engine.lock:self._failure(output,exc);self._save(run)
@@ -1151,11 +1299,7 @@ class LearningRuntime:
                             with self.engine.lock:master.update(status='queued',raw_path=str(raw),baseline_version=baseline['version'],
                                                                prompt=entry['prompt'],reuse_baseline=False);self._save(run)
                             job=self._job(run,entry,raw,'master',baseline)
-                            def execute(job=job,master=master):
-                                with self.engine.lock:
-                                    if not self._closed:master['status']='generating';self._save(run)
-                                return self.executor.generate_image(job,self.stop_event)
-                            pending[self._submit_image(run,execute)]=(master,entry,targets,raw)
+                            pending[self._submit_image(run,job,master,start=True)]=(master,entry,targets,raw)
                             continue
                         for output in targets:
                             if output['status']=='done':continue
@@ -1203,15 +1347,17 @@ class LearningRuntime:
             self._launch(run,work)
             return self._public(run)
 
-    def regenerate_canvas_master(self,rid,master_id,idempotency_key,expected_version=None,*,_review_resume=False,_redraw_review=False):
+    def regenerate_canvas_master(self,rid,master_id,idempotency_key,expected_version=None,*,_review_resume=False,_redraw_review=False,_provider_resume=False):
         key=_key(idempotency_key);scope='canvas-master-'+master_id
         with self.engine.lock:
             run=self._run(rid)
-            if not _review_resume and run.get('kind')!='shared_canvas_adaptation':
+            if not (_review_resume or _provider_resume) and run.get('kind')!='shared_canvas_adaptation':
                 raise UserError('该操作仅用于共用母版批次')
             baseline=self._approved(run)
             master=next((m for m in run['masters'] if m['id']==master_id),None)
             if not master:raise UserError('共用母版不存在',404)
+            if _provider_resume and not master.get('query_required'):
+                raise UserError('母版没有可恢复的 KIE 回执',409)
             if _review_resume and not master.get('visual_review'):
                 raise UserError('该母版没有可恢复的审核',409)
             if _redraw_review and master.get('query_required'):
@@ -1240,7 +1386,7 @@ class LearningRuntime:
                     if not review_pending:
                         job=self._job(run,entry,raw,'master',baseline)
                         with self.engine.lock:master['status']='generating';self._save(run)
-                        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+                        result=self._submit_image(run,job,master).result()
                         self._record_generated(run,master,entry,self._image_result(run,result,raw,entry['aspect_ratio']))
                     if not self.visual_pool.submit(self._visual_gate,run,master,entry).result():
                         with self.engine.lock:
@@ -1282,7 +1428,10 @@ class LearningRuntime:
                     for output in targets:
                         old=old_rows[output['id']];pid=output['placement_id']
                         old_snapshot=old.get('logo_snapshot') or run['logo_snapshot']
-                        if output['status']=='done' and old_snapshot['placements'][pid]['logo_template']==snapshot['placements'][pid]['logo_template']:continue
+                        same_template=old_snapshot['placements'][pid]['logo_template']==snapshot['placements'][pid]['logo_template']
+                        same_assets=all((old_snapshot['assets'].get(aid) or {}).get('sha256')==asset['sha256']
+                                        for aid,asset in snapshot['assets'].items())
+                        if output['status']=='done' and same_template and same_assets and old_snapshot.get('auto_variant'):continue
                         with self.engine.lock:
                             self._new_version(output);output.update(status='processing',logo_snapshot=copy.deepcopy(snapshot),logo_refresh_source=copy.deepcopy(old))
                             for field in ('export_crop_box','sizing_policy','background_processing','background_operation_id','background_native_path','background_source'):
@@ -1333,7 +1482,7 @@ class LearningRuntime:
                             self._save(run)
                     if not review_pending:
                         job=self._job(run,entry,raw,'single',baseline)
-                        result=self._submit_image(run,self.executor.generate_image,job,self.stop_event).result()
+                        result=self._submit_image(run,job,output).result()
                         self._record_generated(run,output,entry,self._image_result(run,result,raw,entry['aspect_ratio']),single=True)
                     if not self.visual_pool.submit(self._visual_gate,run,output,entry,single=True).result():
                         with self.engine.lock:run.update(status='failed',error=output['error']);self._save(run)
@@ -1359,7 +1508,7 @@ class LearningRuntime:
             if not proof:raise UserError('审核图片尚不可查看',404)
         return self._checked_file(run,proof)
 
-    def image(self,rid,kind,image_id,version=None):
+    def image(self,rid,kind,image_id,version=None,logo_review=None):
         if kind=='source':
             with self.engine.lock:
                 run=self._run(rid)
@@ -1379,9 +1528,57 @@ class LearningRuntime:
             if row is None or kind!='package' and row.get('status')!='done':raise UserError('该图片版本尚不可查看',404)
             identity={'directory':run['directory']}
             selected={key:row[key] for key in (path_key,'sha256') if key in row}
+            if kind=='output' and logo_review is not None:
+                from .brand_logo import review_file
+                selected={'path':review_file(row,logo_review,'path'),'sha256':logo_review}
         return self._checked_file(identity,selected,path_key)
 
-    def _logo_export_rows(self,run,rows,asset_id):
+    def _logo_review_switchable(self,run,row):
+        from .learning_logo import ASSET_IDS
+        spec=run['placement_snapshots'].get(row['placement_id']) or {}
+        return bool(row.get('status')=='done' and spec.get('modules',{}).get('logo') and row.get('raw_sha256')
+                    and row.get('raw_path') and Path(row['raw_path']).is_file()
+                    and (row.get('logo_template') or {}).get('asset_id') in ASSET_IDS)
+
+    def review_output_logo(self,rid,image_id,data):
+        from .brand_logo import reviewed_image, store_review_logo
+        from .learning_logo import ASSET_IDS
+        asset=data.get('asset_id')
+        if not isinstance(asset,str) or asset not in ASSET_IDS:raise UserError('请选择验收使用的 Logo')
+        with self.engine.lock:
+            run=self._run(rid);self._maintenance()
+            if run['busy']:raise UserError('正在处理图片或图包，请稍后再切换 Logo',409)
+            row=next((entry for entry in run['outputs'] if entry['id']==image_id),None)
+            if (row is None or type(data.get('expected_version')) is not int or row['version']!=data['expected_version']
+                    or reviewed_image(row,'path').get('sha256')!=data.get('expected_sha256')):
+                raise UserError('图片或 Logo 款式已更新，请刷新后再切换',409)
+            if not self._logo_review_switchable(run,row):raise UserError('此图片没有可切换的独立 Logo 图层',409)
+            prior=row.get('logo_review')
+            run['busy']=True
+        processing=True
+        try:
+            choice=None
+            if asset!=row['logo_template']['asset_id']:
+                rendered=self._logo_export_rows(run,[row],asset,frozen=True)[0]
+                choice=store_review_logo(rendered['path'],rendered['sha256'],asset,rendered['logo_asset_sha256'])
+            else:
+                self._checked_file(run,row,'path')
+            with self.engine.lock:
+                if self._closed:raise UserError('本机服务已停止，请重新打开工作台',409)
+                if choice:row['logo_review']=choice
+                else:row.pop('logo_review',None)
+                run['busy']=False;processing=False
+                try:self._save(run)
+                except Exception:
+                    if prior:row['logo_review']=prior
+                    else:row.pop('logo_review',None)
+                    raise
+                return self._public(run)
+        finally:
+            if processing:
+                with self.engine.lock:run['busy']=False
+
+    def _logo_export_rows(self,run,rows,asset_id,*,frozen=False):
         from .learning_logo import variant_snapshot
         from .learning_output import export_output
         result=[]
@@ -1390,7 +1587,7 @@ class LearningRuntime:
             if not spec['modules']['logo']:
                 result.append(row);continue
             original=row.get('logo_snapshot') or run['logo_snapshot']
-            snapshot=variant_snapshot(original,asset_id,Path(run['directory'])/'export-logos'/asset_id)
+            snapshot=variant_snapshot(original,asset_id,None if frozen else Path(run['directory'])/'export-logos'/asset_id)
             source=self._checked_file(run,{'raw_path':row['raw_path'],'sha256':row['raw_sha256']})
             mapping=next(o for o in run['compiled']['outputs'] if o['output_id']==row['id'])
             sizing_policy=row.get('sizing_policy',mapping.get('sizing_policy'))
@@ -1416,13 +1613,17 @@ class LearningRuntime:
                            'logo_asset_sha256':snapshot['assets'][asset_id]['sha256']})
         return result
 
-    def package(self,rid,logo_asset_id=None):
+    def package(self,rid,logo_asset_id=None,reviewed_versions=None):
+        from .brand_logo import reviewed_image
+        from .delivery import require_reviewed_versions
         from .learning_logo import ASSET_IDS
-        if logo_asset_id not in (None,*ASSET_IDS):raise UserError('请选择黑字标准版或白字APP版Logo')
+        if logo_asset_id not in (None,*ASSET_IDS):raise UserError('请选择黑字标准版或白字反白版 Logo')
         with self.engine.lock:
             run=self._run(rid);self._maintenance()
             if run['busy'] or any(o['status']!='done' for o in run['outputs']):raise UserError('请等待全部图片完成并通过规格检查后保存',409)
-            rows=copy.deepcopy(run['outputs'])
+            if reviewed_versions is not None:
+                require_reviewed_versions(reviewed_versions,{row['id']:row['version'] for row in run['outputs']})
+            rows=copy.deepcopy([reviewed_image(row,'path') for row in run['outputs']])
             run['busy']=True;self._save(run)
         try:
             if logo_asset_id is not None:rows=self._logo_export_rows(run,rows,logo_asset_id)
@@ -1485,8 +1686,13 @@ class LearningRuntime:
                     run.update(busy=False,status='interrupted',error='本机服务已停止，已有图片和版本已保留')
                     if run['suite']['status']=='generating':run['suite']['status']='interrupted'
                     for row in [run['baseline'],*run['masters'],*run['outputs']]:
-                        if row['status'] in ACTIVE:row.update(status='interrupted',query_required=self._has_receipt(row))
+                        if row['status'] in ACTIVE:row.update(status='interrupted',query_required=bool(row.get('query_required') or row.get('provider_query_retry') or self._has_receipt(row)))
                     self._save(run)
             self._closed=True;self.stop_event.set();threads=list(self._threads)
+            from .scene_planner import PlanningStopped
+            for timer,future in self._query_retries.items():
+                timer.cancel()
+                if not future.done():future.set_exception(PlanningStopped())
+            self._query_retries.clear()
         for thread in threads:thread.join(timeout=2)
         self.visual_pool.shutdown(wait=False,cancel_futures=True)

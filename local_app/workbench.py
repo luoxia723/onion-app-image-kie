@@ -16,10 +16,11 @@ class WorkbenchMixin:
         status='正在保存图包' if t.get('exporting') else '正在处理' if active else '已暂停后续' if paused else '需要处理' if errors else '已保存 '+d['last_version'] if d['last_version'] and not d['has_changes'] else '已停止后续' if r.get('stopped') else '待挑选'
         category='running' if active else 'history' if t.get('archived') or d['last_version'] and not d['has_changes'] and not errors else 'attention'
         image=next((s for s in reversed(r['slots']) if s['state']=='done'),None)
+        from .brand_logo import review_query
         value=dict(is_summary=True,id=t['id'],name=t.get('name') or t['direction'],pkg=t['pkg'],date=t['date'],updated_at=t.get('updated_at',t['date']/1000),revision=t.get('revision',0),
                    active=active or t.get('exporting',False),paused=paused,archived=t.get('archived',False),category=category,status=status,done=done,total=len(r['slots']),round_count=len(t['rounds']),
                    image_form=r['params'].get('image_form'),image_model=r.get('image_model',DEFAULT_IMAGE_MODEL),last_version=d['last_version'],has_changes=d['has_changes'],
-                   thumbnail_url=f"/api/tasks/{t['id']}/images/{image['id']}?v={image['att']}" if image else None)
+                   thumbnail_url=f"/api/tasks/{t['id']}/images/{image['id']}?v={image['att']}"+review_query(image) if image else None)
         self.summary_cache[t['id']]=value
         return value
 
@@ -52,25 +53,25 @@ class WorkbenchMixin:
         with self.lock:
             t=self.task(tid);r,s=self.find_image(t,sid);version=s if att is None or att==s['att'] else next((x for x in s['versions'] if x['att']==att),None)
             if not version:raise UserError('图片版本不存在',404)
-            result=copy.deepcopy(version);result.pop('versions',None)
+            from .brand_logo import review_query, review_switchable, reviewed_image, switchable
+            result=copy.deepcopy(reviewed_image(version));result.pop('versions',None);result.pop('logo_review',None)
             for key in ('id','pid','set','idx','first_id'):result[key]=s[key]
             for key in ('production_mode','template_id','parent_id','dependency_ids'):
                 if key in s:result[key]=copy.deepcopy(s[key])
             if version is s:
-                result['query_required']=self.query_required(s)
-                if self.definitely_unsent(s):result.update(reason_code='not_submitted',msg='生图请求未发出，可重试本张')
+                result.update(self.public_image_kie_recovery(s))
             result['preview_kind']='raw' if version.get('delivery_eligible') is False else 'processed'
             result['reference_images']=[dict(name=x.get('role','参考图'),label=x['label'],thumbnail_url=f"/api/tasks/{tid}/references/{sid}/{i}?v={version['att']}") for i,x in enumerate(version['refs'])]
             from font_library import disabled_names
             for ref,view in zip(version['refs'],result['reference_images']):view['retired']=Path(ref['path']).name in disabled_names()
             result['original_image_url']=f"/api/tasks/{tid}/images/{sid}?v={version['att']}&raw=1" if version['state']=='done' and not version.get('files_cleared') else None
-            result['image_url']=f"/api/tasks/{tid}/images/{sid}?v={version['att']}" if version.get('jpeg') and version['state']=='done' and not version.get('files_cleared') else None
-            result['history']=[dict(att=x['att'],state=x['state'],image_url=f"/api/tasks/{tid}/images/{sid}?v={x['att']}" if x.get('jpeg') and x['state']=='done' and not x.get('files_cleared') and Path(x['jpeg']).is_file() else None,files_cleared=x.get('files_cleared',False),pinned=x.get('pinned',False),reason=x.get('version_reason','图片版本')) for x in [*s['versions'],s]]
+            result['image_url']=f"/api/tasks/{tid}/images/{sid}?v={version['att']}"+review_query(version) if version.get('jpeg') and version['state']=='done' and not version.get('files_cleared') else None
+            result['history']=[dict(att=x['att'],state=x['state'],image_url=f"/api/tasks/{tid}/images/{sid}?v={x['att']}"+review_query(x) if x.get('jpeg') and x['state']=='done' and not x.get('files_cleared') and Path(reviewed_image(x)['jpeg']).is_file() else None,files_cleared=x.get('files_cleared',False),pinned=x.get('pinned',False),reason=x.get('version_reason','图片版本')) for x in [*s['versions'],s]]
             result['round_index']=t['rounds'].index(r)
             result['is_historical']=version['att']!=s['att']
             result['generation_disabled']=bool(r.get('generation_disabled') or any(row.get('frame') for row in r['slots']))
-            from .brand_logo import switchable
             result['logo_switchable']=switchable(version)
+            result['logo_review_switchable']=version is s and review_switchable(s)
             if version.get('brand_logo_layer'):
                 from .brand_logo import prompt_rule
                 result['logo_fixed_rule']=prompt_rule(version['brand_logo_layer'])
@@ -81,6 +82,48 @@ class WorkbenchMixin:
             result['edit_drafts']=[v for v in self.prompt_drafts(tid,sid,version['att']) if not v.get('discarded')]
             for key in ('output','jpeg','refs','frame','frame_status','frame_processing','job_path','brand_logo_layer','logo_base','natural_canvas_plan'):result.pop(key,None)
             return result
+
+    def review_image_logo(self,tid,data):
+        from .brand_logo import export_variant, normalize_id, review_switchable, reviewed_image, store_review_logo
+        if not data.get('asset_id'):raise UserError('请选择验收使用的 Logo')
+        asset=normalize_id(data['asset_id'])
+        with self.lock:
+            task=self.task(tid);round_,slot=self.find_image(task,data.get('image_id'))
+            if self.maintenance_active or task.get('exporting') or slot.get('local_processing'):
+                raise UserError('正在处理图片或图包，请稍后再切换 Logo',409)
+            if (type(data.get('expected_att')) is not int or slot['att']!=data['expected_att']
+                    or reviewed_image(slot).get('sha256')!=data.get('expected_sha256')):
+                raise UserError('图片或 Logo 款式已更新，请刷新后再切换',409)
+            if not review_switchable(slot):raise UserError('此图片没有可切换的独立 Logo 图层',409)
+            original=copy.deepcopy(slot)
+            placement=self.placement(task,round_,slot)
+            slot['local_processing']=True
+        processing=True
+        try:
+            choice=None
+            if asset!=original['delivery_logo_asset_id']:
+                with self.processing_slots:
+                    rendered=export_variant(original,placement,asset)
+                    choice=store_review_logo(rendered['jpeg'],rendered['sha256'],asset,
+                                             original['brand_logo_layer']['assets'][asset]['sha256'])
+            else:
+                from .quality import verify_delivery_file
+                verify_delivery_file(original,placement)
+            with self.lock:
+                if self.task(tid) is not task or slot['att']!=original['att']:
+                    raise UserError('图片已更新，请重新选择',409)
+                slot.pop('local_processing',None);processing=False
+                if choice:slot['logo_review']=choice
+                else:slot.pop('logo_review',None)
+                try:self.persist(task)
+                except Exception:
+                    if original.get('logo_review'):slot['logo_review']=original['logo_review']
+                    else:slot.pop('logo_review',None)
+                    raise
+                return self.public(task)
+        finally:
+            if processing:
+                with self.lock:slot.pop('local_processing',None)
 
     def find_image(self,t,sid):
         for r in t['rounds']:

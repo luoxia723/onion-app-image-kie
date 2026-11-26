@@ -69,26 +69,26 @@ def test_default_logos_stay_near_upper_left_and_both_export_variants_fit(setting
             assert t['x']+t['width']<=1 and t['y']+height<=1+1e-9
 
 
-def test_black_asset_preserves_original_pixels_and_white_preserves_eyes():
-    with Image.open(ROOT / 'assets/logos/onion-logo-standard-001.png') as source:
-        original = source.convert('RGBA');original = original.crop(original.getbbox())
-    with Image.open(logos.asset_path('learning.logo.black')) as output:
-        assert original.tobytes() == output.convert('RGBA').tobytes()
-    # White APP source has genuine dark pupil pixels inside the mascot. They
-    # remain opaque and unchanged rather than being removed with the navy field.
-    with Image.open(ROOT / 'assets/logos/onion-logo-app-001.png') as source:
-        original = source.convert('RGB')
-    with Image.open(logos.asset_path('learning.logo.white-app')) as output:
-        rgba = output.convert('RGBA')
-        checked = 0
-        for y in range(480, 570):
-            for x in range(160, 430):
-                color = original.getpixel((x, y))
-                if max(color) < 30:
-                    assert rgba.getpixel((x-86, y-311)) == color + (255,)
-                    checked += 1
-        assert checked > 500
-        assert rgba.getpixel((1250-86, 600-311))[3] == 0
+def test_both_logo_layers_preserve_supplied_transparent_pixels():
+    for aid in logos.ASSET_IDS:
+        record=next(a for a in logos._defaults()['assets'] if a['id']==aid)
+        source_path=ROOT/record['source_path']
+        with Image.open(source_path) as source, Image.open(logos.asset_path(aid)) as layer:
+            assert source.mode==layer.mode=='RGBA'
+            cropped=source.crop(source.getchannel('A').getbbox())
+            assert cropped.size==layer.size==(record['width'],record['height'])
+            assert cropped.tobytes()==layer.tobytes()
+            assert layer.getchannel('A').getextrema()==(0,255)
+
+
+def test_legacy_app_logo_name_resolves_to_new_white_source():
+    from scripts.logo_reference import resolve_logo_selection
+    old=resolve_logo_selection({'logo':'洋葱学园+APP'})
+    new=resolve_logo_selection({'logo':'洋葱学园反白版','logo_asset_id':old['logo_asset_id']})
+    assert old==new
+    assert Path(new['logo_reference_path']).name=='onion-logo-app-001.png'
+    with Image.open(ROOT/new['logo_reference_path']) as original:
+        assert original.mode=='RGBA'
 
 
 def test_save_roundtrip_freeze_is_independent_and_revision_conflict(settings, tmp_path):

@@ -47,7 +47,7 @@ class SchedulerMixin:
                 for r in t['rounds']:
                     if r.get('generation_disabled') or any(s.get('frame') for s in r['slots']):continue
                     pkey=(t['id'],r['id'])
-                    if not self.planning_running and r.get('planning_status')=='queued' and not r.get('stopped') and not r.get('paused'):
+                    if not self.planning_running and r.get('planning_status')=='queued' and not r.get('stopped') and not r.get('paused') and time.time()>=r.get('planning_retry_after',0):
                         r['planning_status']='running';self.last_planned=t['id'];self.planning_running.add(pkey);self.persist(t)
                         self.planning_pool.submit(self.plan_round,t,r,pkey)
                     changed=False

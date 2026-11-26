@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{webcrypto}=require('node:crypto');
 const root=path.resolve(__dirname,'..');
 const {currentLearningConfig}=require('./helpers/workbench.cjs');
-const fixture={revision:1,pipeline:'baseline_then_suite',cta:{default_text:'点击下载'},logo_assets:[{id:'learning.logo.black',label:'黑字版',url:'/api/learning-machine/logo-assets/learning.logo.black',width:200,height:40},{id:'learning.logo.white-app',label:'白字版（含APP）',url:'/api/learning-machine/logo-assets/learning.logo.white-app',width:220,height:40}],placements:[
+const fixture={revision:1,pipeline:'baseline_then_suite',cta:{default_text:'点击下载'},logo_assets:[{id:'learning.logo.black',label:'黑字标准版',url:'/api/learning-machine/logo-assets/learning.logo.black',width:200,height:40},{id:'learning.logo.white-app',label:'白字反白版',url:'/api/learning-machine/logo-assets/learning.logo.white-app',width:220,height:40}],placements:[
  {id:'learning-a',platform:'甲渠道',name:'有Logo横幅',target_width:1200,target_height:400,image_count:1,logo_required:true,content_modules:{main_copy:true,cta:true},logo_template:{asset_id:'learning.logo.black',x:.025,y:.03,width:.15}},
  {id:'learning-b',platform:'乙渠道',name:'固定无Logo',target_width:400,target_height:480,image_count:1,logo_required:false,content_modules:{main_copy:true,cta:false}},
  {id:'learning-c',platform:'甲渠道',name:'同版位两张',target_width:840,target_height:404,image_count:2,logo_required:true,content_modules:{main_copy:true,cta:false},logo_template:{asset_id:'learning.logo.black',x:.025,y:.03,width:.15}},
@@ -37,7 +37,30 @@ test('学习机按文案、画面、版位顺序配置，默认折叠全选版�
 test('旧上传草稿转为单一路径，原历史对象保持不变',()=>{
  const {run}=setup();run('old={channel:"学习机",image_form:"单图",pids:["learning-a"],learning_mode:"upload",learning_source:{id:"old"},sets:3,noLogo:true,logo_asset_id:"old-logo",cta_enabled:false,cta_overrides:{"learning-a":{mode:"none"}},references:[],t1:"已有文案"};loadDraft(old)');
  assert.equal(run('S.draft.learning_mode'),'generate');assert.equal(run('S.draft.learning_pipeline'),'baseline_then_suite');assert.equal(run('S.draft.learning_source'),undefined);assert.equal(run('S.draft.sets'),1);assert.equal(run('S.draft.cta'),'点击下载');assert.equal(run('old.learning_source.id'),'old');
- run('setLearningMode("upload");setLogoSelection("none");setCtaOverride("learning-a","none")');assert.equal(run('S.draft.learning_mode'),'generate');assert.equal(run('S.draft.noLogo'),false);assert.equal(run('placementCtaText(S.draft,"learning-a")'),'点击下载');
+ const html=run('viewForm()');assert(html.includes('先生成基准图'));assert(html.includes('上传概念图'));assert(!html.includes('原图版式'));
+ run('setLogoSelection("none");setCtaOverride("learning-a","none")');assert.equal(run('S.draft.learning_mode'),'generate');assert.equal(run('S.draft.noLogo'),false);assert.equal(run('placementCtaText(S.draft,"learning-a")'),'点击下载');
+});
+test('上传区将单张图片交给对应入口，忙碌时不接受拖入',async()=>{
+ const {ctx,run}=setup(),calls=[],messages=[];
+ ctx.calls=calls;ctx.messages=messages;
+ run('addLearningConcept=file=>calls.push(["learning_concept",file]);addReference=(file,purpose)=>calls.push([purpose,file]);toast=message=>messages.push(message)');
+ const picture={name:'概念图.png',type:'image/png'};
+ const invalid={name:'表格.csv',type:'text/csv'};
+ let prevented=0;
+ ctx.drop={currentTarget:{disabled:false,classList:{remove(){}},},dataTransfer:{files:[picture]},preventDefault(){prevented++}};
+ await run('dropImageFile(drop,"learning_concept")');
+ await run('dropImageFile(drop,"style")');
+ assert.deepEqual(calls.map(([purpose,file])=>[purpose,file]),[['learning_concept',picture],['style',picture]]);
+ ctx.drop.dataTransfer.files=[picture,picture];
+ await run('dropImageFile(drop,"style")');
+ ctx.drop.dataTransfer.files=[invalid];
+ await run('dropImageFile(drop,"style")');
+ ctx.drop.dataTransfer.files=[picture];
+ run('S.uploadingPurpose="style"');
+ await run('dropImageFile(drop,"learning_concept")');
+ assert.equal(calls.length,2);
+ assert.equal(prevented,5);
+ assert.deepEqual(messages,['每次拖入一张图片','请选择 PNG、JPG 或 WebP 图片']);
 });
 test('学习机预览只请求离线preview，不要求API Key、不创建旧/tasks生图任务',async()=>{
  const calls=[];const {run}=setup(async(url,method,body)=>{calls.push({url,method,body});if(url==='/learning-machine/preview')return{baseline:{ratio:'16:9'},placements:fixture.placements,outputs:[{placement_id:'learning-a',size:[1200,400]}],output_count:4};return structuredClone(fixture)});
@@ -45,22 +68,23 @@ test('学习机预览只请求离线preview，不要求API Key、不创建旧/ta
  const call=calls.find(c=>c.url==='/learning-machine/preview');assert(call);assert.equal(call.body.params.cta,'马上试试');assert.equal(call.body.params.sets,1);assert.equal(call.body.params.learning_pipeline,'baseline_then_suite');assert(!calls.some(c=>c.url==='/tasks'||c.url.startsWith('/settings/test')));
  assert(run('viewLearningPlanPreview()').includes('3个版位、4张目标图'));
 });
-test('Logo无开关、黑白版本如实显示，有Logo版可编辑而无Logo版不可启用',()=>{
- const {run}=setup();run('S.view="learning-logo";S.learningLogoPid="learning-a"');let h=run('viewLearningLogoConfig()');assert(h.includes('黑字版'));assert(h.includes('白字版（含APP）'));assert(h.includes('onpointerdown="startLearningLogoDrag(event)"'));assert(!h.includes('type="file"'));
- run('chooseLearningLogoPlacement("learning-b")');h=run('viewLearningLogoConfig()');assert(h.includes('此版位固定无Logo'));assert(!h.includes('id="learning-logo-width"'));run('setLearningLogoAsset("learning.logo.white-app")');assert.equal(run('LEARNING_MACHINE.templates["learning-b"]'),undefined);
+test('Logo模板展示浅底黑字、深底反白，深浅预览不更改模板',()=>{
+ const {run}=setup();run('S.view="learning-logo";S.learningLogoPid="learning-a"');let h=run('viewLearningLogoConfig()');assert.match(h,/id="learning-logo-image"[^>]+learning\.logo\.black/);assert(!h.includes('data-logo-asset'));assert(h.includes('按落点背景自动选黑字或反白'));
+ run('S.learningLogoBg="dark"');h=run('viewLearningLogoConfig()');assert.match(h,/id="learning-logo-image"[^>]+learning\.logo\.white-app[^>]+alt="白字反白版"/);assert(!run('S.learningLogoDirty'));assert(h.includes('onpointerdown="startLearningLogoDrag(event)"'));assert(!h.includes('type="file"'));
+ run('chooseLearningLogoPlacement("learning-b")');h=run('viewLearningLogoConfig()');assert(h.includes('此版位固定无Logo'));assert(!h.includes('id="learning-logo-width"'));assert.equal(run('LEARNING_MACHINE.templates["learning-b"]'),undefined);
 });
 test('Logo拖动/尺寸参数保持素材比例且约束在精确版位画布内',()=>{
  const {run}=setup();run('S.learningLogoPid="learning-a";setLearningLogoValue("width",200);setLearningLogoValue("x",99);setLearningLogoValue("y",99)');
  const t=run('LEARNING_MACHINE.templates["learning-a"]');assert(t.width<=1);assert(t.x+t.width<=1+1e-9);const height=t.width*1200/200*40/400;assert(t.y+height<=1+1e-9);
- run('setLearningLogoAsset("learning.logo.white-app")');assert.equal(run('LEARNING_MACHINE.templates["learning-a"].asset_id'),'learning.logo.white-app');
+ assert.equal(t.asset_id,'learning.logo.black');
  const h=run('viewLearningLogoConfig()');assert(h.includes('--logo-preview-ratio:3'));assert(h.includes('aspect-ratio:1200/400'));
 });
-test('Logo模板保存使用修订号，刷新后恢复所选素材和位置',async()=>{
+test('Logo模板保存使用修订号，刷新后恢复几何参数',async()=>{
  let saved=structuredClone(fixture),body;
  const service=async(url,method,data)=>{if(method==='PUT'){body=data;saved.revision++;for(const t of data.templates)saved.placements.find(p=>p.id===t.placement_id).logo_template={asset_id:t.asset_id,x:t.x,y:t.y,width:t.width}}return structuredClone(saved)};
- const {run}=setup(service);run('S.learningLogoPid="learning-a";setLearningLogoAsset("learning.logo.white-app");setLearningLogoValue("x",12);setLearningLogoValue("width",22)');await run('saveLearningLogoTemplates()');
+ const {run}=setup(service);run('S.learningLogoPid="learning-a";S.learningLogoBg="dark";setLearningLogoValue("x",12);setLearningLogoValue("width",22)');await run('saveLearningLogoTemplates()');
  assert.equal(body.revision,1);assert.equal(body.templates.length,2);assert(!body.templates.some(t=>t.placement_id==='learning-b'));assert.equal(run('S.learningLogoDirty'),false);
- const fresh=setup(service);await fresh.run('loadLearningMachineConfig(true)');assert.equal(fresh.run('LEARNING_MACHINE.templates["learning-a"].asset_id'),'learning.logo.white-app');assert.equal(fresh.run('LEARNING_MACHINE.templates["learning-a"].x'),.12);
+ const fresh=setup(service);await fresh.run('loadLearningMachineConfig(true)');assert.equal(fresh.run('LEARNING_MACHINE.templates["learning-a"].width'),.22);assert.equal(fresh.run('LEARNING_MACHINE.templates["learning-a"].x'),.12);
 });
 test('保存冲突保留工作区修改，不覆盖其他窗口配置',async()=>{
  const {run}=setup(async()=>{const e=new Error('conflict');e.status=409;throw e});run('S.learningLogoPid="learning-a";setLearningLogoValue("x",15)');await run('saveLearningLogoTemplates()');assert.equal(run('S.learningLogoDirty'),true);assert.equal(run('LEARNING_MACHINE.templates["learning-a"].x'),.15);assert(run('S.learningLogoError').includes('其他窗口'));

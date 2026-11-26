@@ -10,7 +10,7 @@ const placements=catalog.filter(p=>p.enabled!==false);
 function context(form='单图') {
   const ctx = vm.createContext({
     document:{addEventListener(){},querySelector(){return null},querySelectorAll(){return []}},
-    PLACEMENTS:structuredClone(placements),UNAVAILABLE_PLACEMENTS:catalog.filter(p=>p.enabled===false), STYLES:[], IPS:[], ASSETS:{logos:[{id:'logo.onion.standard.001',label:'洋葱学园'},{id:'logo.onion.app.001',label:'洋葱学园+APP'}]},
+    PLACEMENTS:structuredClone(placements),UNAVAILABLE_PLACEMENTS:catalog.filter(p=>p.enabled===false), STYLES:[], IPS:[], ASSETS:{logos:[{id:'learning.logo.black',label:'黑字标准版'},{id:'learning.logo.white-app',label:'白字反白版'}]},
     DEF_CTA:'立即体验', SETS_MIN:1, SETS_MAX:20,
     S:{draft:{channel:'应用商店',cta_enabled:true,cta_overrides:{},image_form:form,pids:[],t1:'',t2:'',s1:'',s2:'',s3:'',cta:'立即体验',sets:3,ip:'random',style:'random'},formDrafts:{},tried:false},
     save(){}, structuredClone,
@@ -34,6 +34,28 @@ test('同一种文案允许多选兼容渠道版位',()=>{
   const ids=placements.filter(p=>p.image_form==='单图').slice(0,2).map(p=>p.id);
   vm.runInContext(`togP(${JSON.stringify(ids[0])});togP(${JSON.stringify(ids[1])})`,ctx);
   assert.deepEqual([...ctx.S.draft.pids],ids);
+});
+test('信息流内的喜马拉雅套图默认选五个尺寸，可单独取消并与其他版位一起生成',()=>{
+  const ctx=context();Object.assign(ctx.S.draft,{channel:'信息流',t1:'题目不会先拍一下',t2:'看懂每一步',sets:1,noLogo:true});
+  const run=code=>vm.runInContext(code,ctx);
+  const initial=run('viewForm()');
+  assert(initial.indexOf('id="ximalaya-suite"')>initial.indexOf('id="placements-title"'));
+  assert.doesNotMatch(initial,/ximalaya-placement-items/);
+  run('togP(formPlacements(S.draft).find(p=>p.platform==="CPA").id);setXimalayaSuite(true)');
+  let html=run('viewForm()');
+  assert.match(html,/生成整套/);assert.match(html,/预计 6 次生图/);
+  for(const size of ['1000×1000','1280×720','1200×480','720×1280','720×1559'])assert(html.includes(size));
+  const square=run('ximalayaIds(S.draft)[0]');
+  run('togP(ximalayaIds(S.draft)[0]);setCtaOverride(ximalayaIds(S.draft)[0],"none");setCtaOverride(S.draft.pids[0],"none")');
+  html=run('viewForm()');
+  assert.match(html,/已选 4\/5 个尺寸/);assert.match(html,/预计 5 次生图/);
+  assert.equal(ctx.S.draft.pids.length,5);assert(!ctx.S.draft.pids.includes(square));
+  assert.equal(run('psz(plOf(ximalayaIds(S.draft)[0]))'),'1280×720');
+  assert.equal(run('formIssue(S.draft)'),null);
+  assert.equal(Object.keys(ctx.S.draft.cta_overrides).length,1);
+  run('setXimalayaSuite(false)');assert.equal(ctx.S.draft.pids.length,1);
+  run('selectFeedPlacements(true)');assert.equal(ctx.S.draft.pids.length,8);
+  run('setChannel("应用商店")');assert(!ctx.S.draft.ximalaya_suite);
 });
 test('不允许通过旧点击事件选入其他形式的版位',()=>{
   const ctx=context('单图'),id=placements.find(p=>p.image_form==='双图').id;
@@ -62,7 +84,7 @@ test('画面设定默认收起，定制后显示三个固定上传位和紧凑�
   assert(!/class="[^"]*\bmore\b/.test(html));
   for(const id of ['ips','styleq','nologo','f-feature','f-font','reference-options'])assert(html.includes('id="'+id+'"'),id);
   assert(!html.includes('f-direction'));assert(!html.includes('方向名'));
-  for(const label of ['随机 IP','全随机（含不用 IP）','不用 IP','黑字标准版','白字APP版','不用 Logo','参考风格','参考排版','产品界面'])assert(html.includes(label),label);
+  for(const label of ['随机 IP','全随机（含不用 IP）','不用 IP','添加 Logo','不用 Logo','参考风格','参考排版','产品界面'])assert(html.includes(label),label);
   assert.equal((html.match(/class="reference-slot /g)||[]).length,3);
   assert.equal((html.match(/class="primary"/g)||[]).length,1);
 });
@@ -88,14 +110,21 @@ test('定制控件显示所选值，必带Logo逐行锁定但不改全局不用L
   assert(!/id="nologo"[^>]*disabled/.test(html));
   assert(html.includes('logo-lock force-highlight'));assert(html.includes('🔒 Logo'));
 });
-test('角色素材按标准、学段与Q版、老师展示，指定版本保持选中',()=>{
+test('角色素材按标准、学段与Q版、老师和新增角色展示，指定版本保持选中',()=>{
   const ctx=context();
   ctx.IPS=JSON.parse(fs.readFileSync(path.join(root,'assets/asset-manifest.json'))).assets.filter(a=>a.kind==='ip'&&a.enabled!==false).map(a=>({id:a.asset_id,label:a.asset_name_zh||a.display_name,stage:a.stage,variant:a.variant,thumb:'/api/assets/'+a.asset_id}));
   const selected=ctx.IPS.find(a=>a.id.includes('.primary.'));ctx.S.draft.ip=selected.id;
   const html=vm.runInContext('viewForm()',ctx);
-  for(const name of ['标准形象','学段与 Q 版','老师角色'])assert(html.includes(name),name);
+  for(const name of ['标准形象','学段与 Q 版','老师角色','新增角色'])assert(html.includes(name),name);
   for(const a of ctx.IPS)assert(html.includes('data-ip="'+a.id+'"'),a.id);
   assert(html.includes('value="'+selected.id+'" selected>'+selected.label));
+  const newGroup=html.match(/<optgroup label="新增角色">([\s\S]*?)<\/optgroup>/)[1];
+  const newRoles=ctx.IPS.filter(a=>a.stage==='unspecified');
+  assert.equal(newRoles.length,27);
+  assert.equal((newGroup.match(/data-ip=/g)||[]).length,newRoles.length);
+  for(const a of newRoles)assert(newGroup.includes('data-ip="'+a.id+'"'),a.id);
+  ctx.S.draft.ip=newRoles[0].id;
+  assert(vm.runInContext('viewForm()',ctx).includes('value="'+newRoles[0].id+'" selected>'+newRoles[0].label));
 });
 test('旧草稿缺少非必填配置时补齐结构，不擅自选择渠道',()=>{
   const ctx=context();vm.runInContext('loadDraft({image_form:"单图",t1:"旧草稿标题"})',ctx);
@@ -106,8 +135,8 @@ test('渠道过滤与形式显隐来自当前规则，学习机仅展示唯一�
   const ctx=context();ctx.S.draft.channel='信息流';
   let html=vm.runInContext('viewForm()',ctx);
   const ids=[...html.matchAll(/class="placement-row[^"]*"[^>]*data-pid="([^"]+)"/g)].map(m=>m[1]);
-  assert.deepEqual(ids.sort(),placements.filter(p=>p.category==='信息流').map(p=>p.id).sort());
-  assert(!html.includes('id="image-form"'));assert(html.includes('>喜马拉雅</h4>'));
+  assert.deepEqual(ids.sort(),placements.filter(p=>p.category==='信息流'&&p.platform!=='喜马拉雅').map(p=>p.id).sort());
+  assert(!html.includes('id="image-form"'));assert(html.includes('>喜马拉雅套图</span>'));
   vm.runInContext('setChannel("学习机")',ctx);html=vm.runInContext('viewForm()',ctx);
   const learningIds=[...html.matchAll(/class="placement-row[^"]*"[^>]*data-pid="([^"]+)"/g)].map(m=>m[1]);
   assert.equal(learningIds.length,44);assert.equal(new Set(learningIds).size,44);
@@ -293,11 +322,11 @@ test('学习机整套计数忽略旧多套配置，不宣称真实模型调用�
  const detail=vm.runInContext('learningProduction(S.draft)',ctx);assert(detail.includes('先生成并查看 1 张基准图'));assert(detail.includes(`${count} 张成品`));assert(!detail.includes('个模型任务'));
  const html=vm.runInContext('viewForm()',ctx);assert(!html.includes('id="f-sets"'));assert(html.includes('固定生成一整套'));
 });
-test('普通任务统一选择黑字或白字APP版，兼容旧别名且保留不用Logo限制',()=>{
+test('普通任务只选择添加或不用Logo，必带Logo仍校验',()=>{
  const ctx=context();ctx.S.visualOpen=true;
- let html=vm.runInContext('viewVisualOptions(S.draft)',ctx);assert(html.includes('value="learning.logo.black"'));assert(html.includes('value="learning.logo.white-app"'));assert(html.includes('黑字标准版'));assert(html.includes('白字APP版'));
- vm.runInContext('setLogoSelection("logo.onion.app.001")',ctx);assert.equal(ctx.S.draft.logo_asset_id,'learning.logo.white-app');assert.equal(ctx.S.draft.noLogo,false);
- vm.runInContext('setLogoSelection("learning.logo.black")',ctx);assert.equal(ctx.S.draft.logo_asset_id,'learning.logo.black');
+ const html=vm.runInContext('viewVisualOptions(S.draft)',ctx);assert(html.includes('value="auto"'));assert(html.includes('value="none"'));assert(!html.includes('value="learning.logo.'));
+ ctx.S.draft.logo_asset_id='logo.onion.app.001';
+ vm.runInContext('setLogoSelection("auto")',ctx);assert.equal(ctx.S.draft.logo_asset_id,undefined);assert.equal(ctx.S.draft.noLogo,false);
  const required=placements.find(p=>p.category!=='学习机'&&p.image_form==='单图'&&p.logo_policy==='required');Object.assign(ctx.S.draft,{pids:[required.id],channel:required.category,t1:'已确认正文',t2:'补充说明'});
  vm.runInContext('setLogoSelection("none")',ctx);assert.equal(ctx.S.draft.noLogo,true);assert.equal(vm.runInContext('formIssue(S.draft).field',ctx),'nologo');
 });

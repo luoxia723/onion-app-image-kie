@@ -15,6 +15,23 @@ function readyRun(extra={}){
  const baseline={id:'baseline',version:1,status:'done',sha256:'hash-one',image_url:'/api/learning-machine/runs/run-one/images/baseline/baseline?version=1',prompt:'基准图提示词'};
  return runFixture({status:'waiting_for_confirmation',baseline,...extra});
 }
+test('学习机回执核对与后台续查显示统一状态，接回请求绑定图片版本',async()=>{
+ const run=readyRun({mode:'real'});Object.assign(run.baseline,{status:'failed',image_url:null,query_required:true,submission_unverified:true});
+ const calls=[];
+ const {context,execute}=setup(async(path,method,body)=>{calls.push({path,method,body});return run});
+ context.run=run;
+ execute('installLearningRun(run);S.view="learning-run"');
+ const markup=execute('viewProductionBaseline(run,false)');
+ assert.match(markup,/等待回执核对/);
+ assert.match(markup,/KIE 任务号/);
+ assert.match(markup,/接回任务/);
+ assert.match(markup,/确认未受理后重出/);
+ assert.equal(execute('productionVisualLabel({status:"processing",provider_query_retry:2})'),'后台继续查询原任务');
+ await execute('reconcileLearningKie("baseline","baseline",1," previous-task ")');
+ assert.equal(calls[0].path,'/learning-machine/runs/run-one/kie-receipt');
+ assert.deepEqual({...calls[0].body,idempotency_key:undefined},{action:'attach',kind:'baseline',image_id:'baseline',
+  expected_version:1,task_id:'previous-task',idempotency_key:undefined});
+});
 function approval(run){return {confirmed:true,baseline_version:run.baseline.version,sha256:run.baseline.sha256,mode:run.mode}}
 function setup(service=async()=>runFixture()){
  const messages=[],hashes=[],downloads=[];
@@ -97,17 +114,19 @@ test('运行打开乱序时只安装最后一次选择，hash记录运行ID',asy
 test('成品展示后端已合成图片，版本可查且不重复叠Logo或灰层',()=>{
  const output={id:'one',platform:'优学派',name:'横幅 <测试>',width:840,height:404,image_index:1,status:'done',version:2,image_url:'/composited-v2.png',baseline_version:2,versions:[{version:1,image_url:'/composited-v1.png',baseline_version:1}]};
  const run=readyRun({mode:'simulation',outputs:[output],name:'<script>alert(1)</script>'});run.approval=approval(run);
- const {context,execute}=setup();context.run=run;execute('installLearningRun(run);S.view="learning-run";S.learningOutputVersions={one:1}');
+ const {context,execute}=setup();context.run=run;execute('installLearningRun(run);S.view="learning-run";setLearningStage("results");S.learningOutputVersions={one:1}');
  const html=execute('viewLearningRun()');assert(html.includes('历史模拟记录'));assert(html.includes('/composited-v1.png'));assert(html.includes('横幅 &lt;测试&gt;'));assert(!html.includes('learning-logo-mask-overlay'));assert(html.includes('正在查看历史版本'));
  assert(!execute('viewLearningRunHead()').includes('<script>'));
 });
-test('只有全部成品完成才允许图包，下载使用服务返回地址并重读版本',async()=>{
+test('学习机选齐全部当前成品后允许图包，下载使用服务返回地址并重读版本',async()=>{
  const run=readyRun({outputs:[{id:'one',platform:'百度',name:'广告',width:512,height:512,status:'done',version:1,image_url:'/done.png'}]});const calls=[];
  const pkg={id:'pkg',version:1,image_count:1,download_url:'/api/learning-machine/runs/run-one/images/package/pkg'};
  const {context,execute,downloads}=setup(async(path,method)=>{calls.push({path,method});return path.endsWith('/package')?pkg:{...run,packages:[pkg]}});context.run=run;
- execute('installLearningRun(run);S.view="learning-run"');assert(!execute('viewLearningRun()').match(/id="learning-run-package"[^>]*disabled/));await execute('packageLearningRun()');
+ execute('installLearningRun(run);S.view="learning-run";setLearningStage("results")');assert.match(execute('viewLearningRun()'),/id="learning-run-package"[^>]*disabled/);
+ await execute('packageLearningRun()');assert.equal(calls.length,0);
+ execute('setLearningDeliveryReview(true)');assert(!execute('viewLearningRun()').match(/id="learning-run-package"[^>]*disabled/));await execute('packageLearningRun()');
  assert.deepEqual(calls.map(x=>x.path),['/learning-machine/runs/run-one/package','/learning-machine/runs/run-one']);assert.deepEqual(downloads,[pkg.download_url]);
- execute('LEARNING_RUNS.current.outputs[0].status="failed"');assert.match(execute('viewLearningRun()'),/id="learning-run-package"[^>]*disabled/);
+ execute('LEARNING_RUNS.current.outputs[0].version=2');assert.match(execute('viewLearningRun()'),/id="learning-run-package"[^>]*disabled/);
  await execute('packageLearningRun()');assert.equal(calls.length,2);
 });
 test('已完成整套中的单张重出失败后仍可恢复未完成图片，不被旧suite状态永久锁住',async()=>{
@@ -115,9 +134,9 @@ test('已完成整套中的单张重出失败后仍可恢复未完成图片，�
  const run=readyRun({outputs:[output],suite:{status:'completed',baseline_version:1},status:'failed'});run.approval=approval(run);
  const calls=[];const {context,execute}=setup(async(path,method,body)=>{calls.push({path,body});return run});context.run=run;
  execute('installLearningRun(run);S.view="learning-run"');let html=execute('viewLearningRun()');
- assert(!html.match(/id="learning-run-expand"[^>]*disabled/));assert(html.includes('恢复未完成图片'));
+ assert.match(html,/id="learning-progress-resume"/);assert(!html.match(/id="learning-progress-resume"[^>]*disabled/));assert(html.includes('恢复未完成图片'));
  await execute('learningRunAction("expand")');assert.equal(calls.length,1);assert(calls[0].path.endsWith('/expand'));
- execute('LEARNING_RUNS.current.outputs[0].status="done"');html=execute('viewLearningRun()');assert.match(html,/id="learning-run-expand"[^>]*disabled/);
+ execute('LEARNING_RUNS.current.outputs[0].status="done"');html=execute('viewLearningRun()');assert.match(html,/id="learning-progress-resume"[^>]*disabled/);
 });
 test('修订号未变化时保留运行对象和页面，仅更新计时并合并并发轮询',async()=>{
  const calls=[];let release;const {context,execute}=setup(path=>{calls.push(path);return new Promise(resolve=>release=resolve)});context.run=readyRun();
@@ -132,13 +151,22 @@ test('运行列表低频刷新，隐藏页面十秒内不重复拉列表',async(
  assert(!calls.includes('/learning-machine/runs'));
  execute('document.hidden=false');await execute('refreshLearningRun()');assert.equal(calls.filter(path=>path==='/learning-machine/runs').length,1);
 });
-test('完成整套默认打开成品，阶段切换可查看基准而不执行模型',()=>{
+test('完成整套默认打开成品，每次只执行当前页签的渲染函数，切换不请求API',()=>{
  const output={id:'one',platform:'百度',name:'广告',width:512,height:512,status:'done',version:1,image_url:'/done.png'};
  const run=readyRun({outputs:[output],status:'completed',suite:{status:'completed',baseline_version:1}});run.approval=approval(run);
- const {context,execute}=setup(()=>{throw new Error('切换页签不应调用API')});context.run=run;execute('installLearningRun(run);S.view="learning-run"');
+ const {context,execute}=setup(()=>{throw new Error('切换页签不应调用API')});context.run=run;context.rendered=[];
+ execute(`installLearningRun(run);S.view="learning-run";
+  const baselineView=viewProductionBaseline,resultsView=viewProductionResults;
+  viewProductionBaseline=(...args)=>{rendered.push("baseline");return baselineView(...args)};
+  viewProductionResults=(...args)=>{rendered.push("results");return resultsView(...args)};
+  viewProductionProgress=()=>{throw new Error("不需要渲染进度页")};
+  viewProductionPackages=()=>{throw new Error("不需要渲染图包页")};`);
  assert.equal(execute('productionStage(run)'),'results');
- let html=execute('viewLearningRun()');assert.match(html,/id="learning-stage-baseline"[^>]*hidden/);assert.match(html,/id="production-tab-results" aria-selected="true"/);
- execute('setLearningStage("baseline")');assert.equal(execute('productionStage(run)'),'baseline');assert(!execute('viewLearningRun()').match(/id="learning-stage-baseline"[^>]*hidden/));
+ let html=execute('viewLearningRun()');assert(!html.includes('id="learning-stage-baseline"'));assert.match(html,/id="production-tab-results" aria-selected="true"/);
+ assert.deepEqual(context.rendered,['results']);
+ execute('setLearningStage("baseline")');assert.equal(execute('productionStage(run)'),'baseline');
+ html=execute('viewLearningRun()');assert(html.includes('id="learning-stage-baseline"'));assert(!html.includes('id="learning-stage-results"'));
+ assert.deepEqual(context.rendered,['results','baseline']);
  execute('setLearningBaselineVersion(1)');assert.equal(execute('S.learningBaselineVersion'),1);
 });
 test('扩套提交后打开进度页并聚焦，成品仍可由页签查看',async()=>{
@@ -193,10 +221,14 @@ test('复制失败保留可选择的完整提示词，不误报成功或触发�
 });
 test('成品按冻结大渠道归组，跨母版的同渠道仍在一起且不读取当前目录名称',()=>{
  const make=(id,platform,master)=>({id,platform,name:'冻结版位'+id,width:512,height:512,status:'done',version:1,image_url:'/'+id+'.png',source_master_id:master});
- const run=readyRun({outputs:[make('baidu-a','百度','learning-master-D1'),make('zuoyebang','作业帮','learning-master-D1'),make('baidu-b','百度','learning-master-E7')]});
+ const run=readyRun({outputs:[make('baidu-a','百度','learning-master-D1'),make('zuoyebang','作业帮','learning-master-D1'),{...make('baidu-b','百度','learning-master-E7'),width:1200,height:400}]});
  const {context,execute}=setup();context.run=run;execute('installLearningRun(run);S.view="learning-run";PLACEMENTS.forEach(p=>p.platform="当前目录不应覆盖冻结渠道")');
  assert.deepEqual(JSON.parse(execute('JSON.stringify(learningOutputChannelGroups(run.outputs).map(g=>({channel:g.channel,ids:g.outputs.map(o=>o.id)})))')),[{channel:'百度',ids:['baidu-a','baidu-b']},{channel:'作业帮',ids:['zuoyebang']}]);
  let html=execute('viewLearningOutputGroups(run,run.outputs,false,true)');assert.equal((html.match(/class="learning-output-channel"/g)||[]).length,2);assert(html.includes('<h3>百度</h3>'));assert(html.includes('<h3>作业帮</h3>'));assert(!html.includes('当前目录不应覆盖'));
+ assert.match(html,/<section class="learning-output-channel" data-learning-channel="百度">[\s\S]*?<div class="learning-output-grid mixed-review-gallery">/);
+ assert.equal((html.match(/class="learning-output-grid mixed-review-gallery"/g)||[]).length,1);
+ execute('filterLearningRunChannel("百度");openLearningImage("/baidu-a.png","方图","output","baidu-a",1);stepLearningReview(1)');
+ assert.equal(execute('S.learningImagePreview.id'),'baidu-b');
  execute('filterLearningRunChannel("作业帮")');html=execute('viewLearningOutputGroups(run,run.outputs,false,true)');assert(!html.includes('baidu-a.png'));assert(html.includes('zuoyebang.png'));
 });
 test('点击基准图打开详情直接显示该版本提示词，详情版本切换同步基准选择',()=>{
@@ -247,19 +279,20 @@ test('建立新规则批次遇到未知响应失败时沿用幂等键，成功�
  execute('installLearningRun(source);S.view="learning-run"');await execute('makeLearningRunFromBaseline()');assert.equal(execute('S.learningRunId'),'run-one');await execute('makeLearningRunFromBaseline()');
  assert.equal(calls.length,2);assert.equal(calls[0].body.idempotency_key,calls[1].body.idempotency_key);assert.equal(execute('LEARNING_RUNS.current.baseline.sha256'),source.baseline.sha256);
 });
-test('学习机导出Logo选择不改模板或图片，只在保存图包时传明确版本',async()=>{
+test('学习机按已合成的成品保存图包，无全套Logo款式选择',async()=>{
  const run=readyRun({outputs:[{id:'one',status:'done',version:1,width:512,height:512,image_url:'/original.png',logo_required:true}]});
  const calls=[];const {context,execute}=setup(async(path,method,body)=>{calls.push({path,method,body});return path.endsWith('/package')?{download_url:'/package.zip'}:run});context.run=run;
- execute('installLearningRun(run);S.view="learning-run";S.learningLogoDirty=false;setLearningExportLogo("learning.logo.white-app")');
+ execute('installLearningRun(run);S.view="learning-run";setLearningStage("results");S.learningLogoDirty=false');
  assert.equal(calls.length,0);assert.equal(execute('S.learningLogoDirty'),false);assert.equal(execute('LEARNING_RUNS.current.outputs[0].image_url'),'/original.png');
- const html=execute('viewLearningRun()');assert(html.includes('按各图配置'));assert(html.includes('白字APP版'));assert(html.includes('固定无Logo版位不添加'));
- await execute('packageLearningRun()');assert.equal(calls[0].body.logo_asset_id,'learning.logo.white-app');assert.equal(Object.keys(calls[0].body).length,1);assert.equal(calls[0].path,'/learning-machine/runs/run-one/package');
- calls.length=0;execute('setLearningExportLogo("")');await execute('packageLearningRun()');assert.deepEqual(Object.keys(calls[0].body),[]);
+ const html=execute('viewLearningRun()');assert(html.includes('导出演练图包'));assert(!html.includes('id="learning-export-logo"'));
+ execute('setLearningDeliveryReview(true,"one",1)');
+ await execute('packageLearningRun()');assert.deepEqual(Object.keys(calls[0].body),['reviewed_versions']);
+ assert.deepEqual({...calls[0].body.reviewed_versions},{one:1});assert.equal(calls[0].path,'/learning-machine/runs/run-one/package');
 });
 test('应用当前Logo模板是独立本机操作，不携带导出选择且未完成有Logo图片时拦截',async()=>{
  const run=readyRun({outputs:[{id:'one',status:'done',version:1,logo_required:true},{id:'no-logo',status:'failed',version:1,logo_required:false}]});
  const calls=[];const {context,execute}=setup(async(path,method,body)=>{calls.push({path,body});return {...run,revision:2,busy:true}});context.run=run;
- execute('installLearningRun(run);S.view="learning-run";setLearningExportLogo("learning.logo.white-app");S.learningOutputVersions={one:1}');
+ execute('installLearningRun(run);S.view="learning-run";S.learningOutputVersions={one:1}');
  await execute('refreshLearningRunLogos()');assert.equal(calls.length,1);assert(calls[0].path.endsWith('/refresh-logos'));assert(calls[0].body.idempotency_key);assert(!Object.hasOwn(calls[0].body,'logo_asset_id'));assert(!Object.hasOwn(calls[0].body,'placement_ids'));assert.equal(execute('Object.keys(S.learningOutputVersions).length'),0);
  execute('LEARNING_RUNS.current.busy=false;LEARNING_RUNS.current.outputs[0].status="failed"');await execute('refreshLearningRunLogos()');assert.equal(calls.length,1);
 });
@@ -268,7 +301,8 @@ test('本机Logo更新失败显示本机重试，既不锁死恢复也不引导A
  const run=readyRun({outputs:[output]});run.approval=approval(run);const calls=[];
  const {context,execute}=setup(async(path,method,body)=>{calls.push({path,body});return run});context.run=run;
  execute('installLearningRun(run);S.view="learning-run"');const card=execute('viewLearningOutput(run,run.outputs[0],false,true)');assert(card.includes('重试Logo更新'));assert(card.includes('onclick="refreshLearningRunLogos()"'));assert(!card.includes("learningRunAction('regenerate'"));
- assert(!execute('viewLearningRun()').match(/id="learning-refresh-logos"[^>]*disabled/));
+ execute('setLearningStage("results")');
+ const html=execute('viewLearningRun()');assert.match(html,/id="learning-refresh-logos"/);assert.doesNotMatch(html,/id="learning-refresh-logos"[^>]*disabled/);
  await execute('learningRunAction("regenerate","one")');assert.equal(calls.length,0);
  await execute('refreshLearningRunLogos()');assert.equal(calls.length,1);assert(calls[0].path.endsWith('/refresh-logos'));
 });

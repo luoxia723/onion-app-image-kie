@@ -574,6 +574,11 @@ def test_logo_refresh_and_export_switch_only_use_local_layers_and_keep_versions(
     assert service.image(rid,'output',yes+'::1',1).read_bytes()==old_image
     assert service.package_file(rid,original_package['id']).read_bytes()==old_zip
     service.refresh_logos(rid,'logo-refresh-once',[yes]);assert settled(service,rid)['outputs']==changed['outputs']
+    automatic=service.package(rid)
+    with zipfile.ZipFile(service.package_file(rid,automatic['id'])) as archive:
+        rows=json.loads(archive.read('交付清单.json'))['images']
+        assert next(o for o in rows if o['placement_id']==yes)['logo_asset_id']==current['logo_template']['asset_id']
+        assert next(o for o in rows if o['placement_id']==no)['logo_asset_id'] is None
     white=service.package(rid,logo_asset_id='learning.logo.white-app')
     black=service.package(rid,logo_asset_id='learning.logo.black')
     assert white['id']!=black['id']

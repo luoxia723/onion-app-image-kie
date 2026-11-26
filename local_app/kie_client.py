@@ -1,7 +1,7 @@
 """KIE adapter with per-request dependencies and crash-safe upload cache locks."""
 import json
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from .config import ROOT,UserError
@@ -65,7 +65,7 @@ def _generate(job,key,failed_references,progress):
     if job.get('query_only') and not state.get('task_id'):raise ValueError('unknown')
     timeout=240;submitted=state.get('submitted_at')
     if job.get('query_only') and type(submitted) in (int,float):timeout+=max(0,int(time.time()-submitted))
-    args=SimpleNamespace(image_model=model,retries=3,poll_timeout=timeout,max_timeout_restarts=0)
+    args=SimpleNamespace(image_model=model,retries=3,poll_timeout=timeout)
     cache_path=Path(job['upload_cache']);guard=cache_path.with_suffix('.guard')
     def read_cache():
         try:return json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
@@ -86,22 +86,27 @@ def _generate(job,key,failed_references,progress):
                 urls.append(url)
         return urls
     def request(req,*a,**kw):
-        if '/jobs/createTask' in req.full_url:
+        creating='/jobs/createTask' in req.full_url
+        if creating:
             if Path(job['stop_marker']).exists():raise RuntimeError('onion_stopped')
             progress('submitting')
         result=render.request_json(req,*a,**kw)
-        if '/jobs/createTask' in req.full_url:progress('generating')
+        if creating:progress('generating')
         return result
+    @contextmanager
+    def submission_guard():
+        source=slot.get('ximalaya_source')
+        if source:progress('awaiting_submit')
+        # Keep the lock until the receipt is saved, then allow polling in parallel.
+        with file_lock(output.parent/(source+'-create.guard')) if source else nullcontext():
+            if Path(job['stop_marker']).exists():raise RuntimeError('onion_stopped')
+            yield
     if not (state.get('status')=='downloaded' and output.exists() and render.sha256_file(output)==state.get('sha256')):
         progress('generating' if state.get('task_id') else 'uploading')
         url,state=render.obtain_result(args,job['base'],job['upload'],key,slot['prompt'],paths,fingerprint,state_path,state,ratio,render.RESOLUTION,
-                                       request_fn=request,upload_fn=upload)
+                                       request_fn=request,upload_fn=upload,submission_guard=submission_guard)
         progress('downloading')
-        try:render.download_image(url,output)
-        except render.ResultLinkExpired:
-            state.pop('result_url',None);state['status']='waiting';render.atomic_write_json(state_path,state)
-            url,state=render.obtain_result(args,job['base'],job['upload'],key,slot['prompt'],paths,fingerprint,state_path,state,ratio,render.RESOLUTION,request_fn=request,upload_fn=upload)
-            render.download_image(url,output)
+        render.download_kie_result(url,output,job['base'],key,state['task_id'])
         state.update(status='downloaded',sha256=render.sha256_file(output));render.atomic_write_json(state_path,state)
     result={'ok':True,'source':str(output),'state':state}
     progress('processing')

@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 import threading
+import time
 
 import pytest
 from PIL import Image
@@ -15,6 +16,7 @@ from local_app.learning_pipeline import preview
 from local_app.learning_prompts import build
 from local_app.scene_planner import ApiScenePlanner,PlanningStopped
 from kie_model import GPT_IMAGE_26_FLARE,MODEL
+from tests_local.test_learning_setup_api import api
 import render
 
 
@@ -99,6 +101,12 @@ def image_server(tmp_path):
                                  'on_poll':None,'distinct_upload_urls':False}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*a):pass
+        def send_image(self):
+            if control.get('native_size'):
+                image=BytesIO()
+                Image.new('RGB',control['native_size'],'white').save(image,'PNG')
+                return self.send(image.getvalue(),'image/png')
+            return self.send(buffer.getvalue(),'image/png')
         def send(self,value,mime='application/json',status=200):
             raw=json.dumps(value).encode() if mime=='application/json' else value
             self.send_response(status);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
@@ -110,27 +118,39 @@ def image_server(tmp_path):
                 self.send({'code':200,'data':{'downloadUrl':url}})
             elif self.path=='/api/v1/jobs/createTask':
                 payloads.append(('create',body))
+                control['created_at']=int(time.time()*1000)
                 if control['create_errors']:
                     error=control['create_errors'].pop(0)
                     if error.get('disconnect'):
+                        if error.get('accepted'):control['successful_creates']+=1
                         self.close_connection=True;return
                     self.send({'code':error['code'],'msg':'private test-image-only echoed body',
                                'data':{'taskId':error['task_id']} if error.get('task_id') else None},status=error.get('http_status',200))
                 else:
                     control['successful_creates']+=1
                     self.send({'code':200,'data':{'taskId':'one-provider-task'}})
+            elif self.path=='/api/v1/common/download-url':
+                assert body=={'url':base+'/result.png'}
+                assert self.headers['Authorization']=='Bearer test-image-only'
+                self.send({'code':200,'data':base+'/temporary.png'})
             else:self.send_error(404)
         def do_GET(self):
             records.append(self.path.split('?')[0])
             if self.path.startswith('/api/v1/jobs/recordInfo?'):
                 if control['on_poll']:control['on_poll']()
-                if control['waiting']:
+                if control['waiting'] or control.get('waiting_queries',0)>0:
+                    control['waiting_queries']=max(0,control.get('waiting_queries',0)-1)
                     self.send({'code':200,'data':{'state':'generating'}})
                     if control['event']:control['event'].set()
-                else:self.send({'code':200,'data':{'state':'success','resultJson':json.dumps({'resultUrls':[base+'/result.png']})}})
+                else:
+                    submitted=next((body for kind,body in reversed(payloads) if kind=='create'),None)
+                    record={'taskId':'one-provider-task','state':'success','resultJson':json.dumps({'resultUrls':[base+'/result.png']})}
+                    if submitted:record.update(param=json.dumps(submitted),model=submitted['model'],createTime=control['created_at'])
+                    self.send({'code':200,'data':record})
             elif self.path=='/result.png':
                 if control['expire'] and records.count('/result.png')==1:self.send_error(403)
-                else:self.send(buffer.getvalue(),'image/png')
+                else:self.send_image()
+            elif self.path=='/temporary.png':self.send_image()
             else:self.send_error(404)
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);base=f'http://127.0.0.1:{server.server_port}'
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -157,10 +177,79 @@ def test_actual_image_adapter_submits_once_and_resumes_existing_receipt(image_se
     assert request['input']['resolution']=='1K' and request['input']['prompt']==job['prompt']
     assert request['input']['input_urls']==[executor.settings.base+'/ref.png']
     assert 'test-image-only' not in json.dumps(result)
+    if expired:
+        assert records[-3:]==['/result.png','/api/v1/common/download-url','/temporary.png']
     count=len(records);executor.generate_image(job,threading.Event());assert len(records)==count
     Path(job['output']).unlink();executor.generate_image(job,threading.Event())
     assert records.count('/api/v1/jobs/createTask')==1
     assert records.count('/api/file-base64-upload')==1
+
+
+@pytest.mark.transport
+def test_learning_recovery_without_receipt_never_creates(image_server):
+    executor,job,records,_,_=image_server
+    with pytest.raises(LearningExecutionError,match='回执缺失') as caught:
+        executor.generate_image({**job,'recover_existing':True},threading.Event())
+    assert caught.value.query_required
+    assert records==[]
+
+
+@pytest.mark.transport
+@pytest.mark.parametrize('outcome',['timeout','attach','legacy_attach','unaccepted'])
+def test_learning_baseline_kie_recovery_keeps_one_billable_request(image_server,api,monkeypatch,outcome):
+    from local_app.learning_runtime import LearningRuntime
+    from tests_local.test_learning_runtime import params, settled
+
+    executor,_,records,_,control=image_server
+    engine,request=api
+    for attr in ('key','base','upload'):setattr(engine.settings,attr,getattr(executor.settings,attr))
+    engine.settings.planning_key='offline-planning'
+    control['native_size']=(320,180)
+    plan=executor.plan_scene
+    monkeypatch.setattr(executor,'plan_scene',lambda run,event:plan({**run,'mode':'simulation'},event))
+    if outcome=='timeout':
+        generate=executor.generate_image
+        monkeypatch.setattr(executor,'generate_image',lambda job,event:generate({**job,'poll_timeout':.20},event))
+        monkeypatch.setattr(render,'QUERY_RETRY_DELAYS',(.02,.03))
+        control['waiting_queries']=1
+    else:
+        control['create_errors']=[{'disconnect':True,'accepted':outcome!='unaccepted'}]
+    service=LearningRuntime(engine,executor)
+    engine.learning_runtime=service
+    try:
+        status,created=request('/api/learning-machine/runs','POST',{'params':params(['learning-ruishi-rect-580x320']),
+                                                                    'idempotency_key':'kie-recovery-create'})
+        assert status==200,created
+        rid=created['id'];base='/api/learning-machine/runs/'+rid
+        assert request(base+'/baseline','POST',{'idempotency_key':'kie-recovery-first'})[0]==200
+        run=settled(service,rid)
+        if outcome!='timeout':
+            assert run['baseline']['submission_unverified'] and records.count('/api/v1/jobs/createTask')==1
+            reconcile={'kind':'baseline','image_id':'baseline','expected_version':1,'idempotency_key':'kie-recovery-major'}
+            route=base+'/kie-receipt'
+            if outcome=='unaccepted':
+                assert request(route,'POST',{**reconcile,'action':'confirm_unaccepted'})[0]==400
+                status,value=request(route,'POST',{**reconcile,'action':'confirm_unaccepted','confirmed_unaccepted':True})
+            else:
+                if outcome=='legacy_attach':
+                    path=render.task_state_path(Path(service.runs[rid]['baseline']['raw_path']))
+                    old=render.load_task_state(path);old.pop('submission_signature')
+                    render.atomic_write_json(path,old)
+                wrong_status,wrong=request(route,'POST',{**reconcile,'action':'attach','task_id':'wrong-task'})
+                assert wrong_status==409 and '不一致' in wrong['message_zh']
+                assert records.count('/api/v1/jobs/createTask')==1
+                status,value=request(route,'POST',{**reconcile,'action':'attach','task_id':'one-provider-task'})
+            assert status==200,value
+            run=settled(service,rid)
+        assert run['baseline']['status']=='done',run.get('error')
+        assert run['baseline']['version']==1
+        assert records.count('/api/file-base64-upload')==1
+        assert records.count('/api/v1/jobs/createTask')==(2 if outcome=='unaccepted' else 1)
+        assert control['successful_creates']==1
+        if outcome=='timeout':
+            assert records.count('/api/v1/jobs/recordInfo')==2
+    finally:
+        service.close()
 
 
 @pytest.mark.transport

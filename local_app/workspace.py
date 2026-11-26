@@ -18,6 +18,7 @@ import zipfile
 
 from PIL import Image
 
+from . import ximalaya
 from .config import UserError
 from .quality import verify_saved_package
 
@@ -66,14 +67,16 @@ def items(engine,runtime,*,q='',kind='',state='',cursor='',limit=20):
                     else 'completed' if summary['last_version'] and not summary['has_changes'] else 'ready')
             type='learning' if params.get('channel')=='学习机' else 'ordinary'
             rows.append(dict(key='task:'+task['id'],id=task['id'],source_type='task',type=type,
-                name=summary['name'],channel=params.get('channel') or '多渠道',image_form=summary['image_form'],
+                name=summary['name'],channel='喜马拉雅' if ximalaya.only(params) else params.get('channel') or '多渠道',
+                image_form='套图' if ximalaya.only(params) else summary['image_form'],
                 status=status,status_label=summary['status'],done=summary['done'],total=summary['total'],
                 updated_at=summary['updated_at'],thumbnail_url=summary['thumbnail_url'],active=summary['active'],
                 _search=summary['name']+json.dumps([r['params'] for r in task['rounds']],ensure_ascii=False)))
         for draft in engine.list_drafts():
             params=draft['draft'];type='learning' if params.get('channel')=='学习机' else 'ordinary'
             rows.append(dict(key='draft:'+draft['id'],id=draft['id'],source_type='draft',type=type,name=draft['name'],
-                channel=params.get('channel') or '待选择渠道',image_form=params.get('image_form','单图'),
+                channel='喜马拉雅' if ximalaya.only(params) else params.get('channel') or '待选择渠道',
+                image_form='套图' if ximalaya.only(params) else params.get('image_form','单图'),
                 status='draft',status_label='草稿',done=0,total=0,updated_at=draft['updated_at'],thumbnail_url=None,active=False,
                 _search=draft['name']+json.dumps(params,ensure_ascii=False)))
         for run in runtime.runs.values():
@@ -82,7 +85,7 @@ def items(engine,runtime,*,q='',kind='',state='',cursor='',limit=20):
             unknown=any(o.get('query_required') for o in [baseline,*run.get('masters',[]),*outputs])
             failed=run.get('status') in ('failed','interrupted') or any(o.get('status') in ('failed','interrupted','blocked') for o in outputs)
             status='running' if run.get('busy') else 'attention' if unknown or failed else 'completed' if outputs and done==len(outputs) else 'ready'
-            label=('制作中' if run.get('busy') else '待恢复查询' if unknown else '需要处理' if failed else '已完成' if status=='completed'
+            label=('制作中' if run.get('busy') else '需要处理' if unknown or failed else '已完成' if status=='completed'
                    else '待生成共用母版' if shared else '待确认基准图' if baseline.get('status')=='done' and not (run.get('approval') or {}).get('confirmed')
                    else '待扩展整套' if (run.get('approval') or {}).get('confirmed') else '待生成基准图')
             image=next((o for o in outputs if o.get('status')=='done'),None)

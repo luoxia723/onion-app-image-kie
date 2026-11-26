@@ -36,8 +36,19 @@ def test_deferred_featured_card_keeps_only_logo_and_rounded_alpha(tmp_path):
         assert image.size==(484,580)
         assert image.getpixel((0,0))[3]==0
         assert image.getpixel((40,70))==(204,221,238,255)
-    assert result['logo']['logo_applied'] and result['corner_radius']==44
+    assert result['logo']['logo_asset_id']=='learning.logo.black' and result['corner_radius']==44
     assert not result['badge_applied'] and not result['feature_label_drawn']
+
+
+def test_dark_rounded_card_uses_white_logo_with_exact_alpha_and_byte_limit(tmp_path):
+    pid='learning-dsl-rounded-card-484x580';logo,mask=frozen(tmp_path,pid)
+    source=tmp_path/'source.png';target=tmp_path/'output.png'
+    Image.new('RGB',(484,580),'#24143e').save(source)
+    result=export_output(source,target,pid,logo,mask_snapshot=mask)
+    assert result['logo']['logo_asset_id']=='learning.logo.white-app'
+    assert result['format']=='PNG' and result['bytes']<100*1024
+    with Image.open(target) as image:
+        assert image.size==(484,580) and image.convert('RGBA').getpixel((0,0))[3]==0
 
 
 def test_rounded_card_has_one_clean_alpha_transition(tmp_path):

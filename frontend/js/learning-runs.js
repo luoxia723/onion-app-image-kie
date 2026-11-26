@@ -89,6 +89,30 @@ async function makeLearningRunFromBaseline(){
  }catch(error){if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error);if(error.status&&error.status<500)delete LEARNING_RUNS.actionKeys[scope]}}
  finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
 }
+function viewLearningKieRecovery(run,kind,row,busy,location='card'){
+ if(kieRecoveryAction(row)==='blocked')return viewMissingKieReceipt();
+ const call=`reconcileLearningKie('${kind}',${learningRunJs(row.id)},${row.version}`;
+ return viewKieReceiptRecovery([run.id,kind,row.id,row.version].join('-'),location,
+  call+',this.elements.task_id.value)',call+')',busy);
+}
+async function reconcileLearningKie(kind,id,version,taskId=null){
+ const run=LEARNING_RUNS.current;
+ if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
+ if(taskId===null&&!confirmKieNotAccepted())return;
+ if(taskId!==null&&!taskId.trim())return toast('请填写 KIE 任务号');
+ const epoch=viewEpoch;LEARNING_RUNS.actionBusy=true;LEARNING_RUNS.error='';render();
+ try{
+  const next=await request(learningRunPath(run.id,'/kie-receipt'),'POST',{
+   action:taskId===null?'confirm_unaccepted':'attach',kind,image_id:id,expected_version:version,idempotency_key:crypto.randomUUID(),
+   ...(taskId===null?{confirmed_unaccepted:true}:{task_id:taskId.trim()})
+  });
+  if(epoch!==viewEpoch||LEARNING_RUNS.current?.id!==run.id)return;
+  installLearningRun(next);
+  if(S.learningImagePreview?.id===id)S.learningImagePreview=null;
+  toast(taskId===null?'已提交重出':'已接回 KIE 任务，后台继续取图');
+ }catch(error){if(epoch===viewEpoch)report(error)}
+ finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
+}
 async function learningRunAction(action,outputId=null){
  if(!['baseline','confirm','expand','regenerate'].includes(action))return;
  const run=LEARNING_RUNS.current;if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
@@ -99,6 +123,7 @@ async function learningRunAction(action,outputId=null){
  if(action==='expand'&&!approved)return toast('请先确认当前基准图');
  if(action==='expand'&&run.suite?.status==='completed'&&run.suite.baseline_version===baseline.version&&learningRunOutputsReady(run))return toast('这一版基准图的整套已经完成，可单独重出某张图片');
  const output=outputId&&(run.outputs||[]).find(x=>x.id===outputId);
+ if(action==='baseline'&&needsKieReceiptReview(baseline)||action==='regenerate'&&needsKieReceiptReview(output))return toast('请先核对这张图的 KIE 回执');
  if(action==='regenerate'&&!output)return;
  if(action==='baseline'&&run.concept)return;
  if(action==='regenerate'&&output.logo_refresh_pending)return toast('本图等待本机Logo更新，请使用“重试Logo更新”，不需要重新生图');
@@ -140,23 +165,52 @@ async function resolveLearningVisual(kind,id,action){
   if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error)}
  }finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
 }
+function learningReadyVersions(run){
+ return Object.fromEntries((run.outputs||[]).filter(row=>row.status==='done'&&row.image_url&&Number.isInteger(row.version)&&row.version>0).map(row=>[row.id,row.version]));
+}
+function learningDeliveryScope(run){return 'learning:'+run.id}
+function setLearningDeliveryReview(checked,id=null,version=null){
+ const run=LEARNING_RUNS.current;
+ if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
+ const versions=learningReadyVersions(run);
+ if(id&&versions[id]!==version)return;
+ updateDeliverySelection(learningDeliveryScope(run),id?{[id]:version}:versions,checked);render();
+}
+function viewLearningDeliveryReview(run,row,active,prefix='learning-review'){
+ const ready=row.status==='done'&&row.image_url&&Number.isInteger(row.version)&&row.version>0;
+ const checked=ready&&deliveryReviewSelection(learningDeliveryScope(run)).get(row.id)===row.version;
+ return viewDeliveryReviewCheckbox(prefix+'-'+encodeURIComponent(row.id),'选中 '+(row.name||'本图')+' '+row.width+'×'+row.height+' 作为交付成品',checked,
+  active&&ready&&!LEARNING_RUNS.actionBusy&&!learningRunBusy(run),
+  `setLearningDeliveryReview(this.checked,${learningRunJs(row.id)},${Number(row.version)||0})`);
+}
+async function switchLearningReviewLogo(id,version,assetId,sha256){
+ const run=LEARNING_RUNS.current;
+ if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run)||S.navigationPending)return;
+ const epoch=viewEpoch;LEARNING_RUNS.actionBusy=true;render();
+ try{
+  const next=await request(learningRunPath(run.id,'/outputs/'+encodeURIComponent(id)+'/review-logo'),'POST',{
+   expected_version:version,expected_sha256:sha256,asset_id:assetId
+  });
+  if(epoch!==viewEpoch||LEARNING_RUNS.current?.id!==run.id)return;
+  installLearningRun(next);
+  if(S.learningImagePreview?.id===id&&S.learningImagePreview.version===version)
+   S.learningImagePreview.url=next.outputs.find(row=>row.id===id)?.image_url||'';
+ }catch(error){if(epoch===viewEpoch)report(error)}
+ finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
+}
 async function packageLearningRun(){
  const run=LEARNING_RUNS.current;if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
  if(!learningRunOutputsReady(run))return toast('请先完成所有版位再保存图包');
+ const reviewed_versions=reviewedDeliveryVersions(learningDeliveryScope(run),learningReadyVersions(run));
+ if(Object.keys(reviewed_versions).length!==run.outputs.length)return toast('请先选中全部成品再导出整套');
  LEARNING_RUNS.actionBusy=true;LEARNING_RUNS.error='';render();const epoch=viewEpoch;
- const logo=learningExportLogoValue(run);
- try{const pkg=await request(learningRunPath(run.id,'/package'),'POST',logo?{logo_asset_id:logo}:{});if(epoch!==viewEpoch||S.learningRunId!==run.id)return;
+ try{const pkg=await request(learningRunPath(run.id,'/package'),'POST',{reviewed_versions});if(epoch!==viewEpoch||S.learningRunId!==run.id)return;
   const next=await request(learningRunPath(run.id));if(epoch!==viewEpoch||S.learningRunId!==run.id)return;
   installLearningRun(next);if(pkg.download_url)downloadLink(pkg.download_url);toast(run.mode==='real'?'图包已保存':'演练图包已保存，内容为模拟图片');
  }catch(error){if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error)}}finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
 }
-function learningExportLogoValue(run=LEARNING_RUNS.current){return run?canonicalLogoVariant(S.learningExportLogoByRun?.[run.id]):''}
 function learningLogoRefreshPending(output){return output.logo_refresh_pending===true&&['failed','interrupted'].includes(output.status)}
 function learningRunLogoOutputsReady(run){const outputs=run.outputs||[],known=outputs.filter(output=>output.logo_refresh_supported!==false&&(output.logo_required===true||learningLogoRefreshPending(output)));return known.length?known.every(output=>output.status==='done'||learningLogoRefreshPending(output)):outputs.some(output=>typeof output.logo_required!=='boolean')&&learningRunOutputsReady(run)}
-function setLearningExportLogo(value){
- const run=LEARNING_RUNS.current,selected=value?canonicalLogoVariant(value):'';if(!run||LEARNING_RUNS.actionBusy||value&&!selected)return;
- S.learningExportLogoByRun=S.learningExportLogoByRun||{};S.learningExportLogoByRun[run.id]=selected;render();
-}
 async function refreshLearningRunLogos(){
  const run=LEARNING_RUNS.current;if(!run||LEARNING_RUNS.actionBusy||learningRunBusy(run))return;
  if(isSharedCanvasRun(run)&&run.target_kind==='ordinary')return;
@@ -169,9 +223,6 @@ async function refreshLearningRunLogos(){
   delete LEARNING_RUNS.actionKeys[scope];installLearningRun(next);S.learningOutputVersions={};S.learningImagePreview=null;toast('正在本机应用已保存的Logo模板，不调用生图模型');
  }catch(error){if(epoch===viewEpoch){LEARNING_RUNS.error=error.message;report(error);if(error.status&&error.status<500)delete LEARNING_RUNS.actionKeys[scope]}}
  finally{LEARNING_RUNS.actionBusy=false;if(epoch===viewEpoch)render()}
-}
-function viewLearningLogoExport(run,busy){
- return `<div class="logo-export-control learning-logo-export"><label for="learning-export-logo">导出Logo<select id="learning-export-logo" ${busy?'disabled':''} onchange="setLearningExportLogo(this.value)">${logoVariantOptions(learningExportLogoValue(run),'按各图配置')}</select></label><small>只作用于本次图包；固定无Logo版位不添加。</small></div>`;
 }
 function learningBackgroundPadding(output){const value=output.processing?.sizing?.padding_percent??output.processing?.padding_percent;return typeof value==='number'&&Number.isFinite(value)&&value>0&&value<=100?value:null}
 function learningBackgroundAIRepaired(output){const processing=output.processing,sizing=processing?.sizing||processing;return sizing?.ai_repair_performed===true||processing?.ai_repair_performed===true||sizing?.method==='ai_background_expansion'||processing?.method==='ai_background_expansion'}
@@ -312,7 +363,14 @@ function learningOutputChannelGroups(outputs,filter=''){
  return [...groups].map(([channel,items])=>({channel,outputs:items}));
 }
 function viewLearningOutputGroups(run,outputs,busy,approved){
- return learningOutputChannelGroups(outputs,S.learningRunChannel||'').map(group=>`<section class="learning-output-channel" data-learning-channel="${esc(group.channel)}"><div class="learning-channel-heading"><h3>${esc(group.channel)}</h3><span>${group.outputs.filter(output=>output.status==='done').length} / ${group.outputs.length} 张完成</span></div><div class="learning-output-grid">${group.outputs.map(output=>viewLearningOutput(run,output,busy,approved)).join('')}</div></section>`).join('');
+ const groups=learningOutputChannelGroups(outputs,S.learningRunChannel||'');
+ return groups.map(group=>{
+  const first=group.outputs[0];
+  const mixed=group.outputs.some(row=>row.width*first.height!==first.width*row.height);
+  return `<section class="learning-output-channel" data-learning-channel="${esc(group.channel)}">
+   <div class="learning-channel-heading"><h3>${esc(group.channel)}</h3><span>${group.outputs.filter(output=>output.status==='done').length} / ${group.outputs.length} 张完成</span></div>
+   <div class="learning-output-grid${mixed?' mixed-review-gallery':''}">${group.outputs.map(output=>viewLearningOutput(run,output,busy,approved)).join('')}</div></section>`;
+ }).join('');
 }
 function setLearningImageDetailVersion(version){
  const preview=S.learningImagePreview,run=LEARNING_RUNS.current;if(!preview||!run)return;
@@ -322,6 +380,22 @@ function setLearningImageDetailVersion(version){
  if(preview.kind==='output'){S.learningOutputVersions=S.learningOutputVersions||{};S.learningOutputVersions[preview.id]=selected.version}
  render();document.getElementById('learning-image-version')?.focus();
 }
+function learningReviewSequence(run,preview){
+ if(preview.kind!=='output'&&preview.kind!=='master')return [];
+ const outputs=preview.kind==='output';
+ const filter=outputs?S.learningRunChannel:'';
+ return ((outputs?run.outputs:run.masters)||[]).filter(row=>
+  (!filter||(row.platform||row.channel)===filter)
+  &&(row.id===preview.id||row.image_url||row.visual_review?.repair_url||row.visual_review?.original_url));
+}
+function stepLearningReview(offset){
+ const run=LEARNING_RUNS.current,preview=S.learningImagePreview;
+ if(!run||!preview)return;
+ const sequence=learningReviewSequence(run,preview),index=sequence.findIndex(row=>row.id===preview.id);
+ const next=index<0?null:sequence[index+offset];
+ if(next)openLearningImage(next.image_url||next.visual_review?.repair_url||next.visual_review?.original_url,
+  next.name||next.group_id,preview.kind,next.id,next.version);
+}
 function viewLearningImageDetails(run){
  const preview=S.learningImagePreview;if(!preview)return '';
  const current=preview.kind==='baseline'?run.baseline:(preview.kind==='master'?run.masters:run.outputs)?.find(row=>row.id===preview.id);
@@ -329,7 +403,14 @@ function viewLearningImageDetails(run){
  const selected=current&&learningPromptVersion(run,preview.kind,preview.id,preview.version);
  const title=selected?[preview.kind==='baseline'?(isSharedCanvasRun(run)?'来源图快照':'基准图'):selected.platform||selected.channel||'',preview.kind==='baseline'?'':selected.name||(preview.kind==='master'?'母版 '+(selected.group_id||preview.id):'成品'),'第'+selected.version+'版'].filter(Boolean).join(' · '):preview.label;
  const imageUrl=selected?(selected.image_url||selected.visual_review?.repair_url||selected.visual_review?.original_url):preview.url;
- return `<div class="mask learning-image-modal" role="dialog" aria-modal="true" aria-label="学习机图片详情" onclick="if(event.target===this)closeLearningImage()"><div class="learning-image-dialog"><div class="learning-image-detail-header"><h3>${esc(title)}</h3><button class="x" id="learning-image-close" aria-label="关闭图片详情" onclick="closeLearningImage()">×</button></div><div class="learning-image-detail-layout"><div class="learning-image-visual">${imageUrl?`<img src="${esc(imageUrl)}" alt="${esc(title)}">${selected?.image_url?`<a href="${esc(imageUrl)}" download>下载这张图片</a>`:''}`:'<div class="learning-run-placeholder">这版图片尚未完成，可查看已保存的提示词。</div>'}</div><section class="learning-image-info" aria-label="图片版本与实际提示词">${versions.length?`<label class="learning-detail-version">图片版本<select id="learning-image-version" onchange="setLearningImageDetailVersion(this.value)">${versions.map(row=>`<option value="${row.version}" ${row.version===preview.version?'selected':''}>第${row.version}版${row.version===current.version?' · 当前':''}</option>`).join('')}</select></label>`:''}${selected?.baseline_version?`<p class="field-help">${isSharedCanvasRun(run)?'来源快照记录：第':'来源：基准图第'}${selected.baseline_version}版</p>`:''}${selected?viewProductionVisual(preview.kind,selected,learningRunBusy(run)||LEARNING_RUNS.actionBusy,selected.version===current.version):''}${selected?viewProductionImageActions(run,preview.kind,current,selected):''}${selected?viewLearningActualPrompt(run,selected,preview.kind,preview.id,true,'detail'):isSharedCanvasRun(run)?'<p class="field-help">这是冻结的来源图快照，未重新生图；原历史提示词请在来源任务中查看。</p>':'<p class="field-help">这张图片未保存可查看的提示词记录。</p>'}${selected&&preview.kind==='output'&&run.mode==='real'&&typeof openMasterCanvasFromLearningOutput==='function'&&!(isSharedCanvasRun(run)&&run.target_kind==='ordinary')?`<button id="master-canvas-learning-output" ${learningRunBusy(run)||selected.version!==current.version||selected.status!=='done'?'disabled':''} onclick="openMasterCanvasFromLearningOutput(${learningRunJs(preview.id)},${selected.version})">制作多尺寸母版</button>`:''}</section></div></div></div>`;
+ const sequence=learningReviewSequence(run,preview),index=sequence.findIndex(row=>row.id===preview.id);
+ const stage=`<div class="learning-image-visual review-stage">
+  <div class="preview-image-tools">${sequence.length>1?`<button aria-label="上一张" title="上一张（←）" ${index>0?'':'disabled'} onclick="stepLearningReview(-1)">←</button><span>${index+1} / ${sequence.length}</span><button aria-label="下一张" title="下一张（→）" ${index+1<sequence.length?'':'disabled'} onclick="stepLearningReview(1)">→</button>`:''}<span class="review-tools-spacer"></span>${imageUrl?reviewZoomButton('learning-review-frame'):''}</div>
+  <div id="learning-review-frame" class="review-image-frame" role="region" aria-label="图片预览，放大后可滚动查看">${imageUrl?`<img src="${esc(imageUrl)}" alt="${esc(title)}">`:'<p>这版图片尚未完成</p>'}</div>
+  <div class="preview-image-facts">${selected?.width&&selected?.height?`<span>${selected.width}×${selected.height}</span>`:''}${selected?.image_url?`<a href="${esc(imageUrl)}" download>下载这张图片</a>`:''}</div>
+ </div>`;
+
+ return `<div class="mask learning-image-modal review-mask" role="dialog" aria-modal="true" aria-label="学习机图片详情" onclick="if(event.target===this)closeLearningImage()"><div class="learning-image-dialog"><div class="learning-image-detail-header"><h3>${esc(title)}</h3><button class="x" id="learning-image-close" aria-label="关闭图片详情" onclick="closeLearningImage()">×</button></div><div class="learning-image-detail-layout">${stage}<section class="learning-image-info" aria-label="图片版本与实际提示词">${versions.length?`<label class="learning-detail-version">图片版本<select id="learning-image-version" onchange="setLearningImageDetailVersion(this.value)">${versions.map(row=>`<option value="${row.version}" ${row.version===preview.version?'selected':''}>第${row.version}版${row.version===current.version?' · 当前':''}</option>`).join('')}</select></label>`:''}${selected&&preview.kind==='output'&&selected.version===current.version?viewLearningDeliveryReview(run,selected,true,'learning-detail-review'):''}${selected?.baseline_version?`<p class="field-help">${isSharedCanvasRun(run)?'来源快照记录：第':'来源：基准图第'}${selected.baseline_version}版</p>`:''}${selected?viewProductionVisual(preview.kind,selected,learningRunBusy(run)||LEARNING_RUNS.actionBusy,selected.version===current.version):''}${selected?viewProductionImageActions(run,preview.kind,current,selected):''}${selected?viewLearningActualPrompt(run,selected,preview.kind,preview.id,true,'detail'):isSharedCanvasRun(run)?'<p class="field-help">这是冻结的来源图快照，未重新生图；原历史提示词请在来源任务中查看。</p>':'<p class="field-help">这张图片未保存可查看的提示词记录。</p>'}${selected&&preview.kind==='output'&&run.mode==='real'&&typeof openMasterCanvasFromLearningOutput==='function'&&!(isSharedCanvasRun(run)&&run.target_kind==='ordinary')?`<button id="master-canvas-learning-output" ${learningRunBusy(run)||selected.version!==current.version||selected.status!=='done'?'disabled':''} onclick="openMasterCanvasFromLearningOutput(${learningRunJs(preview.id)},${selected.version})">制作多尺寸母版</button>`:''}</section></div></div></div>`;
 }
 function viewLearningBaselineSource(run){
  const source=run.baseline_source;if(run.baseline?.inherited!==true||typeof source?.run_id!=='string'||!source.run_id)return '';
@@ -342,6 +423,10 @@ function viewLearningOutput(run,output,busy,approved){return viewProductionOutpu
 document.addEventListener('keydown',event=>{
  if(!S.learningImagePreview||S.masterCanvasDialog)return;
  if(event.key==='Escape'){event.preventDefault();closeLearningImage();return}
+ if(['ArrowLeft','ArrowRight'].includes(event.key)
+    &&!event.target?.closest('input,textarea,select,[contenteditable],.review-image-frame.is-full-size')){
+  event.preventDefault();stepLearningReview(event.key==='ArrowLeft'?-1:1);return;
+ }
  if(event.key==='Tab'){const controls=[...document.querySelectorAll('.learning-image-modal button,.learning-image-modal a[href],.learning-image-modal select,.learning-image-modal summary,.learning-image-modal [tabindex="0"]')].filter(control=>!control.disabled&&(!control.getClientRects||control.getClientRects().length));if(!controls.length)return;
   const first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
  }

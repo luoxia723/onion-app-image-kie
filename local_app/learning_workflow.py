@@ -132,6 +132,9 @@ def bind(r,new_ids=None):
 
 def concept_for(r,entry,indexed):
     key=entry['pid']+'::'+str(entry['set'])
+    if entry['config'].get('ximalaya_variant'):
+        from .ximalaya import placements
+        return indexed.get(placements(r['params'])[0]+'::'+str(entry['set']))
     if 'learning_modules' not in entry['config']:return indexed.get(key)
     s=next(s for s in r['slots'] if s['config_idx']==r['configs'].index(entry) and s['idx']==1)
     if entry['config'].get('learning_uploaded_source'):

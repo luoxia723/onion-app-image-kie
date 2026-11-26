@@ -47,9 +47,29 @@ function setup(){
  }
  return{ctx,run,calls,nodes,key,html:()=>run('viewPv()')};
 }
+test('喜马拉雅待复审首图通过缩略图打开当前版本，处理入口留在工作台',async()=>{
+ const {run,html,calls}=setup();
+ run(`S.pv=null;S.pvDetails=null;R().params.ximalaya_suite=true;plOf('xm').platform='喜马拉雅';
+      Object.assign(R().slots.find(s=>s.id==='first'),{image_url:null,original_image_url:null,
+       state:'failed',delivery_eligible:false,review_image_url:'/review.png?v=2',
+       ximalaya_review:{status:'unavailable',message:'视觉审核暂未返回'}});
+      const read=request;request=async(...args)=>{const details=await read(...args);delete details.review_image_url;return details};`);
+ const trigger=run('viewXimalayaImage(R(), R().slots.find(s=>s.id==="first"), R().slots.find(s=>s.id==="first"))')
+  .match(/<button[^>]*class="ximalaya-image-preview"[^>]*onclick="([^"]+)"/);
+ assert(trigger,'缩略图应在本页打开图片详情');
+ await run(trigger[1]);
+ assert.equal(calls.length,1);assert.match(calls[0].url,/\/image-details\/first\?/);assert.equal(calls[0].method,undefined);
+ assert.match(html(),/id="pvImg"[^>]*src="\/review\.png\?v=2"/);
+ assert.match(html(),/视觉审核暂未返回/);
+ assert.match(html(),/重试审核/);
+ assert.doesNotMatch(html(),/id="pvredo"|下载这张图片|选这一套/);
+ run('S.pvDetails.att=1;S.pvDetails.is_historical=true');
+ assert.doesNotMatch(html(),/id="pvImg"[^>]*\/review\.png|重试审核/);
+});
+
 test('新图层图片旁显示固定无Logo规则但不改写提示词，旧图片编辑保持原状',()=>{
  const {run}=setup();run('S.pvDetails.logo_fixed_rule="固定：不绘Logo <品牌>";S.pvDetails.prompt="用户逐字编辑的原文\\n第二行"');
- let html=run('viewPv()');assert(html.includes('Logo固定规则'));assert(html.includes('固定：不绘Logo &lt;品牌&gt;'));assert(html.includes('导出时选择'));
+ let html=run('viewPv()');assert(html.includes('Logo固定规则'));assert(html.includes('固定：不绘Logo &lt;品牌&gt;'));assert(html.includes('验收时可切换'));
  const text=html.match(/<textarea[^>]*id="pvPrompt"[^>]*>([\s\S]*?)<\/textarea>/)[1];assert.equal(text,'用户逐字编辑的原文\n第二行');assert(!text.includes('固定：'));
  run('delete S.pvDetails.logo_fixed_rule');html=run('viewPv()');assert(!html.includes('class="fixed-logo-rule"'));assert(html.includes('用户逐字编辑的原文'));
 });
@@ -155,7 +175,7 @@ test('固定功能导航不混放任务列表或全局模拟标签，模式属�
  const {run}=setup();run('S.tasks=[];S.pv=null');
  const markup=run('viewSide()');
  for(const label of ['制作任务','Logo模板','交付记录','模型与设置','数据维护'])assert(markup.includes(label));
- assert(!markup.includes('draft-list'));assert(!markup.includes('模拟预览'));assert(markup.includes('LOCAL'));
+ assert(!markup.includes('draft-list'));assert(!markup.includes('模拟预览'));
  run('CFG.simulation=false');assert.equal(run('viewSide()'),markup);
 });
 
